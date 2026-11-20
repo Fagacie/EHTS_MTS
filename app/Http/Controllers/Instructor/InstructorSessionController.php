@@ -11,18 +11,21 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessVideoToHlsJob;
 use App\Models\Attendance;
 use App\Models\AuditLog;
+use App\Models\Booking;
 use App\Models\SessionRecording;
 use App\Models\TrainingSession;
 use App\Models\User;
+use App\Support\InstructorPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class InstructorSessionController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $user = $request->user();
         $statusFilter = trim((string) $request->query('status', ''));
@@ -39,13 +42,17 @@ class InstructorSessionController extends Controller
             $sessionsQuery->where('training_sessions.status', $statusFilter);
         }
 
-        return view('instructor.sessions.index', [
-            'sessions' => $sessionsQuery->get(),
+        $sessions = $sessionsQuery->get();
+
+        return Inertia::render('Instructor/Sessions/Index', [
+            'sessions' => $sessions->map(
+                static fn (TrainingSession $session): array => InstructorPresenter::sessionCard($session, $user),
+            )->values()->all(),
             'statusFilter' => $statusFilter,
         ]);
     }
 
-    public function show(Request $request, TrainingSession $session): View
+    public function show(Request $request, TrainingSession $session): InertiaResponse
     {
         $this->ensureAssigned($request->user(), $session);
         $this->syncConfirmedRosterAttendance($session);
@@ -58,24 +65,27 @@ class InstructorSessionController extends Controller
             'recordings',
         ]);
 
-        return view('instructor.sessions.show', [
-            'session' => $session,
+        return Inertia::render('Instructor/Sessions/Show', [
+            'session' => InstructorPresenter::sessionCard($session, $request->user()),
+            'roster' => $session->confirmedBookings->map(
+                static fn (Booking $booking): array => InstructorPresenter::rosterParticipant($booking),
+            )->values()->all(),
         ]);
     }
 
-    public function attendance(Request $request, TrainingSession $session): View
+    public function attendance(Request $request, TrainingSession $session): InertiaResponse
     {
         $this->ensureAssigned($request->user(), $session);
         $this->syncConfirmedRosterAttendance($session);
 
         $session->load([
-            'module',
-            'confirmedBookings.user',
+            'module.category',
+            'confirmedBookings.user.customerProfile',
             'confirmedBookings.attendance',
         ]);
 
         $attendances = Attendance::query()
-            ->with(['user', 'booking'])
+            ->with(['user.customerProfile', 'booking'])
             ->where('training_session_id', $session->id)
             ->orderBy('id')
             ->get();
@@ -86,11 +96,15 @@ class InstructorSessionController extends Controller
         $isLockedVerified = $attendances->isNotEmpty()
             && $attendances->every(fn (Attendance $a) => $a->review_status === AttendanceReviewStatus::Verified);
 
-        return view('instructor.sessions.attendance', [
-            'session' => $session,
-            'attendances' => $attendances,
+        return Inertia::render('Instructor/Sessions/Attendance', [
+            'session' => InstructorPresenter::sessionCard($session, $request->user()),
+            'attendances' => $attendances->map(
+                static fn (Attendance $attendance): array => InstructorPresenter::attendanceRecord($attendance),
+            )->values()->all(),
             'allMarked' => $allMarked,
             'isLockedVerified' => $isLockedVerified,
+            'updateAttendanceUrl' => route('instructor.sessions.attendance.update', $session),
+            'submitAttendanceUrl' => route('instructor.sessions.attendance.submit', $session),
         ]);
     }
 
@@ -213,13 +227,15 @@ class InstructorSessionController extends Controller
             ->with('status', 'Session attendance submitted for administrator verification.');
     }
 
-    public function completion(Request $request, TrainingSession $session): View
+    public function completion(Request $request, TrainingSession $session): InertiaResponse
     {
         $this->ensureAssigned($request->user(), $session);
-        $session->load('module');
+        $session->load('module.category');
 
-        return view('instructor.sessions.completion', [
-            'session' => $session,
+        return Inertia::render('Instructor/Sessions/Completion', [
+            'session' => InstructorPresenter::sessionCard($session, $request->user()),
+            'completionNotes' => $session->completion_notes,
+            'submitUrl' => route('instructor.sessions.completion.store', $session),
         ]);
     }
 
@@ -258,13 +274,17 @@ class InstructorSessionController extends Controller
             ->with('status', 'Session completion report saved and submitted.');
     }
 
-    public function recordings(Request $request, TrainingSession $session): View
+    public function recordings(Request $request, TrainingSession $session): InertiaResponse
     {
         $this->ensureAssigned($request->user(), $session);
-        $session->load(['module', 'recordings']);
+        $session->load(['module.category', 'recordings']);
 
-        return view('instructor.sessions.recordings', [
-            'session' => $session,
+        return Inertia::render('Instructor/Sessions/Recordings', [
+            'session' => InstructorPresenter::sessionCard($session, $request->user()),
+            'recordings' => $session->recordings->map(
+                static fn (SessionRecording $recording): array => InstructorPresenter::recordingItem($recording),
+            )->values()->all(),
+            'submitUrl' => route('instructor.sessions.recordings.store', $session),
         ]);
     }
 

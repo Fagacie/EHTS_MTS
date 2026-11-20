@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
+use Inertia\Testing\AssertableInertia as Assert;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
@@ -32,10 +33,20 @@ class Stage3FoundationTest extends TestCase
     {
         $response = $this->get(route('home'));
 
-        $response->assertOk();
-        $response->assertSee('Ecohydrotech');
-        $response->assertSee('Physical Training Sessions');
-        $response->assertSee('Independent Module Purchases');
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Home')
+                ->where('app.brandName', 'Ecohydrotech Solution')
+                ->where('auth.user', null)
+                ->where('routes.catalogue', route('catalogue.index'))
+                ->where('routes.sessions', route('sessions.index'))
+                ->where('routes.instructors', route('instructors.index'))
+                ->where('routes.login', route('login'))
+                ->where('routes.register', route('register'))
+                ->has('stats.reservationHoldMinutes')
+                ->has('assets.heroPhotoUrl')
+                ->has('assets.classroomPhotoUrl'),
+            );
     }
 
     public function test_customer_registration_assigns_customer_role_writes_audit_log_and_requires_verification(): void

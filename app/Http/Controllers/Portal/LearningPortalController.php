@@ -17,16 +17,18 @@ use App\Models\ModuleEntitlement;
 use App\Models\ModuleVideo;
 use App\Models\SessionRecording;
 use App\Services\Media\SelfHostedVideoService;
+use App\Support\PortalPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class LearningPortalController extends Controller
 {
-    public function modules(Request $request): View
+    public function modules(Request $request): InertiaResponse
     {
         $user = $request->user();
 
@@ -41,10 +43,20 @@ class LearningPortalController extends Controller
             ->orderByDesc('granted_at')
             ->get();
 
-        $activeEntitlements = $entitlements->where('status', EntitlementStatus::Active);
-        $revokedEntitlements = $entitlements->where('status', EntitlementStatus::Revoked);
+        $activeEntitlements = $entitlements
+            ->where('status', EntitlementStatus::Active)
+            ->map(static fn (ModuleEntitlement $entitlement): ?array => PortalPresenter::activeModuleEntitlement($entitlement))
+            ->filter()
+            ->values()
+            ->all();
 
-        return view('portal.modules.index', [
+        $revokedEntitlements = $entitlements
+            ->where('status', EntitlementStatus::Revoked)
+            ->map(static fn (ModuleEntitlement $entitlement): array => PortalPresenter::revokedModuleEntitlement($entitlement))
+            ->values()
+            ->all();
+
+        return Inertia::render('Portal/Modules/Index', [
             'activeEntitlements' => $activeEntitlements,
             'revokedEntitlements' => $revokedEntitlements,
         ]);
@@ -54,7 +66,7 @@ class LearningPortalController extends Controller
         Request $request,
         Module $module,
         SelfHostedVideoService $videoService,
-    ): View {
+    ): InertiaResponse {
         $user = $request->user();
         $module->loadMissing(['category', 'publishedMaterials', 'publishedVideos']);
 
@@ -67,7 +79,7 @@ class LearningPortalController extends Controller
         abort_unless(
             $isAuthorized,
             403,
-            'Access denied: An active lifetime module entitlement is required to open this module learning workspace (D-018).',
+            'Access denied: An active lifetime module entitlement is required to open this module learning workspace.',
         );
 
         $readyVideos = $module->publishedVideos
@@ -90,12 +102,10 @@ class LearningPortalController extends Controller
             ->where('status', EntitlementStatus::Active->value)
             ->first();
 
-        return view('portal.modules.show', [
-            'module' => $module,
-            'entitlement' => $entitlement,
-            'activeVideo' => $activeVideo,
-            'streamManifestUrl' => $streamManifestUrl,
-        ]);
+        return Inertia::render(
+            'Portal/Modules/Show',
+            PortalPresenter::moduleWorkspaceData($module, $entitlement, $activeVideo, $streamManifestUrl),
+        );
     }
 
     public function watchModuleVideo(
@@ -103,7 +113,7 @@ class LearningPortalController extends Controller
         Module $module,
         ModuleVideo $video,
         SelfHostedVideoService $videoService,
-    ): View {
+    ): InertiaResponse {
         if ($request->has('signature') || $request->has('expires')) {
             abort_unless(
                 $request->hasValidSignature(),
@@ -144,12 +154,10 @@ class LearningPortalController extends Controller
             ->where('status', EntitlementStatus::Active->value)
             ->first();
 
-        return view('portal.modules.show', [
-            'module' => $module,
-            'entitlement' => $entitlement,
-            'activeVideo' => $video,
-            'streamManifestUrl' => $streamManifestUrl,
-        ]);
+        return Inertia::render(
+            'Portal/Modules/Show',
+            PortalPresenter::moduleWorkspaceData($module, $entitlement, $video, $streamManifestUrl),
+        );
     }
 
     public function streamModuleVideoAsset(
@@ -212,7 +220,7 @@ class LearningPortalController extends Controller
         return $videoService->streamProtectedFile($request, $disk, $storageKey, $contentType);
     }
 
-    public function recordings(Request $request): View
+    public function recordings(Request $request): InertiaResponse
     {
         $user = $request->user();
 
@@ -226,6 +234,7 @@ class LearningPortalController extends Controller
                 'attendance',
             ])
             ->where('user_id', $user->id)
+            ->where('status', BookingStatus::Confirmed->value)
             ->orderByDesc('created_at')
             ->get();
 
@@ -252,17 +261,17 @@ class LearningPortalController extends Controller
                 $isEligible = true;
             }
 
-            return [
+            return PortalPresenter::recordingBookingGroup([
                 'booking' => $booking,
                 'session' => $session,
                 'attendance' => $attendance,
                 'recordings' => $session?->recordings ?? collect(),
                 'isEligible' => $isEligible,
                 'denialReason' => $denialReason,
-            ];
-        });
+            ]);
+        })->values()->all();
 
-        return view('portal.recordings.index', [
+        return Inertia::render('Portal/Recordings/Index', [
             'bookingItems' => $bookingItems,
         ]);
     }
@@ -271,7 +280,7 @@ class LearningPortalController extends Controller
         Request $request,
         SessionRecording $recording,
         SelfHostedVideoService $videoService,
-    ): View {
+    ): InertiaResponse {
         if ($request->has('signature') || $request->has('expires')) {
             abort_unless(
                 $request->hasValidSignature(),
@@ -303,11 +312,10 @@ class LearningPortalController extends Controller
             actor: $request->user(),
         );
 
-        return view('portal.recordings.watch', [
-            'recording' => $recording,
-            'session' => $recording->trainingSession,
-            'streamManifestUrl' => $streamManifestUrl,
-        ]);
+        return Inertia::render(
+            'Portal/Recordings/Watch',
+            PortalPresenter::recordingWatchData($recording, $recording->trainingSession, $streamManifestUrl),
+        );
     }
 
     public function streamRecordingAsset(

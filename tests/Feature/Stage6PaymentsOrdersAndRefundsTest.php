@@ -33,6 +33,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class Stage6PaymentsOrdersAndRefundsTest extends TestCase
@@ -125,7 +126,12 @@ class Stage6PaymentsOrdersAndRefundsTest extends TestCase
                 'billplz' => ['id' => 'bpz_ses001_paid', 'paid' => 'true'],
             ]))
             ->assertOk()
-            ->assertSee('Awaiting Server-Side Payment Confirmation');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Checkout/Return')
+                ->where('order.orderNumber', $order->order_number)
+                ->where('order.isPendingPayment', true)
+                ->where('redirectReportedPaid', true),
+            );
 
         $this->assertSame(OrderStatus::PendingPayment, $order->fresh()->status);
         $this->assertSame(BookingStatus::PendingPayment, $booking->fresh()->status);

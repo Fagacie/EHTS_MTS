@@ -73,6 +73,17 @@ The following technical design decisions were added during the Stage 1 database 
 |---|---|---|
 | D-036 | Containerisation architecture | Use Docker and Docker Compose v2 for a consistent development and production deployment environment encapsulating the Laravel 13 / PHP 8.3+-FPM runtime (`app`), Nginx (`nginx`), MySQL 8.4 (`mysql`), Redis (`redis`), queue worker (`queue`), and scheduler (`scheduler`) containers with persistent volumes for database data, Redis persistence, and required application storage. External services (Billplz, Bunny Stream, Cloudflare R2, and transactional email) remain external managed integrations. |
 
+## Frontend Modernisation Architecture Decisions — 19 November 2026 (v1.2)
+
+The following decisions record the approved controlled frontend modernisation strategy documented in [ETMS SRS & System Architecture v1.2](ETMS-SRS-and-System-Architecture-v1.2.md) without altering the underlying v1.1 business rules (`D-001`–`D-035`) or container topology (`D-036`).
+
+| ID | Decision | Approved position & rationale |
+|---|---|---|
+| D-037 | Incremental frontend modernisation to Vue 3 + TypeScript + Inertia.js + shadcn-vue | Incrementally supersede `D-011` (Blade + Livewire) across Public, Authentication, Trainee Portal, and Instructor Portal views using Vue 3, TypeScript, Inertia.js (`@inertiajs/vue3` + `inertiajs/inertia-laravel`), and customised `shadcn-vue` (`reka-ui`) inside the existing Laravel 13 modular monolith (`D-009`). Do not introduce a separate frontend repository, separate Node.js runtime server, or client-side rewrites of backend validation, pricing, booking, payment, or entitlement rules. |
+| D-038 | Filament 5 Admin Panel remains permanently separate | Preserve Filament 5 at `/admin` permanently (`D-012`). All 17 administrative resources, relation managers, bulk actions, charts, `ReportsPage`, and TOTP MFA gates remain server-rendered via Filament/Livewire without Vue duplication. |
+| D-039 | Dual-runtime Blade/Livewire + Vue/Inertia coexistence | Operate migrated Inertia routes (`resources/views/app.blade.php` + `resources/js/inertia.ts`) alongside unmigrated Blade/Livewire routes (`resources/js/app.js` untouched with `vendor-hls` isolated by Vite 8) under shared Laravel sessions, CSRF protection, and `resources/css/app.css` Tailwind CSS 4 tokens. Cross-boundary links between Inertia and Blade/Livewire/Filament use native HTML `<a href>` transitions; route URLs are shared explicitly via `HandleInertiaRequests` without adding extra routing packages. |
+| D-040 | Minimal backend dependency scope (`inertiajs/inertia-laravel` only) | Install only `inertiajs/inertia-laravel` (`^3.0`) on Composer as the strict requirement for Laravel 13 Inertia responses, middleware, and `AssertableInertia` tests. Avoid unsolicited packages (`laravel/boost`, `tightenco/ziggy`, etc.). |
+
 ## Remaining clarifications
 
 The following matters are not fully resolved by the confirmed decisions and must be settled before the relevant implementation work.

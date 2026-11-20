@@ -25,6 +25,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class Stage5SessionsInstructorsAndBookingsTest extends TestCase
@@ -86,12 +87,15 @@ class Stage5SessionsInstructorsAndBookingsTest extends TestCase
         // Session detail page shows venue, price, capacity and assigned instructors
         $this->get(route('sessions.show', $session))
             ->assertOk()
-            ->assertSee('SES-2026-001')
-            ->assertSee('Ecohydrotech Training Centre, Hall A')
-            ->assertSee('RM 890.00')
-            ->assertSee('25 / 25 seats open')
-            ->assertSee('Ir. Siti Norzahra, P.Eng')
-            ->assertSee('Dr. Amirul Hakim');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Sessions/Show')
+                ->where('session.sessionCode', 'SES-2026-001')
+                ->where('session.venueName', 'Ecohydrotech Training Centre, Hall A')
+                ->where('session.priceLabel', 'RM 890.00')
+                ->where('session.seatsOpenLabel', '25 / 25 seats open')
+                ->where('session.instructors.0.displayName', 'Ir. Siti Norzahra, P.Eng')
+                ->where('session.instructors.1.displayName', 'Dr. Amirul Hakim'),
+            );
 
         // Module detail page shows upcoming physical sessions for that module
         $this->get(route('catalogue.modules.show', $session->module))

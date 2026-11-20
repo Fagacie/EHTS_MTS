@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Instructor;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\InstructorProfile;
+use App\Support\InstructorPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class InstructorProfileController extends Controller
 {
-    public function edit(Request $request): View
+    public function edit(Request $request): InertiaResponse
     {
         $user = $request->user();
         $profile = InstructorProfile::query()->firstOrCreate(
@@ -23,10 +25,10 @@ class InstructorProfileController extends Controller
             ],
         );
 
-        return view('instructor.profile', [
-            'user' => $user,
-            'profile' => $profile,
-        ]);
+        return Inertia::render(
+            'Instructor/Profile',
+            InstructorPresenter::profileData($user, $profile),
+        );
     }
 
     public function update(Request $request): RedirectResponse

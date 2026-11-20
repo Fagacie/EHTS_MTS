@@ -13,13 +13,17 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class PasswordResetController extends Controller
 {
-    public function createLink(): View
+    public function createLink(): InertiaResponse
     {
-        return view('auth.forgot-password');
+        return Inertia::render('Auth/ForgotPassword', [
+            'submitUrl' => route('password.email'),
+            'loginUrl' => route('login'),
+        ]);
     }
 
     public function storeLink(Request $request): RedirectResponse
@@ -35,11 +39,12 @@ class PasswordResetController extends Controller
             : back()->withInput($request->only('email'))->withErrors(['email' => __($status)]);
     }
 
-    public function createReset(Request $request, string $token): View
+    public function createReset(Request $request, string $token): InertiaResponse
     {
-        return view('auth.reset-password', [
+        return Inertia::render('Auth/ResetPassword', [
             'token' => $token,
-            'email' => $request->query('email', ''),
+            'email' => (string) $request->query('email', ''),
+            'submitUrl' => route('password.update'),
         ]);
     }
 

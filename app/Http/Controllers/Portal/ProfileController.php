@@ -7,15 +7,17 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CustomerProfile;
 use App\Models\User;
+use App\Support\PortalPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class ProfileController extends Controller
 {
-    public function edit(Request $request): View
+    public function edit(Request $request): InertiaResponse
     {
         /** @var User $user */
         $user = $request->user()->load(['roles', 'customerProfile']);
@@ -26,10 +28,7 @@ class ProfileController extends Controller
             'billing_country' => 'MY',
         ]);
 
-        return view('portal.profile', [
-            'user' => $user,
-            'profile' => $profile,
-        ]);
+        return Inertia::render('Portal/Profile', PortalPresenter::profileData($user, $profile));
     }
 
     public function update(Request $request): RedirectResponse

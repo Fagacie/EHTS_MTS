@@ -7,16 +7,22 @@ use App\Http\Controllers\Controller;
 use App\Models\TrainingSession;
 use App\Services\Booking\SessionBookingService;
 use App\Services\Payment\PaymentOrchestrationService;
+use App\Support\PortalPresenter;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class SessionCheckoutController extends Controller
 {
-    public function show(Request $request, TrainingSession $session, SessionBookingService $bookingService): View|RedirectResponse
-    {
+    public function show(
+        Request $request,
+        TrainingSession $session,
+        SessionBookingService $bookingService,
+    ): InertiaResponse|RedirectResponse {
         $session = $bookingService->reconcileSessionCounters($session->id);
         $session->load(['module.category', 'instructors.instructorProfile']);
 
@@ -36,12 +42,12 @@ class SessionCheckoutController extends Controller
                 ->with('status', 'You already hold a confirmed seat for this training session.');
         }
 
-        return view('portal.checkout-session', [
-            'session' => $session,
-            'user' => $user,
-            'profile' => $user->customerProfile,
-            'existingHold' => ($existingBooking && $existingBooking->isHoldActive()) ? $existingBooking : null,
-        ]);
+        $existingHold = ($existingBooking && $existingBooking->isHoldActive()) ? $existingBooking : null;
+
+        return Inertia::render(
+            'Checkout/Session',
+            PortalPresenter::checkoutSessionData($session, $user, $user->customerProfile, $existingHold),
+        );
     }
 
     public function store(
@@ -49,7 +55,7 @@ class SessionCheckoutController extends Controller
         TrainingSession $session,
         SessionBookingService $bookingService,
         PaymentOrchestrationService $paymentService,
-    ): RedirectResponse {
+    ): RedirectResponse|SymfonyResponse {
         $validated = $request->validate([
             'customer_type' => ['required', 'in:individual,company,company_sponsored'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -83,6 +89,10 @@ class SessionCheckoutController extends Controller
         }
 
         if ($request->boolean('redirect_gateway') && ! blank($payment->gateway_payment_url)) {
+            if ($request->header('X-Inertia')) {
+                return Inertia::location($payment->gateway_payment_url);
+            }
+
             return redirect()->away($payment->gateway_payment_url);
         }
 

@@ -6,12 +6,15 @@ use App\Enums\BookingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\Booking\SessionBookingService;
+use App\Support\PortalPresenter;
+use App\Support\PublicCataloguePresenter;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class BookingController extends Controller
 {
-    public function index(Request $request, SessionBookingService $bookingService): View
+    public function index(Request $request, SessionBookingService $bookingService): InertiaResponse
     {
         $user = $request->user();
 
@@ -37,14 +40,26 @@ class BookingController extends Controller
             $bookingsQuery->where('status', $statusFilter);
         }
 
-        return view('portal.bookings.index', [
-            'bookings' => $bookingsQuery->paginate(10)->withQueryString(),
+        $paginator = $bookingsQuery->paginate(10)->withQueryString();
+
+        return Inertia::render('Portal/Bookings/Index', [
+            'bookings' => $paginator->getCollection()
+                ->map(static fn (Booking $booking): array => PortalPresenter::bookingListItem($booking))
+                ->values()
+                ->all(),
+            'pagination' => PublicCataloguePresenter::paginationMeta($paginator),
             'statusFilter' => $statusFilter,
-            'statuses' => BookingStatus::cases(),
+            'statuses' => array_map(
+                static fn (BookingStatus $status): array => [
+                    'value' => $status->value,
+                    'label' => $status->label(),
+                ],
+                BookingStatus::cases(),
+            ),
         ]);
     }
 
-    public function show(Request $request, Booking $booking, SessionBookingService $bookingService): View
+    public function show(Request $request, Booking $booking, SessionBookingService $bookingService): InertiaResponse
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
 
@@ -60,8 +75,11 @@ class BookingController extends Controller
             'attendance',
         ]);
 
-        return view('portal.bookings.show', [
-            'booking' => $booking,
+        $hasModuleEntitlement = $booking->trainingSession?->module_id !== null
+            && $request->user()->hasActiveModuleEntitlement((int) $booking->trainingSession->module_id);
+
+        return Inertia::render('Portal/Bookings/Show', [
+            'booking' => PortalPresenter::bookingDetail($booking, $hasModuleEntitlement),
         ]);
     }
 }

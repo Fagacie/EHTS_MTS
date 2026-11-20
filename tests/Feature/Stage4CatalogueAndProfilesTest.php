@@ -18,6 +18,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class Stage4CatalogueAndProfilesTest extends TestCase
@@ -136,10 +137,14 @@ class Stage4CatalogueAndProfilesTest extends TestCase
 
         $this->get(route('catalogue.modules.show', $published->slug))
             ->assertOk()
-            ->assertSee('EHT-HYD-101')
-            ->assertSee('RM 680.00')
-            ->assertSee('MSMA 2nd Edition Design Calculation Workbook')
-            ->assertSee('Requires Module Entitlement')
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Catalogue/Show')
+                ->where('module.code', 'EHT-HYD-101')
+                ->where('module.independentPriceLabel', 'RM 680.00')
+                ->where('materials.0.title', 'MSMA 2nd Edition Design Calculation Workbook')
+                ->where('materials.0.canDownload', false)
+                ->where('materials.0.downloadUrl', null),
+            )
             ->assertDontSee('modules/materials/eht-hyd-101-msma-workbook.pdf');
 
         // Draft module must return 404

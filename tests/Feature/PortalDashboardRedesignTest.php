@@ -24,6 +24,7 @@ use Database\Seeders\RoleAndPermissionSeeder;
 use Database\Seeders\SessionAndBookingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PortalDashboardRedesignTest extends TestCase
@@ -50,28 +51,27 @@ class PortalDashboardRedesignTest extends TestCase
         $certificate = Certificate::query()->where('user_id', $trainee->id)->firstOrFail();
 
         // Seeded state: 0 active modules, 1 upcoming confirmed booking (SES-2026-003), 0 completed sessions, 1 certificate
-        $response = $this->actingAs($trainee)
+        $this->actingAs($trainee)
             ->get(route('portal.dashboard'))
-            ->assertOk();
-
-        $response
-            ->assertSee("Welcome back, {$trainee->name}")
-            ->assertSee('Active Learning Modules')
-            ->assertSee('Upcoming Confirmed Bookings')
-            ->assertSee('Completed Training Sessions')
-            ->assertSee('Certificates Earned')
-            ->assertSee('Upcoming Training')
-            ->assertSee('Constructed Wetland & Bio-Retention Field Engineering Clinic')
-            ->assertSee('Putrajaya Wetland Engineering Resource Hall')
-            ->assertSee('BKG-2026-DEMO01')
-            ->assertSee('View Booking')
-            ->assertSee('My Certificates')
-            ->assertSee($certificate->certificate_number)
-            ->assertSee($certificate->training_title_snapshot)
-            ->assertSee('Recent Activity')
-            ->assertSee('ORD-2026-DEMO01')
-            ->assertSee('RM 780.00')
-            ->assertSee('Browse Training')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->where('portalMeta.userName', $trainee->name)
+                ->where('portalMeta.continueLearningUrl', null)
+                ->where('stats.activeModulesCount', 0)
+                ->where('stats.upcomingBookingsCount', 1)
+                ->where('stats.completedSessionsCount', 0)
+                ->where('stats.certificatesCount', 1)
+                ->has('upcomingBookings', 1)
+                ->where('upcomingBookings.0.bookingReference', 'BKG-2026-DEMO01')
+                ->where('upcomingBookings.0.sessionTitle', 'Constructed Wetland & Bio-Retention Field Engineering Clinic')
+                ->where('upcomingBookings.0.venueName', 'Putrajaya Wetland Engineering Resource Hall')
+                ->has('certificates', 1)
+                ->where('certificates.0.certificateNumber', $certificate->certificate_number)
+                ->where('certificates.0.title', $certificate->training_title_snapshot)
+                ->has('recentActivity', 2)
+                ->where('recentActivity.0.amountLabel', 'RM 780.00'),
+            )
             ->assertDontSee('Continue Learning')
             ->assertDontSee('D-001')
             ->assertDontSee('D-006')
@@ -223,27 +223,23 @@ class PortalDashboardRedesignTest extends TestCase
             'reservation_expires_at' => now()->addMinutes(13),
         ]);
 
-        $updatedResponse = $this->actingAs($trainee)
+        $this->actingAs($trainee)
             ->get(route('portal.dashboard'))
-            ->assertOk();
-
-        $updatedResponse
-            ->assertSee('Continue Learning')
-            ->assertSee(route('portal.modules.show', $module), false)
-            ->assertSee('1 active module')
-            ->assertSee('1 upcoming session')
-            ->assertSee('1 completed session')
-            ->assertSee('1 certificate earned')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->where('portalMeta.continueLearningUrl', route('portal.modules.show', $module))
+                ->where('stats.activeModulesCount', 1)
+                ->where('stats.upcomingBookingsCount', 1)
+                ->where('stats.completedSessionsCount', 1)
+                ->where('stats.certificatesCount', 1)
+                ->where('stats.summaryLine', '1 active module · 1 upcoming session · 1 completed session · 1 certificate earned')
+                ->where('activeHoldBooking.bookingReference', 'BKG-2026-HOLD1')
+                ->has('upcomingBookings', 1)
+                ->where('upcomingBookings.0.bookingReference', 'BKG-2026-DEMO01'),
+            )
             ->assertSee('ORD-2026-MOD01')
-            ->assertSee('RM 320.00')
-            ->assertSee('Pending Seat Reservation (BKG-2026-HOLD1)');
-
-        // Completed session must not appear under Upcoming Training card
-        $html = $updatedResponse->getContent();
-        preg_match('/Upcoming Training(.*?)Recent Activity/s', $html, $upcomingSection);
-        $this->assertNotEmpty($upcomingSection[1] ?? '');
-        $this->assertStringContainsString('BKG-2026-DEMO01', $upcomingSection[1]);
-        $this->assertStringNotContainsString('Completed Drainage Cohort — Archive', $upcomingSection[1]);
+            ->assertSee('RM 320.00');
     }
 
     public function test_new_trainee_without_records_sees_clean_zero_kpis_and_empty_states(): void
@@ -254,17 +250,22 @@ class PortalDashboardRedesignTest extends TestCase
         ]);
         $newTrainee->assignRole(RoleSlug::Customer);
 
-        $response = $this->actingAs($newTrainee)
+        $this->actingAs($newTrainee)
             ->get(route('portal.dashboard'))
-            ->assertOk();
-
-        $response
-            ->assertSee('Welcome back, Aiman Hakim')
-            ->assertSee('No upcoming training sessions')
-            ->assertSee('No certificates issued yet')
-            ->assertSee('No recent activity')
-            ->assertSee('Browse Training')
-            ->assertDontSee('Continue Learning');
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->where('portalMeta.userName', 'Aiman Hakim')
+                ->where('portalMeta.continueLearningUrl', null)
+                ->where('stats.activeModulesCount', 0)
+                ->where('stats.upcomingBookingsCount', 0)
+                ->where('stats.completedSessionsCount', 0)
+                ->where('stats.certificatesCount', 0)
+                ->has('upcomingBookings', 0)
+                ->has('certificates', 0)
+                ->has('recentActivity', 0)
+                ->where('activeHoldBooking', null),
+            );
 
         // Single-role instructor remains blocked from trainee dashboard
         $instructor = User::query()->where('email', 'instructor@ecohydrotech.com.my')->firstOrFail();

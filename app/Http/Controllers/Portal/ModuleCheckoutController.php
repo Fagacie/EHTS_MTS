@@ -7,17 +7,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Module;
 use App\Models\ModuleEntitlement;
 use App\Services\Payment\PaymentOrchestrationService;
+use App\Support\PortalPresenter;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class ModuleCheckoutController extends Controller
 {
-    public function show(Request $request, Module $module): View|RedirectResponse
+    public function show(Request $request, Module $module): InertiaResponse|RedirectResponse
     {
-        $module->loadMissing(['category', 'publishedMaterials']);
+        $module->loadMissing(['category', 'publishedMaterials', 'publishedVideos']);
 
         abort_unless(
             $module->isPublished() && $module->category?->is_active && $module->is_available_independently && $module->independent_price !== null,
@@ -38,18 +41,17 @@ class ModuleCheckoutController extends Controller
                 ->with('status', 'You already hold an active lifetime entitlement for this module.');
         }
 
-        return view('portal.checkout-module', [
-            'module' => $module,
-            'user' => $user,
-            'profile' => $user->customerProfile,
-        ]);
+        return Inertia::render(
+            'Checkout/Module',
+            PortalPresenter::checkoutModuleData($module, $user, $user->customerProfile),
+        );
     }
 
     public function store(
         Request $request,
         Module $module,
         PaymentOrchestrationService $paymentService,
-    ): RedirectResponse {
+    ): RedirectResponse|SymfonyResponse {
         $validated = $request->validate([
             'customer_type' => ['required', 'in:individual,company,company_sponsored'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -83,6 +85,10 @@ class ModuleCheckoutController extends Controller
         }
 
         if (! blank($payment->gateway_payment_url)) {
+            if ($request->header('X-Inertia')) {
+                return Inertia::location($payment->gateway_payment_url);
+            }
+
             return redirect()->away($payment->gateway_payment_url);
         }
 

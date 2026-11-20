@@ -11,6 +11,8 @@
 | Target market | Malaysia |
 | Application | Responsive web platform |
 
+> **Frontend Revision Notice (`v1.2`):** For incremental frontend modernisation (`Vue 3 + TypeScript + Inertia.js + shadcn-vue` alongside coexisting Blade/Livewire views and permanently separate Filament 5 `/admin`), see [SRS & System Architecture v1.2](ETMS-SRS-and-System-Architecture-v1.2.md). This `v1.1` document remains preserved and authoritative for all functional requirements, business rules (`BR-01`–`BR-16`), roles (`D-004`, `D-026`), and database constraints.
+
 > This is the authoritative requirements and architecture baseline. Antigravity and other development tools must read it before proposing or implementing changes. Do not silently change approved business rules or add out-of-scope features.
 
 ---

@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Auth\TwoFactorAuthenticationService;
+use App\Support\PortalPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class TwoFactorChallengeController extends Controller
 {
@@ -16,7 +19,7 @@ class TwoFactorChallengeController extends Controller
         protected TwoFactorAuthenticationService $twoFactor,
     ) {}
 
-    public function showSetup(Request $request): RedirectResponse|View
+    public function showSetup(Request $request): RedirectResponse|InertiaResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -35,13 +38,14 @@ class TwoFactorChallengeController extends Controller
             $request->session()->put('two_factor.setup_secret', $secret);
         }
 
-        return view('auth.two-factor-setup', [
+        return Inertia::render('Auth/TwoFactorSetup', [
             'secret' => $secret,
             'qrCodeDataUri' => $this->twoFactor->qrCodeDataUri($user, $secret),
+            'confirmUrl' => route('two-factor.setup.confirm'),
         ]);
     }
 
-    public function confirmSetup(Request $request): RedirectResponse
+    public function confirmSetup(Request $request): RedirectResponse|SymfonyResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -80,19 +84,25 @@ class TwoFactorChallengeController extends Controller
             actor: $user,
         );
 
-        return redirect()
-            ->intended(route('filament.admin.pages.dashboard'))
-            ->with('recovery_codes', $recoveryCodes)
-            ->with('status', 'Two-factor authentication has been enabled for your administrator account.');
+        return PortalPresenter::inertiaSafeRedirect(
+            $request,
+            redirect()
+                ->intended(route('filament.admin.pages.dashboard'))
+                ->with('recovery_codes', $recoveryCodes)
+                ->with('status', 'Two-factor authentication has been enabled for your administrator account.'),
+        );
     }
 
-    public function showChallenge(Request $request): RedirectResponse|View
+    public function showChallenge(Request $request): RedirectResponse|InertiaResponse|SymfonyResponse
     {
         /** @var User $user */
         $user = $request->user();
 
         if (! $user->isAdministrator()) {
-            return redirect()->intended($user->defaultDashboardUrl());
+            return PortalPresenter::inertiaSafeRedirect(
+                $request,
+                redirect()->intended($user->defaultDashboardUrl()),
+            );
         }
 
         if (! $user->hasConfirmedTwoFactor()) {
@@ -100,13 +110,19 @@ class TwoFactorChallengeController extends Controller
         }
 
         if ($request->session()->get('auth.two_factor_verified', false)) {
-            return redirect()->intended(route('filament.admin.pages.dashboard'));
+            return PortalPresenter::inertiaSafeRedirect(
+                $request,
+                redirect()->intended(route('filament.admin.pages.dashboard')),
+            );
         }
 
-        return view('auth.two-factor-challenge');
+        return Inertia::render('Auth/TwoFactorChallenge', [
+            'verifyUrl' => route('two-factor.challenge.verify'),
+            'logoutUrl' => route('logout'),
+        ]);
     }
 
-    public function verifyChallenge(Request $request): RedirectResponse
+    public function verifyChallenge(Request $request): RedirectResponse|SymfonyResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -155,6 +171,9 @@ class TwoFactorChallengeController extends Controller
             actor: $user,
         );
 
-        return redirect()->intended(route('filament.admin.pages.dashboard'));
+        return PortalPresenter::inertiaSafeRedirect(
+            $request,
+            redirect()->intended(route('filament.admin.pages.dashboard')),
+        );
     }
 }

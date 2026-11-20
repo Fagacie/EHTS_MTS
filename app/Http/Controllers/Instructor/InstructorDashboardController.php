@@ -7,12 +7,15 @@ use App\Enums\BookingStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\SessionRecording;
+use App\Models\TrainingSession;
+use App\Support\InstructorPresenter;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class InstructorDashboardController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request): InertiaResponse
     {
         $user = $request->user()->load(['roles', 'instructorProfile']);
 
@@ -44,11 +47,21 @@ class InstructorDashboardController extends Controller
                 ->whereIn('training_session_id', $assignedSessionIds)
                 ->count();
 
-        return view('instructor.dashboard', [
-            'user' => $user,
-            'assignedSessions' => $assignedSessions,
-            'pendingAttendanceCount' => $pendingAttendanceCount,
-            'submittedRecordingsCount' => $submittedRecordingsCount,
+        return Inertia::render('Instructor/Dashboard', [
+            'instructor' => [
+                'displayName' => $user->instructorProfile?->display_name ?: $user->name,
+                'email' => $user->email,
+                'isPublic' => (bool) $user->instructorProfile?->is_public,
+                'publicProfileUrl' => $user->instructorProfile?->is_public ? route('instructors.show', $user->instructorProfile) : null,
+            ],
+            'kpis' => [
+                'assignedSessionsCount' => $assignedSessions->count(),
+                'pendingAttendanceCount' => $pendingAttendanceCount,
+                'submittedRecordingsCount' => $submittedRecordingsCount,
+            ],
+            'assignedSessions' => $assignedSessions->map(
+                static fn (TrainingSession $session): array => InstructorPresenter::sessionCard($session, $user),
+            )->values()->all(),
         ]);
     }
 }

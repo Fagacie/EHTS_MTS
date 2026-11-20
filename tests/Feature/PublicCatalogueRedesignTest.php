@@ -13,6 +13,7 @@ use Database\Seeders\DemoUserSeeder;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Inertia\Testing\AssertableInertia as Assert;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -40,40 +41,37 @@ class PublicCatalogueRedesignTest extends TestCase
             'cover_image_path' => 'modules/covers/msma-cover.jpg',
         ]);
 
-        // Guest state & public navigation
-        $guestResponse = $this->get(route('catalogue.index'))
+        // Guest state renders Inertia catalogue page with cover image and neutral-fallback modules
+        $this->get(route('catalogue.index'))
             ->assertOk()
-            ->assertSee('Explore Our Training Programmes')
-            ->assertSee('Training Catalogue')
-            ->assertSee('Physical Sessions')
-            ->assertSee('Instructors')
-            ->assertSee('Verify Certificate')
-            ->assertSee('Log In')
-            ->assertSee('Create Account')
-            ->assertSee('Available programmes')
-            ->assertSee('EHT-HYD-101')
-            ->assertSee('modules/covers/msma-cover.jpg')
-            ->assertSee('Self-paced module')
-            ->assertSee('Lifetime access')
-            ->assertSee('RM 680.00')
-            ->assertSee('Physical session only')
-            ->assertSee('View Programme')
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Catalogue/Index')
+                ->where('auth.user', null)
+                ->where('totalPublishedCount', 3)
+                ->has('modules', 3)
+                ->where('modules.0.code', 'EHT-WQ-105')
+                ->where('modules.0.isAvailableIndependently', false)
+                ->where('modules.2.code', 'EHT-HYD-101')
+                ->where('modules.2.independentPriceLabel', 'RM 680.00')
+                ->where('modules.2.isAvailableIndependently', true)
+                ->where('modules.2.coverImageUrl', fn (?string $url): bool => is_string($url) && str_contains($url, 'modules/covers/msma-cover.jpg')),
+            )
             ->assertDontSee('D-005')
             ->assertDontSee('D-018')
             ->assertDontSee('D-024');
 
-        $html = $guestResponse->getContent();
-        $this->assertMatchesRegularExpression('/Available programmes/i', $html);
-
-        // Authenticated state preserves My Portal and multi-role switcher
+        // Authenticated state preserves My Portal and multi-role switcher in shared Inertia props
         $dualStaff = User::query()->where('email', 'staff.trainee@ecohydrotech.com.my')->firstOrFail();
         $this->actingAs($dualStaff)
             ->get(route('catalogue.index'))
             ->assertOk()
-            ->assertSee('My Portal')
-            ->assertSee('Trainee Portal')
-            ->assertSee('Instructor Portal')
-            ->assertSee('Sign Out');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Catalogue/Index')
+                ->where('auth.user.email', $dualStaff->email)
+                ->has('auth.user.availablePortals', 2)
+                ->where('auth.user.availablePortals.0.label', 'Trainee Portal')
+                ->where('auth.user.availablePortals.1.label', 'Instructor Portal'),
+            );
 
         // Unauthenticated customer role check remains intact
         $trainee = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();

@@ -11,15 +11,19 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Booking\SessionBookingService;
 use App\Services\Payment\PaymentOrchestrationService;
+use App\Support\PortalPresenter;
+use App\Support\PublicCataloguePresenter;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class OrderController extends Controller
 {
-    public function index(Request $request, SessionBookingService $bookingService): View
+    public function index(Request $request, SessionBookingService $bookingService): InertiaResponse
     {
         $user = $request->user();
 
@@ -49,16 +53,34 @@ class OrderController extends Controller
             $ordersQuery->where('order_type', $typeFilter);
         }
 
-        return view('portal.orders.index', [
-            'orders' => $ordersQuery->paginate(10)->withQueryString(),
+        $paginator = $ordersQuery->paginate(10)->withQueryString();
+
+        return Inertia::render('Portal/Orders/Index', [
+            'orders' => $paginator->getCollection()
+                ->map(static fn (Order $order): array => PortalPresenter::orderListItem($order))
+                ->values()
+                ->all(),
+            'pagination' => PublicCataloguePresenter::paginationMeta($paginator),
             'statusFilter' => $statusFilter,
             'typeFilter' => $typeFilter,
-            'statuses' => OrderStatus::cases(),
-            'orderTypes' => OrderType::cases(),
+            'statuses' => array_map(
+                static fn (OrderStatus $status): array => [
+                    'value' => $status->value,
+                    'label' => $status->label(),
+                ],
+                OrderStatus::cases(),
+            ),
+            'orderTypes' => array_map(
+                static fn (OrderType $orderType): array => [
+                    'value' => $orderType->value,
+                    'label' => $orderType->label(),
+                ],
+                OrderType::cases(),
+            ),
         ]);
     }
 
-    public function show(Request $request, Order $order, SessionBookingService $bookingService): View
+    public function show(Request $request, Order $order, SessionBookingService $bookingService): InertiaResponse
     {
         abort_unless($order->user_id === $request->user()->id, 403);
 
@@ -79,8 +101,8 @@ class OrderController extends Controller
             'refunds',
         ]);
 
-        return view('portal.orders.show', [
-            'order' => $order,
+        return Inertia::render('Portal/Orders/Show', [
+            'order' => PortalPresenter::orderDetail($order),
         ]);
     }
 
@@ -88,7 +110,7 @@ class OrderController extends Controller
         Request $request,
         Order $order,
         PaymentOrchestrationService $paymentService,
-    ): RedirectResponse {
+    ): RedirectResponse|SymfonyResponse {
         abort_unless($order->user_id === $request->user()->id, 403);
 
         try {
@@ -100,6 +122,10 @@ class OrderController extends Controller
         }
 
         if (! blank($payment->gateway_payment_url)) {
+            if ($request->header('X-Inertia')) {
+                return Inertia::location($payment->gateway_payment_url);
+            }
+
             return redirect()->away($payment->gateway_payment_url);
         }
 
@@ -112,7 +138,7 @@ class OrderController extends Controller
      * Customer browser return page after Billplz checkout (`/checkout/return`, TRN-06).
      * Strictly read-only: NEVER trusts browser query parameters as payment authority (Section 6.2).
      */
-    public function returnPage(Request $request, SessionBookingService $bookingService): View
+    public function returnPage(Request $request, SessionBookingService $bookingService): InertiaResponse
     {
         $user = $request->user();
         $orderNumber = trim((string) $request->query('order', ''));
@@ -151,11 +177,11 @@ class OrderController extends Controller
 
         $order->load(['items', 'payments', 'bookings.trainingSession', 'moduleEntitlements.module']);
         $latestPayment = $payment ?? $order->payments->first();
+        $redirectReportedPaid = is_array($billplzParams) && (($billplzParams['paid'] ?? '') === 'true');
 
-        return view('portal.checkout-return', [
-            'order' => $order,
-            'payment' => $latestPayment,
-            'redirectReportedPaid' => is_array($billplzParams) && (($billplzParams['paid'] ?? '') === 'true'),
-        ]);
+        return Inertia::render(
+            'Checkout/Return',
+            PortalPresenter::checkoutReturnData($order, $latestPayment, $redirectReportedPaid, $request->fullUrl()),
+        );
     }
 }

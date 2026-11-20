@@ -41,7 +41,7 @@ CMD ["php-fpm"]
 FROM node:22-alpine AS node_assets
 
 WORKDIR /var/www/html
-COPY package.json package-lock.json vite.config.js ./
+COPY package.json package-lock.json vite.config.js tsconfig.json components.json ./
 COPY resources ./resources
 COPY app ./app
 RUN npm ci && npm run build

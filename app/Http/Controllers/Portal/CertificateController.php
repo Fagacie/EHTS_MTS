@@ -8,15 +8,17 @@ use App\Models\AuditLog;
 use App\Models\Certificate;
 use App\Services\Certificate\CertificateService;
 use App\Services\Media\SelfHostedVideoService;
+use App\Support\PortalPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class CertificateController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $user = $request->user();
 
@@ -26,20 +28,28 @@ class CertificateController extends Controller
             ->orderByDesc('issued_at')
             ->get();
 
-        return view('portal.certificates.index', [
-            'issuedCertificates' => $certificates->where('status', CertificateStatus::Issued),
-            'revokedCertificates' => $certificates->where('status', CertificateStatus::Revoked),
+        return Inertia::render('Portal/Certificates/Index', [
+            'issuedCertificates' => $certificates
+                ->where('status', CertificateStatus::Issued)
+                ->map(static fn (Certificate $certificate): array => PortalPresenter::certificateListItem($certificate))
+                ->values()
+                ->all(),
+            'revokedCertificates' => $certificates
+                ->where('status', CertificateStatus::Revoked)
+                ->map(static fn (Certificate $certificate): array => PortalPresenter::certificateListItem($certificate))
+                ->values()
+                ->all(),
         ]);
     }
 
-    public function show(Request $request, Certificate $certificate, CertificateService $certificateService): View
+    public function show(Request $request, Certificate $certificate, CertificateService $certificateService): InertiaResponse
     {
         Gate::authorize('view', $certificate);
 
-        $certificate->loadMissing(['trainingSession', 'module', 'issuer', 'revoker']);
+        $certificate->loadMissing(['trainingSession', 'module']);
 
-        return view('portal.certificates.show', [
-            'certificate' => $certificate,
+        return Inertia::render('Portal/Certificates/Show', [
+            'certificate' => PortalPresenter::certificateDetail($certificate),
             'logoDataUri' => $certificateService->resolveLogoDataUri(),
         ]);
     }

@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
@@ -360,8 +361,14 @@ class Stage9NotificationsAndReportsTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('portal.notifications.index'))
             ->assertOk()
-            ->assertSee('Monsoon Field Safety Advisory')
-            ->assertSee('Unread (');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Notifications/Index')
+                ->where('filter', 'all')
+                ->where('unreadCount', fn (int $count): bool => $count >= 1)
+                ->where('notifications', fn ($items): bool => collect($items)->contains(
+                    fn (array $item): bool => ($item['title'] ?? null) === 'Monsoon Field Safety Advisory',
+                )),
+            );
 
         // Corporate cannot mark trainee's notification read
         $this->actingAs($corporate)

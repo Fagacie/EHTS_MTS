@@ -20,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class Stage8CertificatesTest extends TestCase
@@ -159,25 +160,39 @@ class Stage8CertificatesTest extends TestCase
 
         $certificate = Certificate::query()->where('user_id', $trainee->id)->firstOrFail();
 
-        // Dashboard shows My Certificates section with ref, training title, and Download button
+        // Dashboard exposes issued certificate with ref, training title, and download URL
         $this->actingAs($trainee)
             ->get(route('portal.dashboard'))
             ->assertOk()
-            ->assertSee('My Certificates')
-            ->assertSee($certificate->certificate_number)
-            ->assertSee($certificate->training_title_snapshot);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->has('certificates', 1)
+                ->where('certificates.0.certificateNumber', $certificate->certificate_number)
+                ->where('certificates.0.title', $certificate->training_title_snapshot)
+                ->where('certificates.0.downloadUrl', route('certificates.download', $certificate)),
+            );
 
         // /portal/certificates listing & detail preview
         $this->actingAs($trainee)
             ->get(route('portal.certificates.index'))
             ->assertOk()
-            ->assertSee($certificate->certificate_number);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Certificates/Index')
+                ->has('issuedCertificates', 1)
+                ->where('issuedCertificates.0.certificateNumber', $certificate->certificate_number)
+                ->where('issuedCertificates.0.isIssued', true),
+            );
 
         $this->actingAs($trainee)
             ->get(route('portal.certificates.show', $certificate))
             ->assertOk()
-            ->assertSee('Certificate of Completion')
-            ->assertSee($certificate->signatory_name_snapshot);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Certificates/Show')
+                ->where('certificate.certificateNumber', $certificate->certificate_number)
+                ->where('certificate.isIssued', true)
+                ->where('certificate.signatoryName', $certificate->signatory_name_snapshot)
+                ->where('certificate.downloadUrl', route('certificates.download', $certificate)),
+            );
 
         // Download PDF streams cleanly and writes audit log
         $this->actingAs($trainee)
@@ -249,8 +264,13 @@ class Stage8CertificatesTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('portal.certificates.show', $revoked))
             ->assertOk()
-            ->assertSee('This Certificate Has Been Revoked')
-            ->assertSee('Issued in error prior to final project submission verification.')
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Certificates/Show')
+                ->where('certificate.isIssued', false)
+                ->where('certificate.isRevoked', true)
+                ->where('certificate.revocationReason', 'Issued in error prior to final project submission verification.')
+                ->where('certificate.downloadUrl', null),
+            )
             ->assertDontSee('Download Official PDF');
 
         // Issuance & revocation history maintained in audit_logs

@@ -17,6 +17,7 @@ use App\Http\Controllers\Portal\LearningPortalController;
 use App\Http\Controllers\Portal\ModuleCheckoutController;
 use App\Http\Controllers\Portal\OrderController;
 use App\Http\Controllers\Portal\PortalDashboardController;
+use App\Http\Controllers\Portal\PortalSearchController;
 use App\Http\Controllers\Portal\ProfileController;
 use App\Http\Controllers\Portal\SecurityController;
 use App\Http\Controllers\Portal\SessionCheckoutController;
@@ -102,6 +103,7 @@ Route::prefix('portal')
     ->middleware(['auth', 'active.account', 'verified', 'role:customer'])
     ->group(function (): void {
         Route::get('/', PortalDashboardController::class)->name('dashboard');
+        Route::get('/search', PortalSearchController::class)->name('search');
         Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
         Route::get('/bookings/{booking:booking_reference}', [BookingController::class, 'show'])->name('bookings.show');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');

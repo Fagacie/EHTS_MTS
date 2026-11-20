@@ -24,6 +24,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
@@ -103,20 +104,32 @@ class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
         $this->actingAs($customer)
             ->get(route('portal.modules.index'))
             ->assertOk()
-            ->assertSee('EHT-HYD-101')
-            ->assertSee('Lifetime Access');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Modules/Index')
+                ->has('activeEntitlements', 1)
+                ->where('activeEntitlements.0.module.code', 'EHT-HYD-101')
+                ->where('activeEntitlements.0.accessLabel', 'Lifetime Access'),
+            );
 
         $this->actingAs($customer)
             ->get(route('portal.modules.show', $module))
             ->assertOk()
-            ->assertSee('Part 1: MSMA 2nd Edition IDF')
-            ->assertSee('MSMA 2nd Edition Design Calculation Workbook');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Modules/Show')
+                ->where('module.code', 'EHT-HYD-101')
+                ->where('activeVideo.title', fn (?string $title): bool => is_string($title) && str_contains($title, 'Part 1: MSMA 2nd Edition IDF'))
+                ->where('materials.0.title', 'MSMA 2nd Edition Design Calculation Workbook')
+                ->where('streamManifestUrl', fn (?string $url): bool => is_string($url) && str_contains($url, '/stream/stream.m3u8')),
+            );
 
         $this->actingAs($customer)
             ->get($video->temporaryWatchUrl(30))
             ->assertOk()
-            ->assertSee('data-etms-hls-player', false)
-            ->assertSee('/stream/stream.m3u8');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Modules/Show')
+                ->where('activeVideo.id', $video->id)
+                ->where('streamManifestUrl', fn (?string $url): bool => is_string($url) && str_contains($url, '/stream/stream.m3u8')),
+            );
 
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'module_video.watched',
@@ -192,7 +205,13 @@ class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
         $this->actingAs($customer)
             ->get(route('portal.recordings.index'))
             ->assertOk()
-            ->assertSee('Recording Access Locked');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Recordings/Index')
+                ->has('bookingItems', 1)
+                ->where('bookingItems.0.isEligible', false)
+                ->where('bookingItems.0.recordings.0.watchUrl', null),
+            )
+            ->assertDontSee('D-017');
 
         $this->actingAs($customer)
             ->get($recording->temporaryWatchUrl(30))
@@ -235,13 +254,22 @@ class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
         $this->actingAs($customer)
             ->get(route('portal.recordings.index'))
             ->assertOk()
-            ->assertSee('Watch Recording');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Recordings/Index')
+                ->has('bookingItems', 1)
+                ->where('bookingItems.0.isEligible', true)
+                ->where('bookingItems.0.recordings.0.isReady', true)
+                ->where('bookingItems.0.recordings.0.watchUrl', fn (?string $url): bool => is_string($url) && $url !== ''),
+            );
 
         $this->actingAs($customer)
             ->get($recording->temporaryWatchUrl(30))
             ->assertOk()
-            ->assertSee('data-etms-hls-player', false)
-            ->assertSee('/stream/stream.m3u8');
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Recordings/Watch')
+                ->where('recording.id', $recording->id)
+                ->where('streamManifestUrl', fn (?string $url): bool => is_string($url) && str_contains($url, '/stream/stream.m3u8')),
+            );
 
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'session_recording.watched',

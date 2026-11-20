@@ -14,6 +14,7 @@ use Database\Seeders\RoleAndPermissionSeeder;
 use Database\Seeders\SessionAndBookingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PortalLayoutFoundationTest extends TestCase
@@ -38,6 +39,8 @@ class PortalLayoutFoundationTest extends TestCase
         $trainee = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();
         $dualStaff = User::query()->where('email', 'staff.trainee@ecohydrotech.com.my')->firstOrFail();
 
+        $beforeUnreadCount = $trainee->unreadNotifications()->count();
+
         app(EtmsNotificationService::class)->notifyUser(
             user: $trainee,
             eventType: 'booking.confirmed',
@@ -45,11 +48,47 @@ class PortalLayoutFoundationTest extends TestCase
             message: 'Ensures unread counter renders cleanly across sidebar and header notifications.',
         );
 
-        $response = $this->actingAs($trainee)
+        // Migrated Inertia /portal dashboard exposes unread notification count, routes & multi-role switcher
+        $this->actingAs($trainee)
             ->get(route('portal.dashboard'))
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->where('portalMeta.unreadNotificationsCount', $beforeUnreadCount + 1)
+                ->where('routes.portalModules', route('portal.modules.index'))
+                ->where('routes.portalBookings', route('portal.bookings.index'))
+                ->where('routes.portalCertificates', route('portal.certificates.index'))
+                ->where('routes.portalOrders', route('portal.orders.index'))
+                ->where('routes.portalNotifications', route('portal.notifications.index'))
+                ->where('routes.portalProfile', route('portal.profile.edit'))
+                ->where('routes.portalSecurity', route('portal.security.edit')),
+            );
 
-        $html = $response->getContent();
+        // Migrated /portal/bookings renders Inertia Portal/Bookings/Index while unmigrated Blade /checkout/return retains portal.blade.php
+        $this->actingAs($trainee)
+            ->get(route('portal.bookings.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Bookings/Index')
+                ->has('bookings', 1),
+            );
+
+        $order = Order::query()->where('user_id', $trainee->id)->firstOrFail();
+
+        // /checkout/return renders Inertia Checkout/Return while legacy portal.blade.php remains intact for coexistence
+        $this->actingAs($trainee)
+            ->get(route('checkout.return', ['order' => $order->order_number]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Checkout/Return')
+                ->where('order.orderNumber', $order->order_number),
+            );
+
+        $this->actingAs($trainee);
+        $html = view('components.layouts.portal', [
+            'title' => 'Shell Verification',
+            'slot' => new \Illuminate\Support\HtmlString(''),
+        ])->render();
 
         preg_match('/<aside[^>]*id="portal-sidebar"[^>]*>(.*?)<\/aside>/s', $html, $asideMatch);
         $this->assertNotEmpty($asideMatch[1] ?? '');
@@ -90,17 +129,21 @@ class PortalLayoutFoundationTest extends TestCase
         $this->assertStringContainsString('Sign Out', $menuHtml);
 
         // Desktop sidebar collapse and mobile drawer controls exist
-        $response
-            ->assertSee('id="portal-sidebar-collapse"', false)
-            ->assertSee('id="portal-drawer-open"', false)
-            ->assertSee('id="portal-drawer-close"', false);
+        $this->assertStringContainsString('id="portal-sidebar-collapse"', $html);
+        $this->assertStringContainsString('id="portal-drawer-open"', $html);
+        $this->assertStringContainsString('id="portal-drawer-close"', $html);
 
-        // Multi-role portal switcher appears only for users with additional portal roles
+        // Multi-role portal switcher appears in Inertia portalMeta for dual-role users
         $this->actingAs($dualStaff)
             ->get(route('portal.dashboard'))
             ->assertOk()
-            ->assertSee('Instructor Portal')
-            ->assertSee(route('instructor.dashboard'), false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Dashboard')
+                ->where('auth.user.isInstructor', true)
+                ->has('portalMeta.availablePortals', 2)
+                ->where('portalMeta.availablePortals.1.label', 'Instructor Portal')
+                ->where('portalMeta.availablePortals.1.url', route('instructor.dashboard')),
+            );
     }
 
     public function test_all_redesigned_trainee_portal_pages_render_and_pass_ui_hygiene_checks(): void
@@ -158,12 +201,12 @@ class PortalLayoutFoundationTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('portal.profile.edit'))
             ->assertOk()
-            ->assertSee('Personal Details')
-            ->assertSee('Account Category')
-            ->assertSee('Billing Address')
-            ->assertSee('id="company-billing-panel"', false)
-            ->assertSee('autocomplete="name"', false)
-            ->assertSee('autocomplete="email"', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Profile')
+                ->where('user.email', $trainee->email)
+                ->where('profile.billingCountry', 'MY')
+                ->where('updateUrl', route('portal.profile.update')),
+            );
 
         // Company selection without company name returns inline validation feedback while keeping company value active
         $this->actingAs($trainee)
@@ -182,9 +225,11 @@ class PortalLayoutFoundationTest extends TestCase
         $this->actingAs($trainee)
             ->get(route('portal.security.edit'))
             ->assertOk()
-            ->assertSee('Change Password')
-            ->assertSee('data-toggle-password="security-current-password"', false)
-            ->assertSee('autocomplete="current-password"', false)
-            ->assertSee('autocomplete="new-password"', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Portal/Security')
+                ->where('user.email', $trainee->email)
+                ->where('user.isActive', true)
+                ->where('updatePasswordUrl', route('portal.security.password.update')),
+            );
     }
 }

@@ -2,23 +2,70 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\InstructorPresenter;
+use App\Support\PortalPresenter;
+use App\Support\PublicCataloguePresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class NotificationCentreController extends Controller
 {
-    public function portalIndex(Request $request): View
+    public function portalIndex(Request $request): InertiaResponse
     {
-        return $this->renderCentre($request, 'portal.notifications', 'portal');
+        $user = $request->user();
+        $filter = $request->string('filter')->toString() === 'unread' ? 'unread' : 'all';
+
+        $query = $user->notifications()->latest();
+
+        if ($filter === 'unread') {
+            $query->whereNull('read_at');
+        }
+
+        $paginator = $query->paginate(15)->withQueryString();
+
+        return Inertia::render('Portal/Notifications/Index', [
+            'filter' => $filter,
+            'unreadCount' => $user->unreadNotifications()->count(),
+            'markAllReadUrl' => route('portal.notifications.read-all'),
+            'notifications' => $paginator->getCollection()
+                ->map(static fn (DatabaseNotification $notification): array => PortalPresenter::notificationItem($notification))
+                ->values()
+                ->all(),
+            'pagination' => PublicCataloguePresenter::paginationMeta($paginator),
+        ]);
     }
 
-    public function instructorIndex(Request $request): View
+    public function instructorIndex(Request $request): InertiaResponse
     {
-        return $this->renderCentre($request, 'instructor.notifications', 'instructor');
+        $user = $request->user();
+        $filter = $request->string('filter')->toString() === 'unread' ? 'unread' : 'all';
+
+        $query = $user->notifications()->latest();
+
+        if ($filter === 'unread') {
+            $query->whereNull('read_at');
+        }
+
+        $paginator = $query->paginate(15)->withQueryString();
+
+        return Inertia::render('Instructor/Notifications/Index', [
+            'filter' => $filter,
+            'unreadCount' => $user->unreadNotifications()->count(),
+            'markAllReadUrl' => route('instructor.notifications.read-all'),
+            'notifications' => $paginator->getCollection()
+                ->map(static fn (DatabaseNotification $notification): array => InstructorPresenter::notificationItem($notification))
+                ->values()
+                ->all(),
+            'pagination' => PublicCataloguePresenter::paginationMeta($paginator),
+        ]);
     }
 
-    public function markAsRead(Request $request, string $notificationId): RedirectResponse
+    public function markAsRead(Request $request, string $notificationId): RedirectResponse|SymfonyResponse
     {
         $notification = $request->user()
             ->notifications()
@@ -32,6 +79,10 @@ class NotificationCentreController extends Controller
         if ($request->boolean('open') && is_string($notification->data['action_url'] ?? null)) {
             $target = $notification->data['action_url'];
             if (str_starts_with($target, '/') && ! str_starts_with($target, '//')) {
+                if ($request->header('X-Inertia') && ! PortalPresenter::isInertiaPath($target)) {
+                    return Inertia::location($target);
+                }
+
                 return redirect()->to($target);
             }
         }

@@ -16,13 +16,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class RegisteredUserController extends Controller
 {
-    public function create(): View
+    public function create(): InertiaResponse
     {
-        return view('auth.register');
+        return Inertia::render('Auth/Register', [
+            'submitUrl' => route('register.store'),
+            'loginUrl' => route('login'),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

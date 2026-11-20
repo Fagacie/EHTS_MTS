@@ -14,10 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
@@ -122,15 +122,15 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function hasActiveModuleEntitlement(int $moduleId): bool
     {
-        if (! Schema::hasTable('module_entitlements')) {
+        try {
+            return DB::table('module_entitlements')
+                ->where('user_id', $this->id)
+                ->where('module_id', $moduleId)
+                ->where('status', 'active')
+                ->exists();
+        } catch (QueryException) {
             return false;
         }
-
-        return DB::table('module_entitlements')
-            ->where('user_id', $this->id)
-            ->where('module_id', $moduleId)
-            ->where('status', 'active')
-            ->exists();
     }
 
     public function isActive(): bool

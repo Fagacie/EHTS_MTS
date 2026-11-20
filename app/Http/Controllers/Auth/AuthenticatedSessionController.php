@@ -5,22 +5,29 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\PortalPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(): View
+    public function create(): InertiaResponse
     {
-        return view('auth.login');
+        return Inertia::render('Auth/Login', [
+            'submitUrl' => route('login.store'),
+            'forgotPasswordUrl' => route('password.request'),
+            'registerUrl' => route('register'),
+        ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|SymfonyResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'string', 'email'],
@@ -82,7 +89,10 @@ class AuthenticatedSessionController extends Controller
             );
         }
 
-        return redirect()->intended($user->defaultDashboardUrl());
+        return PortalPresenter::inertiaSafeRedirect(
+            $request,
+            redirect()->intended($user->defaultDashboardUrl()),
+        );
     }
 
     public function destroy(Request $request): RedirectResponse

@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 
 class SystemSetting extends Model
 {
@@ -19,6 +20,17 @@ class SystemSetting extends Model
         'updated_by',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(static function (self $setting): void {
+            Cache::forget(self::cacheKey($setting->setting_key));
+        });
+
+        static::deleted(static function (self $setting): void {
+            Cache::forget(self::cacheKey($setting->setting_key));
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -32,22 +44,39 @@ class SystemSetting extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public static function cacheKey(string $key): string
+    {
+        return "system_setting:{$key}";
+    }
+
     public static function getValue(string $key, mixed $default = null): mixed
     {
-        if (! Schema::hasTable('system_settings')) {
+        try {
+            /** @var array{found: bool, value: mixed} $entry */
+            $entry = Cache::remember(
+                self::cacheKey($key),
+                now()->addSeconds(300),
+                static function () use ($key): array {
+                    $setting = self::query()->where('setting_key', $key)->first();
+
+                    if (! $setting || $setting->setting_value === null) {
+                        return ['found' => false, 'value' => null];
+                    }
+
+                    $resolved = match ($setting->value_type) {
+                        'integer' => (int) $setting->setting_value,
+                        'boolean' => (bool) $setting->setting_value,
+                        default => $setting->setting_value,
+                    };
+
+                    return ['found' => true, 'value' => $resolved];
+                },
+            );
+        } catch (QueryException) {
             return $default;
         }
 
-        $setting = self::query()->where('setting_key', $key)->first();
-        if (! $setting || $setting->setting_value === null) {
-            return $default;
-        }
-
-        return match ($setting->value_type) {
-            'integer' => (int) $setting->setting_value,
-            'boolean' => (bool) $setting->setting_value,
-            default => $setting->setting_value,
-        };
+        return $entry['found'] ? $entry['value'] : $default;
     }
 
     public static function setValue(
@@ -59,7 +88,9 @@ class SystemSetting extends Model
         bool $isPublic = false,
         ?int $updatedBy = null,
     ): self {
-        return self::query()->updateOrCreate(
+        Cache::forget(self::cacheKey($key));
+
+        $record = self::query()->updateOrCreate(
             ['setting_key' => $key],
             [
                 'setting_group' => $group,
@@ -70,5 +101,9 @@ class SystemSetting extends Model
                 'updated_by' => $updatedBy,
             ],
         );
+
+        Cache::forget(self::cacheKey($key));
+
+        return $record;
     }
 }

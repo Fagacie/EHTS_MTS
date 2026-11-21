@@ -93,7 +93,7 @@ class PublicSessionController extends Controller
         $displayTimezone = (string) config('etms.display_timezone', 'Asia/Kuala_Lumpur');
 
         $session = $bookingService->reconcileSessionCounters($session->id);
-        $session->load(['module.category', 'instructors.instructorProfile']);
+        $session->load(['module.category', 'instructors.instructorProfile', 'mainDocumentMaterial']);
 
         $isPublicStatus = in_array($session->status, [
             SessionStatus::Published,
@@ -143,13 +143,13 @@ class PublicSessionController extends Controller
         $venueLocation = collect([$session->venue_city, $session->venue_state])->filter()->implode(', ');
         $venueAddressLine = collect([
             $session->venue_address,
-            trim(implode(' ', array_filter([$session->venue_postcode, $session->venue_city]))),
+            $session->venue_city,
             $session->venue_state,
             'Malaysia',
         ])->filter()->implode(', ');
 
         $module = $session->module;
-        $independentPrice = $module->formattedIndependentPrice();
+        $independentPrice = $session->formattedIndependentPrice();
 
         $recordingPolicyLabel = $session->recording_access_policy === RecordingAccessPolicy::AttendeesOnly
             ? 'Post-session recordings included for verified present attendees'
@@ -172,7 +172,6 @@ class PublicSessionController extends Controller
                 'venueName' => $session->venue_name,
                 'venueAddressLine' => $venueAddressLine !== '' ? $venueAddressLine : null,
                 'venueLocation' => $venueLocation !== '' ? $venueLocation : null,
-                'venueMapUrl' => $session->venue_map_url,
                 'capacity' => (int) $session->capacity,
                 'remainingSeats' => $remainingSeats,
                 'seatsOpenLabel' => "{$remainingSeats} / {$session->capacity} seats open",
@@ -196,8 +195,10 @@ class PublicSessionController extends Controller
                     'categoryUrl' => $module->category
                         ? route('catalogue.index', ['category' => $module->category->slug])
                         : route('catalogue.index'),
-                    'detailUrl' => route('catalogue.modules.show', $module),
-                    'isAvailableIndependently' => (bool) $module->is_available_independently && $independentPrice !== null,
+                    'detailUrl' => route('checkout.session-document.show', $session),
+                    'isAvailableIndependently' => (bool) $session->is_available_independently
+                        && $session->main_document_material_id !== null
+                        && $independentPrice !== null,
                     'independentPriceLabel' => $independentPrice,
                 ],
                 'instructors' => $session->instructors->map(function ($instructorUser): array {

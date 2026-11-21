@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Console\Commands\SendSessionRemindersCommand;
 use App\Enums\AnnouncementStatus;
 use App\Enums\BookingStatus;
+use App\Enums\EntitlementStatus;
 use App\Enums\NotificationDeliveryStatus;
 use App\Enums\OrderStatus;
 use App\Enums\RefundMethod;
@@ -15,6 +16,7 @@ use App\Models\Module;
 use App\Models\NotificationDelivery;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\ModuleEntitlement;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Notifications\EtmsEventNotification;
@@ -171,6 +173,19 @@ class Stage9NotificationsAndReportsTest extends TestCase
         ]);
 
         // 3. Certificate issuance & revocation notifications
+        ModuleEntitlement::query()->updateOrCreate(
+            [
+                'user_id' => $trainee->id,
+                'module_id' => $module->id,
+            ],
+            [
+                'grant_source' => 'admin_grant',
+                'status' => EntitlementStatus::Active,
+                'granted_at' => now(),
+                'granted_by' => $admin->id,
+                'grant_reason' => 'Lifecycle notification test entitlement.',
+            ],
+        );
         $certService = app(CertificateService::class);
         $cert = $certService->issueCertificate(
             admin: $admin,
@@ -311,6 +326,18 @@ class Stage9NotificationsAndReportsTest extends TestCase
         $reminderSession->instructors()->sync([$instructor->id]);
 
         $remBooking = $bookingService->reserveSeat($trainee, $reminderSession);
+        $remBooking->load('order');
+        $remBooking->order->update(['status' => OrderStatus::Paid]);
+        Payment::query()->create([
+            'payment_reference' => 'PAY-STG9-REMINDER',
+            'order_id' => $remBooking->order_id,
+            'user_id' => $trainee->id,
+            'gateway' => 'billplz',
+            'amount' => $remBooking->order->total_amount,
+            'currency' => 'MYR',
+            'status' => 'successful',
+            'gateway_bill_id' => 'bp_stg9_reminder',
+        ]);
         $bookingService->confirmBooking($remBooking, $admin, 'Stage 9 reminder test confirmation');
 
         $this->assertDatabaseHas('notification_deliveries', [

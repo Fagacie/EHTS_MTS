@@ -4,9 +4,13 @@ namespace App\Services\Certificate;
 
 use App\Enums\BookingStatus;
 use App\Enums\CertificateStatus;
+use App\Enums\AttendanceReviewStatus;
+use App\Enums\AttendanceStatus;
+use App\Enums\PdfGenerationStatus;
 use App\Enums\EntitlementStatus;
 use App\Enums\ModuleStatus;
 use App\Enums\SessionStatus;
+use App\Jobs\GenerateCertificatePdfJob;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\Certificate;
@@ -35,7 +39,7 @@ class CertificateService
     /**
      * Retrieve global certificate configuration values from `system_settings`.
      *
-     * @return array{issuing_organisation: string, signatory_name: string, signatory_title: string, logo_path: string}
+     * @return array{issuing_organisation: string, signatory_name: string, signatory_title: string, logo_path: string, signature_path: string}
      */
     public function globalSettings(): array
     {
@@ -44,6 +48,7 @@ class CertificateService
             'signatory_name' => (string) (SystemSetting::getValue('certificates.signatory_name') ?: self::DEFAULT_SIGNATORY_NAME),
             'signatory_title' => (string) (SystemSetting::getValue('certificates.signatory_title') ?: self::DEFAULT_SIGNATORY_TITLE),
             'logo_path' => (string) (SystemSetting::getValue('certificates.logo_path') ?: self::DEFAULT_LOGO_PATH),
+            'signature_path' => (string) (SystemSetting::getValue('certificates.signature_path') ?: ''),
         ];
     }
 
@@ -56,6 +61,7 @@ class CertificateService
         string $signatoryName,
         string $signatoryTitle,
         ?string $logoPath = null,
+        ?string $signaturePath = null,
     ): void {
         $old = $this->globalSettings();
 
@@ -101,6 +107,18 @@ class CertificateService
             );
         }
 
+        if ($signaturePath !== null && $signaturePath !== '') {
+            SystemSetting::setValue(
+                key: 'certificates.signature_path',
+                value: $signaturePath,
+                group: 'certificates',
+                type: 'string',
+                description: 'Uploaded authorised signatory image rendered on official PDF certificates.',
+                isPublic: false,
+                updatedBy: $admin->id,
+            );
+        }
+
         AuditLog::record(
             event: 'certificates.signatory_updated',
             auditableType: 'system_settings',
@@ -120,6 +138,12 @@ class CertificateService
         $configured = $logoPath ?: ($this->globalSettings()['logo_path'] ?? self::DEFAULT_LOGO_PATH);
 
         $publicFullPath = public_path($configured);
+        if (! is_file($publicFullPath)) {
+            $publicFullPath = public_path('storage/'.$configured);
+        }
+        if (! is_file($publicFullPath)) {
+            $publicFullPath = storage_path('app/public/'.$configured);
+        }
         if (is_file($publicFullPath)) {
             $ext = strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION));
             if ($ext === 'svg') {
@@ -133,6 +157,32 @@ class CertificateService
         }
 
         return null;
+    }
+
+    public function resolveSignatureDataUri(): ?string
+    {
+        $path = (string) ($this->globalSettings()['signature_path'] ?? '');
+        if ($path === '') {
+            return null;
+        }
+
+        $publicFullPath = public_path('storage/'.$path);
+        if (! is_file($publicFullPath)) {
+            $publicFullPath = storage_path('app/public/'.$path);
+        }
+        if (! is_file($publicFullPath)) {
+            return null;
+        }
+
+        $mime = match (strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'svg' => 'image/svg+xml',
+            'webp' => 'image/webp',
+            default => null,
+        };
+
+        return $mime ? 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($publicFullPath)) : null;
     }
 
     /**
@@ -170,6 +220,9 @@ class CertificateService
             if ($trainingSession->status === SessionStatus::Cancelled) {
                 throw new DomainException('Certificates cannot be issued for a cancelled training session.');
             }
+            if ($trainingSession->status !== SessionStatus::Completed) {
+                throw new DomainException('A physical-session certificate requires official administrator completion.');
+            }
 
             $module = $trainingSession->module;
             $booking = Booking::query()
@@ -177,6 +230,18 @@ class CertificateService
                 ->where('training_session_id', $trainingSession->id)
                 ->where('status', BookingStatus::Confirmed->value)
                 ->first();
+            if ($booking === null) {
+                throw new DomainException('The trainee does not have a confirmed booking for this session.');
+            }
+
+            $attendance = \App\Models\Attendance::query()
+                ->where('booking_id', $booking->id)
+                ->where('attendance_status', AttendanceStatus::Present->value)
+                ->where('review_status', AttendanceReviewStatus::Verified->value)
+                ->first();
+            if ($attendance === null) {
+                throw new DomainException('A physical-session certificate requires verified present attendance.');
+            }
 
             $codeSnapshot = $trainingSession->session_code;
             $titleSnapshot = $trainingSession->title;
@@ -193,6 +258,9 @@ class CertificateService
                 ->where('module_id', $module->id)
                 ->where('status', EntitlementStatus::Active->value)
                 ->first();
+            if ($entitlement === null) {
+                throw new DomainException('The trainee must have an active module entitlement before a module certificate can be approved.');
+            }
 
             $codeSnapshot = $module->code;
             $titleSnapshot = $module->title;
@@ -250,7 +318,7 @@ class CertificateService
                 'module_id' => $module->id,
                 'booking_id' => $booking?->id,
                 'module_entitlement_id' => $entitlement?->id,
-                'status' => CertificateStatus::Issued,
+                'status' => CertificateStatus::Pending,
                 'trainee_name_snapshot' => $trainee->name,
                 'training_code_snapshot' => $codeSnapshot,
                 'training_title_snapshot' => $titleSnapshot,
@@ -261,13 +329,15 @@ class CertificateService
                 'signatory_title_snapshot' => $settings['signatory_title'],
                 'pdf_storage_disk' => 'certificates',
                 'issued_by' => $admin->id,
+                'approved_by' => $admin->id,
+                'approved_at' => $now,
+                'pdf_generation_status' => PdfGenerationStatus::Queued,
+                'pdf_generation_attempts' => 0,
                 'notes' => $notes,
             ]);
 
-            $this->renderAndStorePdfLocked($certificate, $settings['logo_path']);
-
             AuditLog::record(
-                event: 'certificate.issued',
+                event: 'certificate.approved',
                 auditableType: Certificate::class,
                 auditableId: $certificate->id,
                 oldValues: null,
@@ -278,29 +348,77 @@ class CertificateService
                     'training_session_id' => $trainingSession?->id,
                     'module_id' => $module->id,
                     'completion_date' => $parsedCompletionDate->toDateString(),
-                    'pdf_storage_key' => $certificate->pdf_storage_key,
                 ],
-                reason: $notes ?: 'Administrator issued official completion certificate.',
+                reason: $notes ?: 'Administrator approved certificate and queued PDF generation.',
                 actor: $admin,
             );
 
+            DB::afterCommit(fn () => GenerateCertificatePdfJob::dispatch($certificate->id));
+
             return $certificate->fresh(['user', 'trainingSession', 'module', 'issuer']);
         });
+
+        return $certificate->fresh(['user', 'trainingSession', 'module', 'issuer']);
+    }
+
+    public function generateApprovedPdf(int $certificateId): Certificate
+    {
+        try {
+            $certificate = DB::transaction(function () use ($certificateId): Certificate {
+                $certificate = Certificate::query()
+                    ->whereKey($certificateId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($certificate->status === CertificateStatus::Revoked || $certificate->status === CertificateStatus::Issued) {
+                    return $certificate;
+                }
+
+                $certificate->update([
+                    'pdf_generation_status' => PdfGenerationStatus::Generating,
+                    'pdf_generation_attempts' => $certificate->pdf_generation_attempts + 1,
+                    'pdf_generation_error' => null,
+                ]);
+
+                $this->renderAndStorePdfLocked($certificate);
+                $certificate->update([
+                    'status' => CertificateStatus::Issued,
+                    'issued_at' => now(),
+                    'pdf_generation_status' => PdfGenerationStatus::Completed,
+                ]);
+
+                AuditLog::record(
+                    event: 'certificate.issued',
+                    auditableType: Certificate::class,
+                    auditableId: $certificate->id,
+                    oldValues: ['status' => CertificateStatus::Pending->value],
+                    newValues: [
+                        'status' => CertificateStatus::Issued->value,
+                        'pdf_generation_status' => PdfGenerationStatus::Completed->value,
+                    ],
+                    reason: 'Approved certificate PDF generation completed.',
+                    actor: $certificate->approved_by ? User::find($certificate->approved_by) : null,
+                );
+
+                return $certificate->fresh(['user']);
+            });
+        } catch (\Throwable $e) {
+            Certificate::query()->whereKey($certificateId)->update([
+                'pdf_generation_status' => PdfGenerationStatus::Failed,
+                'pdf_generation_error' => mb_substr($e->getMessage(), 0, 2000),
+            ]);
+            throw $e;
+        }
 
         if ($certificate->user) {
             app(EtmsNotificationService::class)->notifyUser(
                 user: $certificate->user,
                 eventType: 'certificate.issued',
                 title: "Certificate Issued: {$certificate->training_title_snapshot}",
-                message: "Congratulations! Your completion certificate {$certificate->certificate_number} for {$certificate->training_title_snapshot} is ready to view and download.",
+                message: "Your completion certificate {$certificate->certificate_number} is ready to view and download.",
                 actionUrl: route('portal.certificates.show', $certificate, false),
                 actionLabel: 'View & Download Certificate',
-                details: [
-                    'Certificate Number' => $certificate->certificate_number,
-                    'Training' => "{$certificate->training_code_snapshot} — {$certificate->training_title_snapshot}",
-                    'Completion Date' => $certificate->completion_date?->format('d M Y') ?? '-',
-                    'Issued Date' => $certificate->issued_at?->timezone(config('etms.display_timezone', 'Asia/Kuala_Lumpur'))->format('d M Y') ?? '-',
-                ],
+                details: ['Certificate Number' => $certificate->certificate_number],
                 reference: $certificate->certificate_number,
             );
         }
@@ -318,6 +436,7 @@ class CertificateService
         return Pdf::loadView('pdf.certificate', [
             'certificate' => $certificate,
             'logoDataUri' => $logoDataUri,
+            'signatureDataUri' => $this->resolveSignatureDataUri(),
         ])
             ->setPaper('a4', 'landscape')
             ->output();

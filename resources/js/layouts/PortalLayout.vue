@@ -852,7 +852,8 @@ function openNotificationItem(item: PortalNotificationItem): void {
                                     class="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border border-[#D9D0F2] bg-[#E8E2F8] text-[13px] font-extrabold text-[#5942B5] transition-colors hover:border-[#7057D9] hover:bg-[#EAE5F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/40"
                                     :aria-label="`User profile menu for ${user?.name ?? 'User'}`"
                                 >
-                                    {{ userInitials }}
+                                    <img v-if="user?.photoUrl" :src="user.photoUrl" alt="" class="h-full w-full rounded-full object-cover"/>
+                                    <span v-else>{{ userInitials }}</span>
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent class="portal-violet w-64 font-sans">

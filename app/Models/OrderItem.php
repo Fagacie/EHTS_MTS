@@ -17,6 +17,7 @@ class OrderItem extends Model
         'item_type',
         'training_session_id',
         'module_id',
+        'session_material_id',
         'item_code_snapshot',
         'item_title_snapshot',
         'unit_price',
@@ -52,6 +53,11 @@ class OrderItem extends Model
         return $this->belongsTo(Module::class);
     }
 
+    public function sessionMaterial(): BelongsTo
+    {
+        return $this->belongsTo(SessionMaterial::class, 'session_material_id');
+    }
+
     public function booking(): HasOne
     {
         return $this->hasOne(Booking::class);
@@ -60,5 +66,10 @@ class OrderItem extends Model
     public function moduleEntitlement(): HasOne
     {
         return $this->hasOne(ModuleEntitlement::class);
+    }
+
+    public function sessionDocumentEntitlement(): HasOne
+    {
+        return $this->hasOne(SessionDocumentEntitlement::class);
     }
 }

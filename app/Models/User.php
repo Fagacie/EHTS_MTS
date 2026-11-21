@@ -5,8 +5,6 @@ namespace App\Models;
 use App\Enums\RoleSlug;
 use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +16,9 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
-class User extends Authenticatable implements FilamentUser, MustVerifyEmail
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
@@ -30,13 +29,12 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         'email',
         'password',
         'email_verified_at',
+        'photo_storage_disk',
+        'photo_storage_key',
         'status',
         'status_reason',
         'status_changed_at',
         'status_changed_by',
-        'two_factor_secret',
-        'two_factor_recovery_codes',
-        'two_factor_confirmed_at',
         'last_login_at',
     ];
 
@@ -44,8 +42,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
-        'two_factor_secret',
-        'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -55,9 +51,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'password' => 'hashed',
             'status' => UserStatus::class,
             'status_changed_at' => 'datetime',
-            'two_factor_secret' => 'encrypted',
-            'two_factor_recovery_codes' => 'encrypted:array',
-            'two_factor_confirmed_at' => 'datetime',
             'last_login_at' => 'datetime',
         ];
     }
@@ -81,6 +74,15 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function instructorProfile(): HasOne
     {
         return $this->hasOne(InstructorProfile::class);
+    }
+
+    public function photoUrl(): ?string
+    {
+        if (blank($this->photo_storage_key)) {
+            return null;
+        }
+
+        return Storage::disk($this->photo_storage_disk ?: 'public')->url($this->photo_storage_key);
     }
 
     public function assignedSessions(): BelongsToMany
@@ -220,11 +222,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return $this->hasRole(RoleSlug::Customer);
     }
 
-    public function hasConfirmedTwoFactor(): bool
-    {
-        return $this->two_factor_confirmed_at !== null && ! empty($this->two_factor_secret);
-    }
-
     public function primaryRoleSlug(): ?string
     {
         foreach ([RoleSlug::Administrator, RoleSlug::Instructor, RoleSlug::Customer] as $priority) {
@@ -239,7 +236,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function defaultDashboardUrl(): string
     {
         if ($this->isAdministrator()) {
-            return route('filament.admin.pages.dashboard');
+            return route('admin-vue.dashboard');
         }
 
         if ($this->isInstructor()) {
@@ -284,19 +281,13 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             $portals[] = [
                 'slug' => RoleSlug::Administrator->value,
                 'label' => 'Administrator Panel',
-                'description' => 'Filament 5 operations & RBAC',
-                'url' => route('filament.admin.pages.dashboard'),
-                'route_pattern' => 'filament.admin.*',
+                'description' => 'Vue administrator workspace',
+                'url' => route('admin-vue.dashboard'),
+                'route_pattern' => 'admin-vue.*',
             ];
         }
 
         return $portals;
     }
 
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return $this->isActive()
-            && $this->hasVerifiedEmail()
-            && $this->isAdministrator();
-    }
 }

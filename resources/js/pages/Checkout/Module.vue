@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { AlertCircle, ArrowLeft, Info } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
@@ -18,18 +17,16 @@ import PortalLayout from '@/layouts/PortalLayout.vue';
 import type { CheckoutModuleProps } from '@/types/etms';
 
 const props = defineProps<CheckoutModuleProps>();
+const isSessionDocument = props.purchaseKind === 'session_document';
 
 const form = useForm({
-    customer_type: props.defaults.customerType,
     phone: props.defaults.phone,
-    company_name: props.defaults.companyName,
     billing_address_line1: props.defaults.billingAddressLine1,
     billing_city: props.defaults.billingCity,
     billing_state: props.defaults.billingState,
     billing_postcode: props.defaults.billingPostcode,
 });
 
-const isCompany = computed(() => form.customer_type === 'company');
 
 function submitCheckout(): void {
     form.post(props.submitUrl, {
@@ -39,16 +36,16 @@ function submitCheckout(): void {
 </script>
 
 <template>
-    <Head title="Module Purchase Checkout" />
+    <Head :title="isSessionDocument ? 'Session Document Checkout' : 'Module Purchase Checkout'" />
 
-    <PortalLayout breadcrumb="Module Checkout">
+    <PortalLayout :breadcrumb="isSessionDocument ? 'Session Document Checkout' : 'Module Checkout'">
         <div class="mx-auto max-w-[1440px] space-y-5">
             <Link
                 :href="module.detailUrl"
                 class="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[#5942B5] transition-colors hover:text-[#7057D9] hover:underline underline-offset-4"
             >
                 <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-                <span>Back to Module Overview</span>
+                <span>{{ isSessionDocument ? 'Back to Session Overview' : 'Back to Module Overview' }}</span>
             </Link>
 
             <header class="space-y-2">
@@ -61,10 +58,12 @@ function submitCheckout(): void {
                     </Badge>
                 </div>
                 <h1 class="text-[24px] font-extrabold leading-tight tracking-tight text-[#282338] sm:text-[26px]">
-                    Independent Module Checkout
+                    {{ isSessionDocument ? 'Session Document Checkout' : 'Independent Module Checkout' }}
                 </h1>
                 <p class="text-[13.5px] text-[#625D6D]">
-                    Complete your billing details to unlock lifetime digital access to this module's learning materials and videos.
+                    {{ isSessionDocument
+                        ? 'Complete your billing details to purchase the main document for this training session.'
+                        : "Complete your billing details to unlock lifetime digital access to this module's learning materials and videos." }}
                 </p>
             </header>
 
@@ -107,27 +106,6 @@ function submitCheckout(): void {
 
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label for="checkout-module-customer-type" class="mb-1.5">
-                                            Account Type <span aria-hidden="true">*</span>
-                                        </Label>
-                                        <NativeSelect
-                                            id="checkout-module-customer-type"
-                                            v-model="form.customer_type"
-                                            name="customer_type"
-                                            required
-                                        >
-                                            <option value="individual">Individual</option>
-                                            <option value="company">Company / Organisation</option>
-                                        </NativeSelect>
-                                        <p
-                                            v-if="form.errors.customer_type"
-                                            class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                        >
-                                            {{ form.errors.customer_type }}
-                                        </p>
-                                    </div>
-
-                                    <div>
                                         <Label for="checkout-module-phone" class="mb-1.5">
                                             Contact Phone Number <span aria-hidden="true">*</span>
                                         </Label>
@@ -149,26 +127,6 @@ function submitCheckout(): void {
                                         </p>
                                     </div>
 
-                                    <div v-if="isCompany" class="sm:col-span-2">
-                                        <Label for="checkout-module-company-name" class="mb-1.5">
-                                            Company / Organisation Name <span aria-hidden="true">*</span>
-                                        </Label>
-                                        <Input
-                                            id="checkout-module-company-name"
-                                            v-model="form.company_name"
-                                            name="company_name"
-                                            type="text"
-                                            :required="isCompany"
-                                            autocomplete="organization"
-                                            :aria-invalid="form.errors.company_name ? 'true' : undefined"
-                                        />
-                                        <p
-                                            v-if="form.errors.company_name"
-                                            class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                        >
-                                            {{ form.errors.company_name }}
-                                        </p>
-                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -279,7 +237,7 @@ function submitCheckout(): void {
                 <div class="space-y-5">
                     <Card>
                         <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Module Purchase Summary</CardTitle>
+                            <CardTitle>{{ isSessionDocument ? 'Session Document Summary' : 'Module Purchase Summary' }}</CardTitle>
                         </CardHeader>
                         <CardContent class="space-y-4 pt-4">
                             <div>
@@ -328,7 +286,9 @@ function submitCheckout(): void {
                             <div>
                                 <p class="text-[14.5px] font-bold text-[#282338]">Self-Paced Digital Learning</p>
                                 <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                                    Independent module purchases include on-demand video lessons and reference materials, separate from physical session seat reservations.
+                                    {{ isSessionDocument
+                                        ? 'This purchase grants access to the published session document only. It does not create a booking, attendance record, instructor assignment, completion record, or certificate.'
+                                        : 'Independent module purchases include on-demand video lessons and reference materials, separate from physical session seat reservations.' }}
                                 </p>
                             </div>
                         </div>

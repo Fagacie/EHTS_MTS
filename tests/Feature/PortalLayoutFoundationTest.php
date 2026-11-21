@@ -208,19 +208,16 @@ class PortalLayoutFoundationTest extends TestCase
                 ->where('updateUrl', route('portal.profile.update')),
             );
 
-        // Company selection without company name returns inline validation feedback while keeping company value active
+        // Trainee profile persists only trainee and billing fields
         $this->actingAs($trainee)
             ->from(route('portal.profile.edit'))
             ->put(route('portal.profile.update'), [
                 'name' => 'Preserved Name Value',
                 'email' => $trainee->email,
-                'customer_type' => 'company',
                 'phone' => '+60 12-999 0000',
-                'company_name' => '',
                 'billing_country' => 'MY',
             ])
-            ->assertRedirect(route('portal.profile.edit'))
-            ->assertSessionHasErrors('company_name');
+            ->assertRedirect(route('portal.profile.edit'));
 
         $this->actingAs($trainee)
             ->get(route('portal.security.edit'))

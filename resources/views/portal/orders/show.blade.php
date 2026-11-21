@@ -208,8 +208,6 @@
                             </div>
                         @endif
                         <div>
-                            <dt class="text-sm font-medium text-portal-muted">Account Category</dt>
-                            <dd class="mt-0.5 text-portal-text">{{ ucwords(str_replace('_', ' ', (string) $order->customer_type)) }}</dd>
                         </div>
                         @if ($order->company_name)
                             <div>

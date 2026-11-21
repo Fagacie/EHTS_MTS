@@ -7,12 +7,14 @@ use App\Enums\AttendanceStatus;
 use App\Enums\BookingStatus;
 use App\Enums\EncodingStatus;
 use App\Enums\RecordingStatus;
+use App\Enums\SessionStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessVideoToHlsJob;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\SessionRecording;
+use App\Models\SessionMaterial;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Support\InstructorPresenter;
@@ -144,6 +146,9 @@ class InstructorSessionController extends Controller
                 if ($newStatus !== AttendanceStatus::Pending) {
                     $payload['recorded_by'] = $user->id;
                     $payload['recorded_at'] = $now;
+                } else {
+                    $payload['recorded_by'] = null;
+                    $payload['recorded_at'] = null;
                 }
 
                 $attendance->update($payload);
@@ -244,6 +249,15 @@ class InstructorSessionController extends Controller
         $user = $request->user();
         $this->ensureAssigned($user, $session);
 
+        if (
+            $session->status === \App\Enums\SessionStatus::Cancelled
+            || $session->status === \App\Enums\SessionStatus::Completed
+        ) {
+            return redirect()
+                ->route('instructor.sessions.completion', $session)
+                ->with('error', 'A completion report can only be submitted after the session has started and before administrator completion approval.');
+        }
+
         $validated = $request->validate([
             'completion_notes' => ['required', 'string', 'min:10', 'max:5000'],
         ]);
@@ -252,8 +266,6 @@ class InstructorSessionController extends Controller
             'completion_notes' => $validated['completion_notes'],
             'completion_submitted_by' => $user->id,
             'completion_submitted_at' => now(),
-            'completed_at' => $session->completed_at ?? now(),
-            'completed_by' => $session->completed_by ?? $user->id,
             'updated_by' => $user->id,
         ]);
 
@@ -263,7 +275,7 @@ class InstructorSessionController extends Controller
             auditableId: $session->id,
             oldValues: null,
             newValues: [
-                'completed_at' => $session->completed_at?->toIso8601String(),
+                'completion_submitted_at' => $session->completion_submitted_at?->toIso8601String(),
             ],
             reason: 'Instructor submitted session completion report.',
             actor: $user,
@@ -368,6 +380,41 @@ class InstructorSessionController extends Controller
         return redirect()
             ->route('instructor.sessions.recordings', $session)
             ->with('status', 'Session recording uploaded to server storage and submitted for administrator review.');
+    }
+
+    public function storeMaterial(Request $request, TrainingSession $session): RedirectResponse
+    {
+        $user = $request->user();
+        $this->ensureAssigned($user, $session);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'material_type' => ['required', 'in:pdf,presentation,document,image,worksheet,other'],
+            'material_file' => ['required', 'file', 'max:102400'],
+        ]);
+
+        $file = $request->file('material_file');
+        $storageKey = $file->store("sessions/{$session->id}", 'session-materials');
+
+        SessionMaterial::query()->create([
+            'training_session_id' => $session->id,
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'material_type' => $validated['material_type'],
+            'storage_disk' => 'session-materials',
+            'storage_key' => $storageKey,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $file->getClientMimeType(),
+            'file_size_bytes' => $file->getSize(),
+            'checksum_sha256' => hash_file('sha256', $file->getRealPath()),
+            'status' => \App\Enums\SessionMaterialStatus::PendingReview,
+            'uploaded_by' => $user->id,
+        ]);
+
+        return redirect()
+            ->route('instructor.sessions.show', $session)
+            ->with('status', 'Session material submitted for administrator review.');
     }
 
     protected function ensureAssigned(User $user, TrainingSession $session): void

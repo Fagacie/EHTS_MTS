@@ -68,7 +68,6 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
-        $request->session()->forget('auth.two_factor_verified');
 
         $user->forceFill(['last_login_at' => now()])->save();
 
@@ -84,9 +83,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         if ($user->isAdministrator()) {
-            return redirect()->route(
-                $user->hasConfirmedTwoFactor() ? 'two-factor.challenge' : 'two-factor.setup',
-            );
+            return redirect()->route('admin-vue.dashboard');
         }
 
         return PortalPresenter::inertiaSafeRedirect(

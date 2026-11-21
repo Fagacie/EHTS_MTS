@@ -51,9 +51,8 @@ class EmailVerificationController extends Controller
         }
 
         if ($user->isAdministrator()) {
-            return redirect()->route(
-                $user->hasConfirmedTwoFactor() ? 'two-factor.challenge' : 'two-factor.setup',
-            )->with('status', 'Email address verified. Complete administrator MFA to continue.');
+            return redirect()->route('admin-vue.dashboard')
+                ->with('status', 'Email address verified.');
         }
 
         return redirect()

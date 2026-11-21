@@ -3,9 +3,14 @@
 namespace Database\Seeders;
 
 use App\Models\Certificate;
+use App\Models\Attendance;
+use App\Models\Booking;
 use App\Models\SystemSetting;
 use App\Models\TrainingSession;
 use App\Models\User;
+use App\Enums\AttendanceReviewStatus;
+use App\Enums\AttendanceStatus;
+use App\Enums\SessionStatus;
 use App\Services\Certificate\CertificateService;
 use Illuminate\Database\Seeder;
 
@@ -65,12 +70,46 @@ class CertificateSeeder extends Seeder
             return;
         }
 
-        $session3 = TrainingSession::query()->where('session_code', 'SES-2026-003')->first();
-        if ($session3) {
+        $certificateSession = TrainingSession::query()->where('session_code', 'SES-2026-003')->first();
+        if ($certificateSession) {
+            $certificateSession->update([
+                'status' => SessionStatus::Completed,
+                'completed_at' => $certificateSession->completed_at ?? now()->subDay(),
+                'completed_by' => $certificateSession->completed_by ?? $admin->id,
+                'completion_notes' => $certificateSession->completion_notes ?: 'Seeded demo session completion.',
+                'completion_submitted_by' => $certificateSession->completion_submitted_by ?? $admin->id,
+                'completion_submitted_at' => $certificateSession->completion_submitted_at ?? now()->subDays(2),
+            ]);
+
+            $booking = Booking::query()
+                ->where('user_id', $trainee->id)
+                ->where('training_session_id', $certificateSession->id)
+                ->where('status', 'confirmed')
+                ->firstOrFail();
+
+            Attendance::query()
+                ->updateOrCreate(
+                    [
+                        'training_session_id' => $certificateSession->id,
+                        'booking_id' => $booking->id,
+                    ],
+                    [
+                        'user_id' => $trainee->id,
+                        'attendance_status' => AttendanceStatus::Present,
+                        'review_status' => AttendanceReviewStatus::Verified,
+                        'recorded_by' => $admin->id,
+                        'recorded_at' => now()->subDay(),
+                        'submitted_by' => $admin->id,
+                        'submitted_at' => now()->subDay(),
+                        'verified_by' => $admin->id,
+                        'verified_at' => now()->subDay(),
+                    ],
+                );
+
             $alreadyExists = Certificate::query()
                 ->where('user_id', $trainee->id)
                 ->where('record_type', 'session')
-                ->where('training_session_id', $session3->id)
+                ->where('training_session_id', $certificateSession->id)
                 ->exists();
 
             if (! $alreadyExists) {
@@ -78,11 +117,34 @@ class CertificateSeeder extends Seeder
                     admin: $admin,
                     trainee: $trainee,
                     recordType: 'session',
-                    recordId: $session3->id,
+                    recordId: $certificateSession->id,
                     completionDate: now()->subDay()->toDateString(),
                     notes: 'Seeded demo completion certificate.',
                 );
             }
+
+            $certificateSession->update([
+                'status' => SessionStatus::Published,
+                'completed_at' => null,
+                'completed_by' => null,
+                'completion_notes' => null,
+                'completion_submitted_by' => null,
+                'completion_submitted_at' => null,
+            ]);
+
+            Attendance::query()
+                ->where('training_session_id', $certificateSession->id)
+                ->where('user_id', $trainee->id)
+                ->update([
+                    'attendance_status' => AttendanceStatus::Pending,
+                    'review_status' => AttendanceReviewStatus::Draft,
+                    'recorded_by' => null,
+                    'recorded_at' => null,
+                    'submitted_by' => null,
+                    'submitted_at' => null,
+                    'verified_by' => null,
+                    'verified_at' => null,
+                ]);
         }
     }
 }

@@ -271,6 +271,7 @@ class PortalDashboardController extends Controller
             ->where('review_status', AttendanceReviewStatus::Verified->value)
             ->whereHas('booking', fn ($query) => $query->where('status', BookingStatus::Confirmed->value))
             ->whereHas('trainingSession', fn ($query) => $query
+                ->where('status', SessionStatus::Completed->value)
                 ->where('recording_access_policy', RecordingAccessPolicy::AttendeesOnly->value)
                 ->whereHas('recordings', fn ($recordings) => $recordings->where('status', RecordingStatus::Published->value)))
             ->exists();

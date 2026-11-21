@@ -310,9 +310,6 @@ Scheduled in-person training events belonging to a module (FR-03, BR-04, BR-05; 
 | `venue_address` | `TEXT` | YES | `NULL` | — | Full venue street address |
 | `venue_city` | `VARCHAR(100)` | YES | `NULL` | — | Venue city |
 | `venue_state` | `VARCHAR(100)` | YES | `NULL` | — | Venue state |
-| `venue_postcode` | `VARCHAR(20)` | YES | `NULL` | — | Venue postcode |
-| `venue_map_url` | `VARCHAR(500)` | YES | `NULL` | — | Optional Google Maps URL |
-| `venue_notes` | `TEXT` | YES | `NULL` | — | Room, parking, PPE/safety notes |
 | `capacity` | `INT UNSIGNED` | NO | — | `CHECK (capacity >= 1)` | Maximum physical participants (BR-03) |
 | `reserved_seats_count` | `INT UNSIGNED` | NO | `0` | — | Synchronized count of active `pending_payment` bookings (`D-033`) |
 | `confirmed_seats_count` | `INT UNSIGNED` | NO | `0` | — | Synchronized count of active `confirmed` bookings (`D-033`) |

@@ -149,6 +149,9 @@ class PublicHomepageInertiaTest extends TestCase
             ->assertOk();
 
         $this->get('/admin')
+            ->assertNotFound();
+
+        $this->get(route('admin-vue.dashboard'))
             ->assertRedirect(route('login'));
     }
 }

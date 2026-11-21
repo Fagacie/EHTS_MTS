@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { AlertCircle, ArrowLeft, Info } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
@@ -21,16 +20,13 @@ import type { CheckoutSessionProps } from '@/types/etms';
 const props = defineProps<CheckoutSessionProps>();
 
 const form = useForm({
-    customer_type: props.defaults.customerType,
     phone: props.defaults.phone,
-    company_name: props.defaults.companyName,
     billing_address_line1: props.defaults.billingAddressLine1,
     billing_city: props.defaults.billingCity,
     billing_state: props.defaults.billingState,
     billing_postcode: props.defaults.billingPostcode,
 });
 
-const isCompanySponsored = computed(() => form.customer_type === 'company_sponsored');
 
 function submitCheckout(): void {
     form.post(props.submitUrl, {
@@ -136,27 +132,6 @@ function submitCheckout(): void {
 
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label for="checkout-session-customer-type" class="mb-1.5">
-                                            Booking Type <span aria-hidden="true">*</span>
-                                        </Label>
-                                        <NativeSelect
-                                            id="checkout-session-customer-type"
-                                            v-model="form.customer_type"
-                                            name="customer_type"
-                                            required
-                                        >
-                                            <option value="individual">Individual</option>
-                                            <option value="company_sponsored">Company Sponsored</option>
-                                        </NativeSelect>
-                                        <p
-                                            v-if="form.errors.customer_type"
-                                            class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                        >
-                                            {{ form.errors.customer_type }}
-                                        </p>
-                                    </div>
-
-                                    <div>
                                         <Label for="checkout-session-phone" class="mb-1.5">
                                             Contact Phone Number <span aria-hidden="true">*</span>
                                         </Label>
@@ -178,26 +153,6 @@ function submitCheckout(): void {
                                         </p>
                                     </div>
 
-                                    <div v-if="isCompanySponsored" class="sm:col-span-2">
-                                        <Label for="checkout-session-company-name" class="mb-1.5">
-                                            Sponsoring Company / Organisation <span aria-hidden="true">*</span>
-                                        </Label>
-                                        <Input
-                                            id="checkout-session-company-name"
-                                            v-model="form.company_name"
-                                            name="company_name"
-                                            type="text"
-                                            :required="isCompanySponsored"
-                                            autocomplete="organization"
-                                            :aria-invalid="form.errors.company_name ? 'true' : undefined"
-                                        />
-                                        <p
-                                            v-if="form.errors.company_name"
-                                            class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                        >
-                                            {{ form.errors.company_name }}
-                                        </p>
-                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

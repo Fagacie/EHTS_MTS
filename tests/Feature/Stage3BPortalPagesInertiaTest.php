@@ -52,7 +52,6 @@ class Stage3BPortalPagesInertiaTest extends TestCase
     {
         $admin = User::query()->where('email', 'admin@ecohydrotech.com.my')->firstOrFail();
         $trainee = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();
-        $trainee->forceFill(['two_factor_secret' => 'SENSITIVE_TOTP_SECRET_VALUE'])->save();
 
         $module = Module::query()->where('code', 'EHT-HYD-101')->firstOrFail();
         ModuleEntitlement::query()->create([
@@ -177,7 +176,6 @@ class Stage3BPortalPagesInertiaTest extends TestCase
                 'venue_address' => 'Menara Ecohydrotech',
                 'venue_city' => 'Shah Alam',
                 'venue_state' => 'Selangor',
-                'venue_postcode' => '40000',
                 'capacity' => 25,
                 'reserved_seats_count' => 0,
                 'confirmed_seats_count' => 0,
@@ -413,29 +411,15 @@ class Stage3BPortalPagesInertiaTest extends TestCase
         $this->actingAs($trainee)
             ->from(route('portal.profile.edit'))
             ->put(route('portal.profile.update'), [
-                'name' => $trainee->name,
-                'email' => $trainee->email,
-                'customer_type' => 'company',
-                'company_name' => '',
-                'billing_country' => 'MY',
-            ])
-            ->assertRedirect(route('portal.profile.edit'))
-            ->assertSessionHasErrors('company_name');
-
-        $this->actingAs($trainee)
-            ->from(route('portal.profile.edit'))
-            ->put(route('portal.profile.update'), [
                 'name' => 'Ahmad Faiz bin Kamaruddin',
                 'email' => $trainee->email,
-                'customer_type' => 'company',
-                'company_name' => 'Perunding Ecohydrology Sdn. Bhd.',
                 'phone' => '+6019-245 7710',
                 'billing_country' => 'MY',
             ])
             ->assertRedirect(route('portal.profile.edit'))
             ->assertSessionHas('status');
 
-        $this->assertSame('Perunding Ecohydrology Sdn. Bhd.', $trainee->fresh()->customerProfile->company_name);
+        $this->assertSame('Ahmad Faiz bin Kamaruddin', $trainee->fresh()->name);
 
         // Security wrong current password returns error; valid password updates hash & emits notification
         $this->actingAs($trainee)

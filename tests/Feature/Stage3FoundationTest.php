@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
-use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class Stage3FoundationTest extends TestCase
@@ -156,10 +155,7 @@ class Stage3FoundationTest extends TestCase
         $instructor = User::factory()->create();
         $instructor->assignRole(RoleSlug::Instructor);
 
-        $admin = User::factory()->create([
-            'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
-            'two_factor_confirmed_at' => now(),
-        ]);
+        $admin = User::factory()->create();
         $admin->assignRole(RoleSlug::Administrator);
 
         // Customer boundaries
@@ -202,47 +198,15 @@ class Stage3FoundationTest extends TestCase
             ->assertSee('Instructor Portal');
     }
 
-    public function test_administrator_mfa_enforcement_and_filament_panel_access(): void
+    public function test_administrator_can_access_vue_workspace(): void
     {
-        $adminWithoutMfa = User::factory()->create();
-        $adminWithoutMfa->assignRole(RoleSlug::Administrator);
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleSlug::Administrator);
 
-        // Admin without configured TOTP is routed to setup
-        $this->actingAs($adminWithoutMfa)
-            ->get('/admin')
-            ->assertRedirect(route('two-factor.setup'));
-
-        $secret = 'JBSWY3DPEHPK3PXP';
-        $adminWithMfa = User::factory()->create([
-            'two_factor_secret' => $secret,
-            'two_factor_recovery_codes' => ['ABCD-1234', 'EFGH-5678'],
-            'two_factor_confirmed_at' => now(),
-        ]);
-        $adminWithMfa->assignRole(RoleSlug::Administrator);
-
-        // Admin with TOTP configured must complete challenge before accessing Filament
-        $this->actingAs($adminWithMfa)
-            ->get('/admin')
-            ->assertRedirect(route('two-factor.challenge'));
-
-        $otp = (new Google2FA)->getCurrentOtp($secret);
-
-        $this->actingAs($adminWithMfa)
-            ->post(route('two-factor.challenge.verify'), ['code' => $otp])
-            ->assertRedirect(route('filament.admin.pages.dashboard'));
-
-        $this->actingAs($adminWithMfa)
-            ->get('/admin')
+        $this->actingAs($admin)
+            ->get(route('admin-vue.dashboard'))
             ->assertOk()
-            ->assertSee('Ecohydrotech ETMS Admin');
-
-        $this->actingAs($adminWithMfa)
-            ->get('/admin/users')
-            ->assertOk();
-
-        $this->actingAs($adminWithMfa)
-            ->get('/admin/audit-logs')
-            ->assertOk();
+            ->assertInertia(fn (Assert $page) => $page->component('Admin/Dashboard'));
     }
 
     public function test_mysql_check_constraints_reject_invalid_status_and_role_slug(): void

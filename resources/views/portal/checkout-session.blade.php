@@ -1,9 +1,4 @@
 <x-layouts.portal title="Session Booking Checkout">
-    @php
-        $defaultCustomerType = $profile->customer_type?->value === 'company' ? 'company_sponsored' : 'individual';
-        $selectedCustomerType = old('customer_type', $defaultCustomerType);
-        $isCompanySponsored = $selectedCustomerType === 'company_sponsored';
-    @endphp
 
     <div class="space-y-6">
         <div class="flex items-center justify-between gap-3">
@@ -85,18 +80,6 @@
 
                             <div class="grid gap-5 sm:grid-cols-2">
                                 <div>
-                                    <x-portal.select
-                                        id="checkout-session-customer-type"
-                                        name="customer_type"
-                                        label="Booking Type"
-                                        :required="true"
-                                    >
-                                        <option value="individual" @selected(! $isCompanySponsored)>Individual</option>
-                                        <option value="company_sponsored" @selected($isCompanySponsored)>Company Sponsored</option>
-                                    </x-portal.select>
-                                </div>
-
-                                <div>
                                     <x-portal.input
                                         type="tel"
                                         name="phone"
@@ -108,16 +91,6 @@
                                     />
                                 </div>
 
-                                <div id="checkout-session-company-wrap" class="sm:col-span-2 {{ $isCompanySponsored ? '' : 'hidden' }}">
-                                    <x-portal.input
-                                        id="checkout-session-company-name"
-                                        name="company_name"
-                                        label="Sponsoring Company / Organisation"
-                                        :value="old('company_name', $profile->company_name)"
-                                        autocomplete="organization"
-                                        :required="$isCompanySponsored"
-                                    />
-                                </div>
                             </div>
                         </div>
                     </x-portal.card>
@@ -227,30 +200,4 @@
         </div>
     </div>
 
-    <script>
-        (function () {
-            const select = document.getElementById('checkout-session-customer-type');
-            const companyWrap = document.getElementById('checkout-session-company-wrap');
-            const companyInput = document.getElementById('checkout-session-company-name');
-
-            if (!select || !companyWrap) {
-                return;
-            }
-
-            const sync = () => {
-                const show = select.value === 'company_sponsored';
-                companyWrap.classList.toggle('hidden', !show);
-                if (companyInput) {
-                    if (show) {
-                        companyInput.setAttribute('required', 'required');
-                    } else {
-                        companyInput.removeAttribute('required');
-                    }
-                }
-            };
-
-            select.addEventListener('change', sync);
-            sync();
-        })();
-    </script>
 </x-layouts.portal>

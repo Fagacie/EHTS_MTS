@@ -26,7 +26,7 @@ const { routes } = useRoutes();
     <Head :title="instructor.displayName" />
 
     <PublicLayout>
-        <section class="border-b border-[#272d38]/10 bg-white py-8 lg:py-10">
+        <section class="border-b border-[#252238]/10 bg-[#F7F8FC] py-10 lg:py-14">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <Breadcrumb>
                     <BreadcrumbList>
@@ -45,17 +45,17 @@ const { routes } = useRoutes();
                         v-if="instructor.photoUrl"
                         :src="instructor.photoUrl"
                         :alt="instructor.displayName"
-                        class="h-20 w-20 shrink-0 rounded-full border border-[#272d38]/12 object-cover"
+                        class="h-28 w-28 shrink-0 rounded-full border-4 border-white object-cover shadow-lg"
                     >
                     <span
                         v-else
-                        class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#272d38] text-xl font-bold tracking-wide text-white"
+                        class="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-[#7057D9] text-2xl font-bold tracking-wide text-white shadow-lg"
                     >
                         {{ getInitials(instructor.displayName) }}
                     </span>
 
                     <div>
-                        <h1 class="text-3xl font-bold text-[#272d38] sm:text-4xl">
+                        <h1 class="text-4xl font-extrabold text-[#252238] sm:text-5xl">
                             {{ instructor.displayName }}
                         </h1>
                         <p

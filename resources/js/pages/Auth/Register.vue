@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AuthLayout from '@/layouts/AuthLayout.vue';
-import { cn } from '@/lib/utils';
 import type { AuthRegisterProps } from '@/types/etms';
 
 const props = defineProps<AuthRegisterProps>();
@@ -15,16 +14,12 @@ const form = useForm({
     name: '',
     email: '',
     phone: '',
-    customer_type: 'individual' as 'individual' | 'company',
-    company_name: '',
-    company_registration_no: '',
     password: '',
     password_confirmation: '',
 });
 
 const showPassword = ref(false);
 const showConfirm = ref(false);
-const isCompany = computed(() => form.customer_type === 'company');
 
 function submitRegistration(): void {
     form.post(props.submitUrl, {
@@ -116,102 +111,6 @@ function submitRegistration(): void {
                 </div>
             </div>
 
-            <fieldset class="space-y-2">
-                <legend class="block text-[15px] font-semibold text-[#272d38]">
-                    Purchase profile type
-                </legend>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label
-                        :class="
-                            cn(
-                                'flex cursor-pointer items-start gap-2.5 rounded-xl border p-3.5 transition-colors',
-                                !isCompany
-                                    ? 'border-[#272d38] bg-[#272d38]/[0.04]'
-                                    : 'border-[#272d38]/15 bg-white hover:border-[#272d38]/35',
-                            )
-                        "
-                    >
-                        <input
-                            v-model="form.customer_type"
-                            type="radio"
-                            name="customer_type"
-                            value="individual"
-                            class="mt-0.5 h-4 w-4 accent-[#272d38]"
-                        >
-                        <span>
-                            <span class="block text-[14px] font-bold text-[#272d38]">Individual</span>
-                            <span class="block text-[13px] text-[#272d38]/65">Personal training receipt</span>
-                        </span>
-                    </label>
-
-                    <label
-                        :class="
-                            cn(
-                                'flex cursor-pointer items-start gap-2.5 rounded-xl border p-3.5 transition-colors',
-                                isCompany
-                                    ? 'border-[#272d38] bg-[#272d38]/[0.04]'
-                                    : 'border-[#272d38]/15 bg-white hover:border-[#272d38]/35',
-                            )
-                        "
-                    >
-                        <input
-                            v-model="form.customer_type"
-                            type="radio"
-                            name="customer_type"
-                            value="company"
-                            class="mt-0.5 h-4 w-4 accent-[#272d38]"
-                        >
-                        <span>
-                            <span class="block text-[14px] font-bold text-[#272d38]">Company Buyer</span>
-                            <span class="block text-[13px] text-[#272d38]/65">Include company billing</span>
-                        </span>
-                    </label>
-                </div>
-            </fieldset>
-
-            <div
-                v-if="isCompany"
-                class="space-y-3 rounded-xl border border-[#272d38]/15 bg-[#272d38]/[0.02] p-4"
-            >
-                <p class="text-[13px] leading-relaxed text-[#272d38]/70">
-                    Company billing details appear on your order receipt. Bookings remain registered to your personal account.
-                </p>
-
-                <div>
-                    <Label for="company_name" class="mb-1.5">
-                        Company name <span aria-hidden="true">*</span>
-                    </Label>
-                    <Input
-                        id="company_name"
-                        v-model="form.company_name"
-                        name="company_name"
-                        type="text"
-                        :required="isCompany"
-                        placeholder="Ecohydro Engineering Sdn. Bhd."
-                        :aria-invalid="form.errors.company_name ? 'true' : undefined"
-                    />
-                    <p
-                        v-if="form.errors.company_name"
-                        class="mt-1.5 text-[14px] font-semibold text-[#272d38]"
-                    >
-                        {{ form.errors.company_name }}
-                    </p>
-                </div>
-
-                <div>
-                    <Label for="company_registration_no" class="mb-1.5">
-                        Company registration / SSM No.
-                        <span class="ml-1 font-normal text-[#272d38]/55">(Optional)</span>
-                    </Label>
-                    <Input
-                        id="company_registration_no"
-                        v-model="form.company_registration_no"
-                        name="company_registration_no"
-                        type="text"
-                        placeholder="202001012345 (1368665-X)"
-                    />
-                </div>
-            </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>

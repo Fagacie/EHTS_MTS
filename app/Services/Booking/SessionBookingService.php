@@ -143,11 +143,8 @@ class SessionBookingService
             $expiresAt = $now->copy()->addMinutes($holdMinutes);
             $profile = $user->customerProfile;
 
-            $companyName = $billingInput['company_name'] ?? $profile?->company_name;
-            $rawCustomerType = $billingInput['customer_type']
-                ?? ((! blank($companyName) || $profile?->isCompany()) ? 'company' : 'individual');
-
-            $customerType = in_array($rawCustomerType, ['company', 'company_sponsored'], true) ? 'company' : 'individual';
+            $customerType = 'individual';
+            $companyName = null;
 
             $phone = $billingInput['phone'] ?? $profile?->phone;
             $addr = $billingInput['billing_address'] ?? [];
@@ -268,6 +265,15 @@ class SessionBookingService
 
             if (! in_array($lockedBooking->status, [BookingStatus::PendingPayment, BookingStatus::Expired], true)) {
                 throw new DomainException('Only pending or expired bookings can be confirmed.');
+            }
+
+            $successfulPayment = Payment::query()
+                ->where('order_id', $lockedBooking->order_id)
+                ->where('status', PaymentStatus::Successful->value)
+                ->exists();
+
+            if ($lockedBooking->order?->status !== OrderStatus::Paid || ! $successfulPayment) {
+                throw new DomainException('A booking can only be confirmed after verified Billplz payment.');
             }
 
             [$activeReserved, $activeConfirmed] = $this->computeActiveCountsLocked($lockedSession->id);

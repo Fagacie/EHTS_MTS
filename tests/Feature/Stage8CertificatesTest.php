@@ -3,9 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\CertificateStatus;
+use App\Enums\AttendanceReviewStatus;
+use App\Enums\AttendanceStatus;
+use App\Enums\EntitlementStatus;
 use App\Enums\RoleSlug;
 use App\Models\Certificate;
+use App\Models\Attendance;
 use App\Models\Module;
+use App\Models\ModuleEntitlement;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\Certificate\CertificateService;
@@ -43,10 +48,46 @@ class Stage8CertificatesTest extends TestCase
     {
         $admin = User::query()->where('email', 'admin@ecohydrotech.com.my')->firstOrFail();
         $trainee = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();
-        $session1 = TrainingSession::query()->where('session_code', 'SES-2026-001')->firstOrFail();
+        $session1 = TrainingSession::query()->where('session_code', 'SES-2026-003')->firstOrFail();
         $module101 = Module::query()->where('code', 'EHT-HYD-101')->firstOrFail();
 
         $certificateService = app(CertificateService::class);
+        $seededCertificate = Certificate::query()
+            ->where('user_id', $trainee->id)
+            ->where('training_session_id', $session1->id)
+            ->firstOrFail();
+        $certificateService->revokeCertificate($seededCertificate, $admin, 'Reissued during certificate lifecycle test.');
+        $session1->update([
+            'status' => \App\Enums\SessionStatus::Completed,
+            'completed_at' => now()->subDay(),
+            'completed_by' => $admin->id,
+        ]);
+        Attendance::query()
+            ->where('training_session_id', $session1->id)
+            ->where('user_id', $trainee->id)
+            ->update([
+                'attendance_status' => AttendanceStatus::Present,
+                'review_status' => AttendanceReviewStatus::Verified,
+                'recorded_by' => $admin->id,
+                'recorded_at' => now()->subDay(),
+                'submitted_by' => $admin->id,
+                'submitted_at' => now()->subDay(),
+                'verified_by' => $admin->id,
+                'verified_at' => now()->subDay(),
+            ]);
+        ModuleEntitlement::query()->updateOrCreate(
+            [
+                'user_id' => $trainee->id,
+                'module_id' => $module101->id,
+            ],
+            [
+                'grant_source' => 'admin_grant',
+                'status' => EntitlementStatus::Active,
+                'granted_at' => now(),
+                'granted_by' => $admin->id,
+                'grant_reason' => 'Certificate lifecycle test entitlement.',
+            ],
+        );
 
         // Configure custom global signatory details in system_settings
         $certificateService->updateGlobalSettings(
@@ -279,32 +320,18 @@ class Stage8CertificatesTest extends TestCase
         $this->assertTrue($history->contains('event', 'certificate.revoked'));
     }
 
-    public function test_filament_admin_certificate_resource_and_mysql_revocation_check_constraint(): void
+    public function test_vue_admin_certificate_workspace_and_mysql_revocation_check_constraint(): void
     {
         $admin = User::query()->where('email', 'admin@ecohydrotech.com.my')->firstOrFail();
         $customer = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();
         $certificate = Certificate::query()->where('user_id', $customer->id)->firstOrFail();
 
-        $this->actingAs($customer)->get('/admin/certificates')->assertForbidden();
+        $this->actingAs($customer)->get(route('admin-vue.certificates.index'))->assertForbidden();
 
         $this->actingAs($admin)
-            ->withSession(['auth.two_factor_verified' => true])
-            ->get('/admin/certificates')
+            ->get(route('admin-vue.certificates.index'))
             ->assertOk()
             ->assertSee($certificate->certificate_number);
-
-        $this->actingAs($admin)
-            ->withSession(['auth.two_factor_verified' => true])
-            ->get('/admin/certificates/create')
-            ->assertOk()
-            ->assertSee('Select Trainee & Completed Training Record');
-
-        $this->actingAs($admin)
-            ->withSession(['auth.two_factor_verified' => true])
-            ->get("/admin/certificates/{$certificate->id}")
-            ->assertOk()
-            ->assertSee('Certificate Issuance & Revocation History')
-            ->assertSee('certificate.issued');
 
         // Admin CAN download stored PDF from Filament/controller for inspection
         $this->actingAs($admin)

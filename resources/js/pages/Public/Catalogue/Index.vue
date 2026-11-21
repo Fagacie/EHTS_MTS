@@ -159,11 +159,12 @@ function clearFilters(): void {
     <Head title="Training Catalogue" />
 
     <PublicLayout>
-        <section class="border-b border-[#272d38]/10 bg-white py-12 lg:py-16">
+        <section class="border-b border-[#252238]/10 bg-[#F7F8FC] py-14 lg:py-20">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                     <div class="max-w-2xl">
-                        <h1 class="text-3xl font-bold text-[#272d38] sm:text-4xl">
+                        <p class="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-[#159CAA]">Training programmes</p>
+                        <h1 class="text-4xl font-extrabold text-[#252238] sm:text-5xl">
                             Training Catalogue
                         </h1>
                         <p class="mt-3 text-[16px] leading-relaxed text-[#272d38]/70">
@@ -188,7 +189,7 @@ function clearFilters(): void {
 
         <section class="bg-white py-12 lg:py-16" aria-label="Training programmes">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <div class="flex flex-col gap-4 border-b border-[#272d38]/10 pb-6">
+                <div class="flex flex-col gap-4 rounded-lg border border-[#252238]/10 bg-[#F7F8FC] p-4">
                     <div class="grid gap-3 md:grid-cols-12 md:items-center">
                         <div class="relative md:col-span-5">
                             <label for="catalogue-search-input" class="sr-only">

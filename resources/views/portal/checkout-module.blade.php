@@ -1,7 +1,5 @@
 <x-layouts.portal title="Module Purchase Checkout">
     @php
-        $selectedCustomerType = old('customer_type', $profile->customer_type?->value ?? 'individual');
-        $isCompany = $selectedCustomerType === 'company';
         $videoCount = $module->publishedVideos()->count();
         $materialCount = $module->publishedMaterials()->count();
     @endphp
@@ -68,18 +66,6 @@
 
                             <div class="grid gap-5 sm:grid-cols-2">
                                 <div>
-                                    <x-portal.select
-                                        id="checkout-module-customer-type"
-                                        name="customer_type"
-                                        label="Account Type"
-                                        :required="true"
-                                    >
-                                        <option value="individual" @selected(! $isCompany)>Individual</option>
-                                        <option value="company" @selected($isCompany)>Company / Organisation</option>
-                                    </x-portal.select>
-                                </div>
-
-                                <div>
                                     <x-portal.input
                                         type="tel"
                                         name="phone"
@@ -91,16 +77,6 @@
                                     />
                                 </div>
 
-                                <div id="checkout-module-company-wrap" class="sm:col-span-2 {{ $isCompany ? '' : 'hidden' }}">
-                                    <x-portal.input
-                                        id="checkout-module-company-name"
-                                        name="company_name"
-                                        label="Company / Organisation Name"
-                                        :value="old('company_name', $profile->company_name)"
-                                        autocomplete="organization"
-                                        :required="$isCompany"
-                                    />
-                                </div>
                             </div>
                         </div>
                     </x-portal.card>
@@ -208,30 +184,4 @@
         </div>
     </div>
 
-    <script>
-        (function () {
-            const select = document.getElementById('checkout-module-customer-type');
-            const companyWrap = document.getElementById('checkout-module-company-wrap');
-            const companyInput = document.getElementById('checkout-module-company-name');
-
-            if (!select || !companyWrap) {
-                return;
-            }
-
-            const sync = () => {
-                const show = select.value === 'company';
-                companyWrap.classList.toggle('hidden', !show);
-                if (companyInput) {
-                    if (show) {
-                        companyInput.setAttribute('required', 'required');
-                    } else {
-                        companyInput.removeAttribute('required');
-                    }
-                }
-            };
-
-            select.addEventListener('change', sync);
-            sync();
-        })();
-    </script>
 </x-layouts.portal>

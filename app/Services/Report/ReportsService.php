@@ -4,7 +4,6 @@ namespace App\Services\Report;
 
 use App\Enums\BookingStatus;
 use App\Enums\CertificateStatus;
-use App\Enums\CustomerType;
 use App\Enums\EntitlementStatus;
 use App\Enums\ModuleStatus;
 use App\Enums\OrderItemType;
@@ -80,12 +79,8 @@ class ReportsService
             ->when($end, fn ($q) => $q->where('created_at', '<=', $end))
             ->count();
 
-        $individualCustomers = CustomerProfile::query()
-            ->where('customer_type', CustomerType::Individual->value)
-            ->count();
-        $companyCustomers = CustomerProfile::query()
-            ->where('customer_type', CustomerType::Company->value)
-            ->count();
+        $individualCustomers = $totalCustomers;
+        $companyCustomers = 0;
 
         // 2. Modules & Published Sessions
         $totalModules = Module::query()->count();

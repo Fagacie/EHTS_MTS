@@ -17,6 +17,7 @@ use App\Models\ModuleEntitlement;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Refund;
+use App\Models\SessionDocumentEntitlement;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\Notification\EtmsNotificationService;
@@ -331,6 +332,31 @@ class RefundService
                     AuditLog::record(
                         event: 'module_entitlement.revoked_on_refund',
                         auditableType: ModuleEntitlement::class,
+                        auditableId: $entitlement->id,
+                        oldValues: ['status' => EntitlementStatus::Active->value],
+                        newValues: ['status' => EntitlementStatus::Revoked->value],
+                        reason: $refund->reason,
+                        actor: $admin,
+                    );
+                }
+
+                $documentEntitlements = SessionDocumentEntitlement::query()
+                    ->where('order_id', $lockedOrder->id)
+                    ->where('status', EntitlementStatus::Active->value)
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($documentEntitlements as $entitlement) {
+                    $entitlement->update([
+                        'status' => EntitlementStatus::Revoked,
+                        'revoked_at' => $now,
+                        'revoked_by' => $admin->id,
+                        'revocation_reason' => "Order refunded ({$refund->refund_reference}): {$refund->reason}",
+                    ]);
+
+                    AuditLog::record(
+                        event: 'session_document_entitlement.revoked_on_refund',
+                        auditableType: SessionDocumentEntitlement::class,
                         auditableId: $entitlement->id,
                         oldValues: ['status' => EntitlementStatus::Active->value],
                         newValues: ['status' => EntitlementStatus::Revoked->value],

@@ -23,7 +23,6 @@ use Database\Seeders\SessionAndBookingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
-use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class Stage4CheckoutAuthHlsInertiaTest extends TestCase
@@ -42,7 +41,7 @@ class Stage4CheckoutAuthHlsInertiaTest extends TestCase
         ]);
     }
 
-    public function test_all_seven_auth_and_mfa_routes_render_expected_inertia_components_without_secrets(): void
+    public function test_auth_routes_render_expected_inertia_components_without_secrets(): void
     {
         $this->get(route('login'))
             ->assertOk()
@@ -88,39 +87,9 @@ class Stage4CheckoutAuthHlsInertiaTest extends TestCase
                 ->where('email', $unverified->email),
             );
 
-        // Non-admin blocked from admin MFA setup
-        $customer = User::query()->where('email', 'trainee@ecohydrotech.com.my')->firstOrFail();
-        $this->actingAs($customer)
-            ->get(route('two-factor.setup'))
-            ->assertForbidden();
-
-        // Admin without MFA sees Auth/TwoFactorSetup
-        $adminNoMfa = User::factory()->create();
-        $adminNoMfa->assignRole(RoleSlug::Administrator);
-
-        $this->actingAs($adminNoMfa)
-            ->get(route('two-factor.setup'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Auth/TwoFactorSetup')
-                ->where('secret', fn (?string $s): bool => is_string($s) && $s !== '')
-                ->where('qrCodeDataUri', fn (?string $uri): bool => is_string($uri) && str_starts_with($uri, 'data:image/')),
-            )
-            ->assertDontSee('SRS Section 14');
-
-        // Seeded admin with TOTP sees Auth/TwoFactorChallenge
-        $admin = User::query()->where('email', 'admin@ecohydrotech.com.my')->firstOrFail();
-
-        $this->actingAs($admin)
-            ->get(route('two-factor.challenge'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Auth/TwoFactorChallenge')
-                ->where('verifyUrl', route('two-factor.challenge.verify')),
-            );
     }
 
-    public function test_inertia_login_and_mfa_redirects_handle_customer_instructor_and_admin_boundaries(): void
+    public function test_inertia_login_redirects_handle_customer_instructor_and_admin_boundaries(): void
     {
         // Customer login redirects normally inside Inertia to /portal
         $this->withHeader('X-Inertia', 'true')
@@ -142,20 +111,13 @@ class Stage4CheckoutAuthHlsInertiaTest extends TestCase
 
         $this->post(route('logout'));
 
-        // Admin login redirects to Inertia TwoFactorChallenge, then MFA verify returns 409 X-Inertia-Location -> /admin
+        // Admin login redirects directly to the Vue administrator dashboard
         $this->withHeader('X-Inertia', 'true')
             ->post(route('login.store'), [
                 'email' => 'admin@ecohydrotech.com.my',
                 'password' => 'Password123!',
             ])
-            ->assertRedirect(route('two-factor.challenge'));
-
-        $otp = (new Google2FA)->getCurrentOtp('JBSWY3DPEHPK3PXP');
-
-        $this->withHeader('X-Inertia', 'true')
-            ->post(route('two-factor.challenge.verify'), ['code' => $otp])
-            ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', route('filament.admin.pages.dashboard'));
+            ->assertRedirect(route('admin-vue.dashboard'));
     }
 
     public function test_checkout_session_module_and_return_pages_render_inertia_and_redirect_billplz_safely(): void

@@ -591,9 +591,8 @@ function openNotificationItem(item: PortalNotificationItem): void {
                                 class="flex h-9 items-center gap-2 rounded-full p-1 hover:bg-[#EAE5F8] focus-visible:ring-[#7057D9]/40"
                                 aria-label="Open user menu"
                             >
-                                <span
-                                    class="flex h-7 w-7 items-center justify-center rounded-full bg-[#7057D9] text-[11px] font-extrabold text-white"
-                                >
+                                <img v-if="user?.photoUrl" :src="user.photoUrl" alt="" class="h-7 w-7 rounded-full object-cover"/>
+                                <span v-else class="flex h-7 w-7 items-center justify-center rounded-full bg-[#7057D9] text-[11px] font-extrabold text-white">
                                     {{ getInitials(user?.name ?? '') }}
                                 </span>
                             </Button>

@@ -20,8 +20,8 @@ use Database\Seeders\RoleAndPermissionSeeder;
 use Database\Seeders\SessionAndBookingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -45,7 +45,6 @@ class Stage5InstructorPortalInertiaTest extends TestCase
     public function test_all_eight_instructor_routes_render_expected_inertia_components_and_leak_no_sensitive_data(): void
     {
         $instructor = User::query()->where('email', 'instructor@ecohydrotech.com.my')->firstOrFail();
-        $instructor->forceFill(['two_factor_secret' => 'SUPER_SECRET_TOTP_KEY'])->save();
 
         $session = $instructor->assignedSessions()->firstOrFail();
 
@@ -312,6 +311,7 @@ class Stage5InstructorPortalInertiaTest extends TestCase
 
     public function test_instructor_can_update_profile(): void
     {
+        Storage::fake('public');
         $instructor = User::query()->where('email', 'instructor@ecohydrotech.com.my')->firstOrFail();
 
         $response = $this->actingAs($instructor)->put(
@@ -323,6 +323,10 @@ class Stage5InstructorPortalInertiaTest extends TestCase
                 'short_bio' => '20+ years flood modelling and stormwater engineering specialist.',
                 'specialisations_text' => 'HEC-RAS, MSMA, Flood Forecasting, SWMM',
                 'biography' => 'Full detailed biography covering consulting projects across Southeast Asia.',
+                'photo' => UploadedFile::fake()->createWithContent(
+                    'instructor.png',
+                    base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=')
+                )->mimeType('image/png'),
             ]
         );
 

@@ -37,7 +37,7 @@ return [
 
         'public' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
+            'root' => public_path('storage'),
             'url' => rtrim((string) env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
@@ -47,6 +47,15 @@ return [
         'materials' => [
             'driver' => 'local',
             'root' => $etmsStorageRoot.'/materials',
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'session-materials' => [
+            'driver' => 'local',
+            'root' => $etmsStorageRoot.'/session-materials',
             'visibility' => 'private',
             'serve' => false,
             'throw' => false,

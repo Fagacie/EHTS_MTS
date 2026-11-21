@@ -69,7 +69,7 @@ flowchart TD
 
 | Element | Desktop (`>= 1024px`) | Tablet / Mobile (`< 1024px`) |
 |---|---|---|
-| **Filament Sidebar** | Collapsible 7-group Filament 5 navigation: `Overview`, `Training & Catalogue`, `Physical Sessions & Delivery`, `Commerce & Finance`, `Users & Access`, `Communications & Reports`, `System & Governance`. Live badge counters on `Refunds (requested)`, `Attendance Review (submitted)`, `Session Recordings (pending_review)`, and `Payment Webhooks (unmatched_pending)`. | Native Filament 5 responsive slide-over drawer. |
+| **Filament Sidebar** | Native Filament 5 sidebar with a visible desktop collapse toggle and independently collapsible sections: **Overview**, **Training & Catalogue**, **Sessions & Delivery**, **Commerce & Finance**, **Users & Access**, **Communications & Reports**, and **System & Governance**. | Native Filament 5 responsive slide-over drawer. |
 | **Top Bar** | Filament Global Search (`Ctrl+K` across users, `order_number`, `booking_reference`, `certificate_number`, `session_code`), Database Notifications bell (async PDF failures, webhook alerts), Custom **Portal Switcher** action (if admin holds `customer`/`instructor` role), and Profile/Sign Out menu. | Global Search modal icon, Notifications bell, and User Avatar menu. |
 | **Breadcrumbs** | Native Filament resource/action breadcrumbs (`Training Sessions > SES-2026-001 > Edit`). | Compact parent back link. |
 
@@ -185,7 +185,7 @@ flowchart TD
     Browse["Customer views Module Detail (/training/{slug})"]
     Eligible{"is_available_independently = true & no active entitlement?"}
     AlreadyOwned["Show 'Lifetime Access Owned' -> Open /portal/modules/{slug}"]
-    Checkout["/checkout/module/{slug}: confirm MYR price & D-018 notice (no certificate)"]
+    Checkout["/checkout/module/{slug}: confirm MYR price & D-018 notice (module certificate eligible; no physical session)"]
     LockTx["Transaction (orders -> payments): insert orders ('module_purchase'), order_items ('module', qty=1), payments ('pending')"]
     Billplz["Call Billplz Create Bill -> Redirect Customer to Billplz"]
     Webhook["Billplz POST /webhooks/billplz -> HMAC verified -> HTTP 200 -> Dispatch Fulfilment Job"]

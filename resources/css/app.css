@@ -13,6 +13,21 @@
 @source "../views/**/*.blade.php";
 @source "../js/**/*.{vue,ts,js}";
 
+@keyframes public-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.public-enter {
+  animation: public-enter 500ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-enter {
+    animation: none;
+  }
+}
+
 :root {
   --background: #FFFFFF;
   --foreground: #272d38;

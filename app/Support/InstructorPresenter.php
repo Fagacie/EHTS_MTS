@@ -101,7 +101,7 @@ class InstructorPresenter
             'bookingId' => $booking->id,
             'bookingReference' => $booking->booking_reference,
             'participantName' => $booking->user?->name ?? 'Participant',
-            'organisation' => $booking->user?->customerProfile?->company_name ?: 'Individual',
+            'organisation' => 'Trainee',
             'attendanceStatusValue' => $attendance?->attendance_status?->value ?? AttendanceStatus::Pending->value,
             'attendanceStatusLabel' => $attendance?->attendance_status?->label() ?? AttendanceStatus::Pending->label(),
             'reviewStatusValue' => $attendance?->review_status?->value ?? AttendanceReviewStatus::Draft->value,
@@ -120,7 +120,7 @@ class InstructorPresenter
             'bookingId' => $attendance->booking_id,
             'bookingReference' => $attendance->booking?->booking_reference ?? '—',
             'participantName' => $attendance->user?->name ?? 'Participant',
-            'organisation' => $attendance->user?->customerProfile?->company_name ?: 'Individual',
+            'organisation' => 'Trainee',
             'attendanceStatus' => $attendance->attendance_status->value,
             'attendanceStatusLabel' => $attendance->attendance_status->label(),
             'remarks' => $attendance->remarks ?? '',
@@ -169,6 +169,7 @@ class InstructorPresenter
             'user' => [
                 'name' => $user->name,
                 'email' => $user->email,
+                'photoUrl' => $user->photoUrl(),
             ],
             'profile' => [
                 'displayName' => $profile->display_name ?: $user->name,
@@ -179,6 +180,7 @@ class InstructorPresenter
                 'specialisationsText' => implode(', ', $specialisations),
                 'biography' => $profile->biography ?? '',
                 'isPublic' => (bool) $profile->is_public,
+                'photoUrl' => $profile->photoUrl(),
                 'publicProfileUrl' => $profile->is_public ? route('instructors.show', $profile) : null,
             ],
             'updateUrl' => route('instructor.profile.update'),

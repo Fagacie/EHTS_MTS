@@ -310,13 +310,13 @@ class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
             ->withSession(['auth.two_factor_verified' => true])
             ->get('/admin/module-videos')
             ->assertOk()
-            ->assertSee('vid-eht-hyd-101-p1');
+            ->assertSee('Part 1: MSMA 2nd Edition IDF & Rational Method Walkthrough');
 
         $this->actingAs($admin)
             ->withSession(['auth.two_factor_verified' => true])
             ->get('/admin/session-recordings')
             ->assertOk()
-            ->assertSee('vid-ses-2026-003-rec1');
+            ->assertSee('SES-2026-003');
 
         $this->actingAs($admin)
             ->withSession(['auth.two_factor_verified' => true])

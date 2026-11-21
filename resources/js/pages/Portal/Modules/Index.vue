@@ -52,7 +52,7 @@ const { routes } = useRoutes();
             </header>
 
             <Card
-                v-if="activeEntitlements.length === 0"
+                v-if="activeEntitlements.length === 0 && sessionDocuments.length === 0"
                 class="flex flex-col items-center justify-center px-6 py-12 text-center"
             >
                 <p class="text-[16px] font-bold text-[#282338]">
@@ -76,7 +76,35 @@ const { routes } = useRoutes();
                 </div>
             </Card>
 
-            <section v-else aria-label="Active Module Workspaces">
+            <Card v-if="sessionDocuments.length > 0">
+                <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
+                    <CardTitle>Purchased Session Documents</CardTitle>
+                    <CardDescription>
+                        Documents purchased separately from physical session bookings
+                    </CardDescription>
+                </CardHeader>
+                <CardContent class="divide-y divide-[#EEEAF2] pt-4">
+                    <div
+                        v-for="document in sessionDocuments"
+                        :key="document.id"
+                        class="flex flex-wrap items-center justify-between gap-4 py-3.5 first:pt-0 last:pb-0"
+                    >
+                        <div>
+                            <p class="text-[14.5px] font-bold text-[#282338]">
+                                {{ document.documentTitle }}
+                            </p>
+                            <p class="mt-0.5 text-[13px] text-[#625D6D]">
+                                {{ document.sessionTitle }} &middot; Granted {{ document.grantedDateLabel }}
+                            </p>
+                        </div>
+                        <Button v-if="document.downloadUrl" as-child size="sm">
+                            <a :href="document.downloadUrl">Download Document</a>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <section v-if="activeEntitlements.length > 0" aria-label="Active Module Workspaces">
                 <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                     <Card
                         v-for="entitlement in activeEntitlements"

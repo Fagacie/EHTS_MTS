@@ -8,6 +8,7 @@ use App\Models\InstructorProfile;
 use App\Support\InstructorPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -42,6 +43,7 @@ class InstructorProfileController extends Controller
             'short_bio' => ['nullable', 'string', 'max:500'],
             'specialisations_text' => ['nullable', 'string', 'max:500'],
             'biography' => ['nullable', 'string', 'max:5000'],
+            'photo' => ['nullable', 'image', 'max:5120'],
         ]);
 
         $specialisations = collect(explode(',', (string) ($validated['specialisations_text'] ?? '')))
@@ -62,6 +64,26 @@ class InstructorProfileController extends Controller
                 'updated_by' => $user->id,
             ],
         );
+
+        if ($request->hasFile('photo')) {
+            $oldKey = $profile->photo_storage_key;
+            $oldUserKey = $user->photo_storage_key;
+            $storedPhoto = $request->file('photo')->store('instructors/photos', 'public');
+            $profile->update([
+                'photo_storage_disk' => 'public',
+                'photo_storage_key' => $storedPhoto,
+            ]);
+            $user->update([
+                'photo_storage_disk' => 'public',
+                'photo_storage_key' => $storedPhoto,
+            ]);
+            if ($oldKey && $oldKey !== $profile->photo_storage_key) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldKey);
+            }
+            if ($oldUserKey && $oldUserKey !== $storedPhoto) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldUserKey);
+            }
+        }
 
         AuditLog::record(
             event: 'instructor_profile.updated',

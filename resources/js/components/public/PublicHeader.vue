@@ -50,7 +50,7 @@ function closeMobileMenu(): void {
 
 <template>
     <header
-        class="sticky top-0 z-40 h-16 border-b border-[#272d38]/10 bg-white text-[#272d38]"
+        class="sticky top-0 z-40 h-[72px] border-b border-[#252238]/10 bg-white/95 text-[#252238] backdrop-blur-md"
     >
         <div
             class="mx-auto flex h-full max-w-6xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8"
@@ -66,7 +66,7 @@ function closeMobileMenu(): void {
                     height="28"
                     class="h-7 w-7 shrink-0"
                 >
-                <span class="text-[18px] font-bold text-[#272d38]">
+                <span class="text-[18px] font-extrabold tracking-tight text-[#252238]">
                     Ecohydrotech
                 </span>
             </Link>
@@ -81,10 +81,10 @@ function closeMobileMenu(): void {
                         :href="item.href"
                         :class="
                             cn(
-                                'rounded-lg px-3 py-1.5 text-[15px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30 focus-visible:ring-offset-2',
+                                'rounded-md px-3 py-2 text-[14px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/30',
                                 isActive(item.matchPrefix)
-                                    ? 'bg-[#272d38]/[0.06] font-bold text-[#272d38]'
-                                    : 'font-normal text-[#272d38]/70 hover:bg-[#272d38]/[0.03] hover:text-[#272d38]',
+                                    ? 'bg-[#F0ECFC] text-[#5942B5]'
+                                    : 'text-[#625D6D] hover:bg-[#F7F8FC] hover:text-[#252238]',
                             )
                         "
                     >
@@ -170,14 +170,14 @@ function closeMobileMenu(): void {
                 <template v-else>
                     <Link
                         :href="routes.login"
-                        class="rounded-lg px-2 py-1 text-[15px] font-normal text-[#272d38]/80 underline-offset-4 transition-colors duration-150 hover:text-[#272d38] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30 focus-visible:ring-offset-2"
+                        class="rounded-md px-3 py-2 text-[14px] font-semibold text-[#625D6D] transition-colors hover:text-[#252238]"
                     >
                         Sign in
                     </Link>
                     <Button
                         as-child
                         size="sm"
-                        class="px-4 text-[15px]"
+                        class="rounded-md bg-[#7057D9] px-4 text-[14px] font-bold shadow-none hover:bg-[#5942B5]"
                     >
                         <Link :href="routes.register">
                             Register

@@ -20,6 +20,7 @@ export interface AuthUser {
     id: number;
     name: string;
     email: string;
+    photoUrl: string | null;
     isCustomer: boolean;
     isInstructor: boolean;
     isAdministrator: boolean;
@@ -56,6 +57,7 @@ export interface SharedRoutes {
     instructorSessions: string;
     instructorProfile: string;
     instructorNotifications: string;
+    adminDashboard: string;
 }
 
 export interface PortalShellData {
@@ -746,6 +748,13 @@ export interface PortalRevokedEntitlementItem {
 export interface PortalModulesIndexProps extends EtmsSharedProps {
     activeEntitlements: PortalModuleEntitlementItem[];
     revokedEntitlements: PortalRevokedEntitlementItem[];
+    sessionDocuments: {
+        id: number;
+        sessionTitle: string;
+        documentTitle: string;
+        grantedDateLabel: string;
+        downloadUrl: string | null;
+    }[];
 }
 
 export interface PortalRecordingItem {
@@ -807,14 +816,12 @@ export interface PortalProfileProps extends EtmsSharedProps {
     user: {
         name: string;
         email: string;
+        photoUrl: string | null;
         isEmailVerified: boolean;
     };
     profile: {
-        customerType: 'individual' | 'company';
         phone: string;
         jobTitle: string;
-        companyName: string;
-        companyRegistrationNo: string;
         billingContactName: string;
         billingEmail: string;
         billingPhone: string;
@@ -855,9 +862,7 @@ export interface CheckoutSessionProps extends EtmsSharedProps {
         email: string;
     };
     defaults: {
-        customerType: 'individual' | 'company_sponsored';
         phone: string;
-        companyName: string;
         billingAddressLine1: string;
         billingCity: string;
         billingState: string;
@@ -872,6 +877,7 @@ export interface CheckoutSessionProps extends EtmsSharedProps {
 }
 
 export interface CheckoutModuleProps extends EtmsSharedProps {
+    purchaseKind?: 'module' | 'session_document';
     module: {
         code: string;
         title: string;
@@ -887,9 +893,7 @@ export interface CheckoutModuleProps extends EtmsSharedProps {
         email: string;
     };
     defaults: {
-        customerType: 'individual' | 'company';
         phone: string;
-        companyName: string;
         billingAddressLine1: string;
         billingCity: string;
         billingState: string;
@@ -1005,17 +1009,6 @@ export interface AuthResetPasswordProps extends EtmsSharedProps {
 export interface AuthVerifyEmailProps extends EtmsSharedProps {
     email: string;
     resendUrl: string;
-    logoutUrl: string;
-}
-
-export interface AuthTwoFactorSetupProps extends EtmsSharedProps {
-    secret: string;
-    qrCodeDataUri: string;
-    confirmUrl: string;
-}
-
-export interface AuthTwoFactorChallengeProps extends EtmsSharedProps {
-    verifyUrl: string;
     logoutUrl: string;
 }
 
@@ -1145,6 +1138,7 @@ export interface InstructorProfileProps extends EtmsSharedProps {
     user: {
         name: string;
         email: string;
+        photoUrl: string | null;
     };
     profile: {
         displayName: string;
@@ -1155,6 +1149,7 @@ export interface InstructorProfileProps extends EtmsSharedProps {
         specialisationsText: string;
         biography: string;
         isPublic: boolean;
+        photoUrl: string | null;
         publicProfileUrl: string | null;
     };
     updateUrl: string;

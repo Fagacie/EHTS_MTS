@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Enums\BookingStatus;
-use App\Enums\CustomerType;
 use App\Enums\EncodingStatus;
 use App\Enums\EntitlementStatus;
 use App\Enums\OrderStatus;
@@ -81,8 +80,6 @@ class PortalPresenter
             '/register',
             '/forgot-password',
             '/email/verify',
-            '/two-factor-setup',
-            '/two-factor-challenge',
             '/checkout/return',
             '/portal',
             '/portal/bookings',
@@ -127,7 +124,7 @@ class PortalPresenter
     }
 
     /**
-     * Convert redirects pointing to external origins or unmigrated Blade/Filament routes into Inertia::location()
+     * Convert redirects pointing to external origins or unmigrated Blade routes into Inertia::location()
      * for Inertia XHR requests while leaving standard HTTP redirects untouched.
      */
     public static function inertiaSafeRedirect(
@@ -204,7 +201,7 @@ class PortalPresenter
 
         $venueAddressParts = array_filter([
             $session?->venue_address,
-            trim(($session?->venue_postcode ?? '').' '.($session?->venue_city ?? '')),
+            $session?->venue_city,
             $session?->venue_state,
         ]);
 
@@ -239,8 +236,6 @@ class PortalPresenter
                 'durationLabel' => $session?->formattedDuration() ?? '—',
                 'venueName' => $session?->venue_name ?: 'To be confirmed',
                 'venueAddressLine' => $venueAddressParts !== [] ? implode(', ', $venueAddressParts) : null,
-                'venueNotes' => $session?->venue_notes,
-                'venueMapUrl' => $session?->venue_map_url,
                 'isOpenForBooking' => $isOpenForBooking,
                 'bookAgainUrl' => $session && $isOpenForBooking ? route('checkout.session.show', $session) : null,
                 'modulePortalUrl' => $booking->status === BookingStatus::Confirmed && $session?->module && $hasModuleEntitlement
@@ -261,8 +256,8 @@ class PortalPresenter
                 'orderNumber' => $order->order_number,
                 'statusValue' => $order->status->value,
                 'statusLabel' => $order->status->label(),
-                'registrationTypeLabel' => ucwords(str_replace('_', ' ', (string) $order->customer_type)),
-                'companyName' => $order->company_name,
+                'registrationTypeLabel' => 'Trainee',
+                'companyName' => null,
                 'totalLabel' => $order->formattedTotal(),
                 'detailUrl' => route('portal.orders.show', $order),
                 'payUrl' => route('portal.orders.pay', $order),
@@ -392,8 +387,8 @@ class PortalPresenter
                 'customerName' => $order->customer_name,
                 'customerEmail' => $order->customer_email,
                 'customerPhone' => $order->customer_phone,
-                'customerTypeLabel' => ucwords(str_replace('_', ' ', (string) $order->customer_type)),
-                'companyName' => $order->company_name,
+                'customerTypeLabel' => 'Trainee',
+                'companyName' => null,
                 'billingAddress' => $billingAddress !== '' ? $billingAddress : null,
             ],
         ];
@@ -586,12 +581,11 @@ class PortalPresenter
                 'name' => $user->name,
                 'email' => $user->email,
                 'isEmailVerified' => $user->email_verified_at !== null,
+                'photoUrl' => $user->photoUrl(),
             ],
             'profile' => [
-                'customerType' => $profile->customer_type?->value ?? CustomerType::Individual->value,
                 'phone' => $profile->phone ?? '',
                 'jobTitle' => $profile->job_title ?? '',
-                'companyName' => $profile->company_name ?? '',
                 'companyRegistrationNo' => $profile->company_registration_no ?? '',
                 'billingContactName' => $profile->billing_contact_name ?? '',
                 'billingEmail' => $profile->billing_email ?? '',
@@ -655,9 +649,7 @@ class PortalPresenter
                 'email' => $user->email,
             ],
             'defaults' => [
-                'customerType' => $profile?->customer_type === CustomerType::Company ? 'company_sponsored' : 'individual',
                 'phone' => $profile?->phone ?? '',
-                'companyName' => $profile?->company_name ?? '',
                 'billingAddressLine1' => $profile?->billing_address_line_1 ?? '',
                 'billingCity' => $profile?->billing_city ?? '',
                 'billingState' => $profile?->billing_state ?? '',
@@ -698,15 +690,50 @@ class PortalPresenter
                 'email' => $user->email,
             ],
             'defaults' => [
-                'customerType' => $profile?->customer_type?->value ?? CustomerType::Individual->value,
                 'phone' => $profile?->phone ?? '',
-                'companyName' => $profile?->company_name ?? '',
                 'billingAddressLine1' => $profile?->billing_address_line_1 ?? '',
                 'billingCity' => $profile?->billing_city ?? '',
                 'billingState' => $profile?->billing_state ?? '',
                 'billingPostcode' => $profile?->billing_postcode ?? '',
             ],
             'submitUrl' => route('checkout.module.store', $module),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function checkoutSessionDocumentData(
+        TrainingSession $session,
+        User $user,
+        ?CustomerProfile $profile,
+    ): array {
+        $material = $session->mainDocumentMaterial;
+
+        return [
+            'purchaseKind' => 'session_document',
+            'module' => [
+                'code' => $session->session_code,
+                'title' => $material?->title ?? $session->title,
+                'summary' => $session->description,
+                'categoryName' => 'Session Document',
+                'priceLabel' => $session->formattedIndependentPrice() ?? '—',
+                'materialsCount' => 1,
+                'videosCount' => 0,
+                'detailUrl' => route('sessions.show', $session),
+            ],
+            'learner' => [
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+            'defaults' => [
+                'phone' => $profile?->phone ?? '',
+                'billingAddressLine1' => $profile?->billing_address_line_1 ?? '',
+                'billingCity' => $profile?->billing_city ?? '',
+                'billingState' => $profile?->billing_state ?? '',
+                'billingPostcode' => $profile?->billing_postcode ?? '',
+            ],
+            'submitUrl' => route('checkout.session-document.store', $session),
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\RecordingAccessPolicy;
 use App\Enums\SessionStatus;
+use App\Models\SessionDocumentEntitlement;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,9 +28,6 @@ class TrainingSession extends Model
         'venue_address',
         'venue_city',
         'venue_state',
-        'venue_postcode',
-        'venue_map_url',
-        'venue_notes',
         'capacity',
         'reserved_seats_count',
         'confirmed_seats_count',
@@ -38,6 +36,9 @@ class TrainingSession extends Model
         'price',
         'currency',
         'recording_access_policy',
+        'is_available_independently',
+        'independent_price',
+        'main_document_material_id',
         'status',
         'published_at',
         'closed_at',
@@ -63,6 +64,8 @@ class TrainingSession extends Model
             'reserved_seats_count' => 'integer',
             'confirmed_seats_count' => 'integer',
             'price' => 'decimal:2',
+            'is_available_independently' => 'boolean',
+            'independent_price' => 'decimal:2',
             'registration_opens_at' => 'datetime',
             'registration_closes_at' => 'datetime',
             'recording_access_policy' => RecordingAccessPolicy::class,
@@ -110,6 +113,21 @@ class TrainingSession extends Model
     public function recordings(): HasMany
     {
         return $this->hasMany(SessionRecording::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function materials(): HasMany
+    {
+        return $this->hasMany(SessionMaterial::class)->latest('id');
+    }
+
+    public function mainDocumentMaterial(): BelongsTo
+    {
+        return $this->belongsTo(SessionMaterial::class, 'main_document_material_id');
+    }
+
+    public function sessionDocumentEntitlements(): HasMany
+    {
+        return $this->hasMany(SessionDocumentEntitlement::class);
     }
 
     public function certificates(): HasMany
@@ -188,6 +206,13 @@ class TrainingSession extends Model
     public function formattedPrice(): string
     {
         return 'RM '.number_format((float) $this->price, 2);
+    }
+
+    public function formattedIndependentPrice(): ?string
+    {
+        return $this->independent_price === null
+            ? null
+            : 'RM '.number_format((float) $this->independent_price, 2);
     }
 
     public function formattedDuration(): string

@@ -23,6 +23,8 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\PaymentWebhookEvent;
 use App\Models\Refund;
+use App\Models\SessionDocumentEntitlement;
+use App\Models\SessionMaterial;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\Booking\SessionBookingService;
@@ -78,11 +80,8 @@ class PaymentOrchestrationService
 
         return DB::transaction(function () use ($user, $module, $billingInput): Order {
             $profile = $user->customerProfile;
-            $companyName = $billingInput['company_name'] ?? $profile?->company_name;
-            $rawCustomerType = $billingInput['customer_type']
-                ?? ((! blank($companyName) || $profile?->isCompany()) ? 'company' : 'individual');
-
-            $customerType = in_array($rawCustomerType, ['company', 'company_sponsored'], true) ? 'company' : 'individual';
+            $customerType = 'individual';
+            $companyName = null;
             $phone = $billingInput['phone'] ?? $profile?->phone;
             $addr = $billingInput['billing_address'] ?? [];
             $unitPrice = (float) $module->independent_price;
@@ -144,6 +143,80 @@ class PaymentOrchestrationService
                 reason: 'Independent module purchase order created.',
                 actor: $user,
             );
+
+            return $order->load('items');
+        });
+    }
+
+    /**
+     * Create an independent purchase order for a published session-owned document.
+     *
+     * @param  array<string, mixed>  $billingInput
+     */
+    public function createSessionDocumentPurchaseOrder(User $user, TrainingSession $session, array $billingInput = []): Order
+    {
+        $session->loadMissing('mainDocumentMaterial');
+        $material = $session->mainDocumentMaterial;
+
+        if ($session->status !== SessionStatus::Published || ! $session->is_available_independently || $session->independent_price === null || ! $material || $material->status->value !== 'published') {
+            throw new DomainException('This training session document is not available for independent purchase.');
+        }
+
+        if (SessionDocumentEntitlement::query()->where('user_id', $user->id)->where('session_material_id', $material->id)->where('status', EntitlementStatus::Active->value)->exists()) {
+            throw new DomainException('You already hold an active entitlement for this session document.');
+        }
+
+        $existing = Order::query()
+            ->where('user_id', $user->id)
+            ->where('order_type', OrderType::ModulePurchase->value)
+            ->where('status', OrderStatus::PendingPayment->value)
+            ->whereHas('items', fn ($query) => $query->where('session_material_id', $material->id))
+            ->latest('id')
+            ->first();
+        if ($existing !== null) {
+            return $existing->load(['items', 'payments']);
+        }
+
+        return DB::transaction(function () use ($user, $session, $material, $billingInput): Order {
+            $profile = $user->customerProfile;
+            $companyName = null;
+            $customerType = 'individual';
+            $address = $billingInput['billing_address'] ?? [];
+            $price = (float) $session->independent_price;
+
+            $order = Order::query()->create([
+                'order_number' => Order::generateOrderNumber(),
+                'user_id' => $user->id,
+                'order_type' => OrderType::ModulePurchase,
+                'status' => OrderStatus::PendingPayment,
+                'currency' => $session->currency ?: 'MYR',
+                'subtotal_amount' => $price,
+                'total_amount' => $price,
+                'customer_name' => $user->name,
+                'customer_email' => $user->email,
+                'customer_phone' => $billingInput['phone'] ?? $profile?->phone,
+                'customer_type' => $customerType,
+                'company_name' => $companyName,
+                'billing_address_line_1' => $address['line1'] ?? $profile?->billing_address_line_1,
+                'billing_city' => $address['city'] ?? $profile?->billing_city,
+                'billing_state' => $address['state'] ?? $profile?->billing_state,
+                'billing_postcode' => $address['postcode'] ?? $profile?->billing_postcode,
+                'billing_country' => $address['country'] ?? $profile?->billing_country ?? 'MY',
+            ]);
+
+            OrderItem::query()->create([
+                'order_id' => $order->id,
+                'order_type' => OrderType::ModulePurchase,
+                'item_type' => OrderItemType::SessionDocument,
+                'session_material_id' => $material->id,
+                'item_code_snapshot' => $session->session_code,
+                'item_title_snapshot' => $material->title,
+                'unit_price' => $price,
+                'quantity' => 1,
+                'line_total' => $price,
+                'currency' => $session->currency ?: 'MYR',
+                'metadata_snapshot' => ['training_session_id' => $session->id],
+            ]);
 
             return $order->load('items');
         });
@@ -952,6 +1025,11 @@ class PaymentOrchestrationService
     protected function fulfilModuleOrderLocked(Order $lockedOrder, Carbon $now): void
     {
         foreach ($lockedOrder->items as $item) {
+            if ($item->item_type === OrderItemType::SessionDocument && $item->session_material_id) {
+                $this->fulfilSessionDocumentOrderItemLocked($lockedOrder, $item, $now);
+                continue;
+            }
+
             if ($item->item_type !== OrderItemType::Module || ! $item->module_id) {
                 continue;
             }
@@ -1014,6 +1092,49 @@ class PaymentOrchestrationService
                 );
             });
         }
+    }
+
+    protected function fulfilSessionDocumentOrderItemLocked(Order $lockedOrder, OrderItem $item, Carbon $now): void
+    {
+        $material = SessionMaterial::query()->with('trainingSession')->find($item->session_material_id);
+        if (! $material) {
+            throw new DomainException('The purchased session document no longer exists.');
+        }
+
+        $existingActive = SessionDocumentEntitlement::query()
+            ->where('user_id', $lockedOrder->user_id)
+            ->where('session_material_id', $material->id)
+            ->where('status', EntitlementStatus::Active->value)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingActive !== null) {
+            return;
+        }
+
+        $entitlement = SessionDocumentEntitlement::query()->create([
+            'user_id' => $lockedOrder->user_id,
+            'training_session_id' => $material->training_session_id,
+            'session_material_id' => $material->id,
+            'order_id' => $lockedOrder->id,
+            'order_item_id' => $item->id,
+            'status' => EntitlementStatus::Active,
+            'granted_at' => $now,
+        ]);
+
+        AuditLog::record(
+            event: 'session_document_entitlement.granted_on_purchase',
+            auditableType: SessionDocumentEntitlement::class,
+            auditableId: $entitlement->id,
+            oldValues: null,
+            newValues: [
+                'user_id' => $lockedOrder->user_id,
+                'training_session_id' => $material->training_session_id,
+                'session_material_id' => $material->id,
+                'order_id' => $lockedOrder->id,
+            ],
+            reason: 'Session document entitlement granted upon verified Billplz payment.',
+        );
     }
 
     /**

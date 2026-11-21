@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import { AlertCircle } from 'lucide-vue-next';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -28,9 +28,6 @@ const form = useForm({
     email: props.user.email,
     phone: props.profile.phone,
     job_title: props.profile.jobTitle,
-    customer_type: props.profile.customerType,
-    company_name: props.profile.companyName,
-    company_registration_no: props.profile.companyRegistrationNo,
     billing_contact_name: props.profile.billingContactName,
     billing_email: props.profile.billingEmail,
     billing_phone: props.profile.billingPhone,
@@ -42,10 +39,34 @@ const form = useForm({
     billing_country: props.profile.billingCountry || 'MY',
 });
 
-const isCompany = computed(() => form.customer_type === 'company');
+const photo = ref<File | null>(null);
+const photoPreview = ref<string | null>(props.user.photoUrl);
+
+function handlePhoto(event: Event): void {
+    photo.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+    photoPreview.value = photo.value ? URL.createObjectURL(photo.value) : props.user.photoUrl;
+}
+
 
 function submitProfile(): void {
-    form.put(props.updateUrl, {
+    router.post(props.updateUrl, {
+        _method: 'PUT',
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        job_title: form.job_title,
+        billing_contact_name: form.billing_contact_name,
+        billing_email: form.billing_email,
+        billing_phone: form.billing_phone,
+        billing_address_line_1: form.billing_address_line_1,
+        billing_address_line_2: form.billing_address_line_2,
+        billing_city: form.billing_city,
+        billing_state: form.billing_state,
+        billing_postcode: form.billing_postcode,
+        billing_country: form.billing_country,
+        photo: photo.value,
+    }, {
+        forceFormData: true,
         preserveScroll: true,
     });
 }
@@ -117,6 +138,14 @@ function submitProfile(): void {
                             </CardHeader>
                             <CardContent class="pt-4">
                                 <div class="grid gap-4 sm:grid-cols-2">
+                                    <div class="sm:col-span-2 flex items-center gap-4">
+                                        <img v-if="photoPreview" :src="photoPreview" alt="Profile photo" class="h-20 w-20 rounded-full object-cover border border-[#E5E1EB]"/>
+                                        <span v-else class="grid h-20 w-20 place-items-center rounded-full bg-[#F1EDFB] text-xl font-bold text-[#5942B5]">{{props.user.name.slice(0,1).toUpperCase()}}</span>
+                                        <div>
+                                            <Label for="profile-photo" class="mb-1.5">Profile photo</Label>
+                                            <input id="profile-photo" name="photo" type="file" accept="image/*" class="block max-w-xs text-[13px]" @change="handlePhoto"/>
+                                        </div>
+                                    </div>
                                     <div class="sm:col-span-2">
                                         <Label for="profile-name" class="mb-1.5">
                                             Full Name <span aria-hidden="true">*</span>
@@ -219,201 +248,6 @@ function submitProfile(): void {
                                         >
                                             {{ form.errors.job_title }}
                                         </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                                <CardTitle>Account Category</CardTitle>
-                                <CardDescription>
-                                    Choose whether you attend and pay as an individual or under a company or agency.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent class="pt-4">
-                                <fieldset>
-                                    <legend class="sr-only">Account Category</legend>
-                                    <div class="grid gap-3.5 sm:grid-cols-2">
-                                        <label
-                                            for="profile-customer-type-individual"
-                                            :class="
-                                                cn(
-                                                    'flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors',
-                                                    !isCompany
-                                                        ? 'border-[#7057D9] bg-[#F1EDFB]/65'
-                                                        : 'border-[#E5E1EB] bg-white hover:border-[#B9ADE9]',
-                                                )
-                                            "
-                                        >
-                                            <input
-                                                id="profile-customer-type-individual"
-                                                v-model="form.customer_type"
-                                                type="radio"
-                                                name="customer_type"
-                                                value="individual"
-                                                class="mt-1 h-4 w-4 accent-[#7057D9]"
-                                            >
-                                            <div>
-                                                <span class="block text-[14px] font-bold text-[#282338]">Individual</span>
-                                                <span class="mt-0.5 block text-[12.5px] text-[#625D6D]">
-                                                    Personal registrations billed directly to you.
-                                                </span>
-                                            </div>
-                                        </label>
-
-                                        <label
-                                            for="profile-customer-type-company"
-                                            :class="
-                                                cn(
-                                                    'flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors',
-                                                    isCompany
-                                                        ? 'border-[#7057D9] bg-[#F1EDFB]/65'
-                                                        : 'border-[#E5E1EB] bg-white hover:border-[#B9ADE9]',
-                                                )
-                                            "
-                                        >
-                                            <input
-                                                id="profile-customer-type-company"
-                                                v-model="form.customer_type"
-                                                type="radio"
-                                                name="customer_type"
-                                                value="company"
-                                                class="mt-1 h-4 w-4 accent-[#7057D9]"
-                                            >
-                                            <div>
-                                                <span class="block text-[14px] font-bold text-[#282338]">
-                                                    Company / Sponsored
-                                                </span>
-                                                <span class="mt-0.5 block text-[12.5px] text-[#625D6D]">
-                                                    Corporate, agency, or employer-sponsored billing.
-                                                </span>
-                                            </div>
-                                        </label>
-                                    </div>
-
-                                    <p
-                                        v-if="form.errors.customer_type"
-                                        class="mt-2 text-[12.5px] font-semibold text-[#A33C48]"
-                                    >
-                                        {{ form.errors.customer_type }}
-                                    </p>
-                                </fieldset>
-
-                                <div
-                                    v-if="isCompany"
-                                    id="company-billing-panel"
-                                    class="mt-5 border-t border-[#EEEAF2] pt-5"
-                                >
-                                    <h3 class="text-[15px] font-bold text-[#282338]">
-                                        Organisation &amp; Billing Contact
-                                    </h3>
-                                    <p class="mt-1 text-[12.5px] text-[#625D6D]">
-                                        Required for company-sponsored bookings and official corporate order records.
-                                    </p>
-
-                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                                        <div class="sm:col-span-2">
-                                            <Label for="profile-company-name" class="mb-1.5">
-                                                Company / Organisation Name <span aria-hidden="true">*</span>
-                                            </Label>
-                                            <Input
-                                                id="profile-company-name"
-                                                v-model="form.company_name"
-                                                name="company_name"
-                                                type="text"
-                                                :required="isCompany"
-                                                autocomplete="organization"
-                                                :aria-invalid="form.errors.company_name ? 'true' : undefined"
-                                            />
-                                            <p
-                                                v-if="form.errors.company_name"
-                                                class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                            >
-                                                {{ form.errors.company_name }}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <Label for="profile-company-reg" class="mb-1.5">
-                                                Company Registration No.
-                                                <span class="ml-1 font-normal text-[#625D6D]">(Optional)</span>
-                                            </Label>
-                                            <Input
-                                                id="profile-company-reg"
-                                                v-model="form.company_registration_no"
-                                                name="company_registration_no"
-                                                type="text"
-                                                placeholder="e.g. 202001012345"
-                                                :aria-invalid="form.errors.company_registration_no ? 'true' : undefined"
-                                            />
-                                            <p
-                                                v-if="form.errors.company_registration_no"
-                                                class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                            >
-                                                {{ form.errors.company_registration_no }}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <Label for="profile-billing-contact" class="mb-1.5">
-                                                Billing Contact Name
-                                                <span class="ml-1 font-normal text-[#625D6D]">(Optional)</span>
-                                            </Label>
-                                            <Input
-                                                id="profile-billing-contact"
-                                                v-model="form.billing_contact_name"
-                                                name="billing_contact_name"
-                                                type="text"
-                                                :aria-invalid="form.errors.billing_contact_name ? 'true' : undefined"
-                                            />
-                                            <p
-                                                v-if="form.errors.billing_contact_name"
-                                                class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                            >
-                                                {{ form.errors.billing_contact_name }}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <Label for="profile-billing-email" class="mb-1.5">
-                                                Billing Email
-                                                <span class="ml-1 font-normal text-[#625D6D]">(Optional)</span>
-                                            </Label>
-                                            <Input
-                                                id="profile-billing-email"
-                                                v-model="form.billing_email"
-                                                name="billing_email"
-                                                type="email"
-                                                :aria-invalid="form.errors.billing_email ? 'true' : undefined"
-                                            />
-                                            <p
-                                                v-if="form.errors.billing_email"
-                                                class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                            >
-                                                {{ form.errors.billing_email }}
-                                            </p>
-                                        </div>
-
-                                        <div>
-                                            <Label for="profile-billing-phone" class="mb-1.5">
-                                                Billing Phone
-                                                <span class="ml-1 font-normal text-[#625D6D]">(Optional)</span>
-                                            </Label>
-                                            <Input
-                                                id="profile-billing-phone"
-                                                v-model="form.billing_phone"
-                                                name="billing_phone"
-                                                type="tel"
-                                                :aria-invalid="form.errors.billing_phone ? 'true' : undefined"
-                                            />
-                                            <p
-                                                v-if="form.errors.billing_phone"
-                                                class="mt-1.5 text-[12.5px] font-semibold text-[#A33C48]"
-                                            >
-                                                {{ form.errors.billing_phone }}
-                                            </p>
-                                        </div>
                                     </div>
                                 </div>
                             </CardContent>

@@ -79,15 +79,8 @@
                             <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500">Physical Venue</dt>
                             <dd class="mt-1 font-semibold text-slate-900">{{ $session->venue_name }}</dd>
                             <dd class="mt-0.5 text-xs text-slate-600">
-                                {{ $session->venue_address }}, {{ $session->venue_postcode }} {{ $session->venue_city }}, {{ $session->venue_state }}, Malaysia
+                                {{ $session->venue_address }}, {{ $session->venue_city }}, {{ $session->venue_state }}, Malaysia
                             </dd>
-                            @if ($session->venue_map_url)
-                                <dd class="mt-2">
-                                    <a href="{{ $session->venue_map_url }}" target="_blank" rel="noopener" class="text-xs font-semibold text-eht-teal-700 hover:underline">
-                                        Open Venue Map Location &rarr;
-                                    </a>
-                                </dd>
-                            @endif
                         </div>
                     </dl>
 

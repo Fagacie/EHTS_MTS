@@ -403,18 +403,18 @@ const seatAvailabilityPercent = computed(() => {
                                 <span>Independent Option</span>
                             </div>
                             <h2 class="mt-3 text-[18px] font-bold text-[#272d38]">
-                                Prefer self-paced study?
+                                Need the session document only?
                             </h2>
                             <p class="mt-1.5 text-[14px] leading-relaxed text-[#272d38]/70">
-                                Study the standalone module online from
+                                Purchase the main session document separately from
                                 <span class="font-bold text-[#272d38] tabular-nums">
                                     {{ formatDisplayFee(session.module.independentPriceLabel) }}
                                 </span>
-                                without booking a physical workshop seat.
+                                booking a physical workshop seat.
                             </p>
                             <Button as-child variant="outline" class="mt-4 w-full">
                                 <Link :href="session.module.detailUrl">
-                                    <span>View standalone module</span>
+                                    <span>Purchase Session Document</span>
                                     <ArrowRight class="h-4 w-4" aria-hidden="true" />
                                 </Link>
                             </Button>

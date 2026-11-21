@@ -47,68 +47,6 @@
             </div>
         </div>
 
-        <fieldset class="space-y-2">
-            <legend class="block text-sm font-medium text-slate-800">Purchase profile type</legend>
-            <div class="grid grid-cols-2 gap-3">
-                <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-300 p-3 text-xs hover:bg-slate-50">
-                    <input
-                        type="radio"
-                        name="customer_type"
-                        value="individual"
-                        {{ old('customer_type', 'individual') === 'individual' ? 'checked' : '' }}
-                        onchange="document.getElementById('register-company-fields').classList.add('hidden')"
-                        class="mt-0.5 text-eht-navy-700 focus:ring-eht-teal-600"
-                    >
-                    <span>
-                        <strong class="block text-slate-900">Individual</strong>
-                        <span class="text-slate-500">Personal training receipt</span>
-                    </span>
-                </label>
-
-                <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-300 p-3 text-xs hover:bg-slate-50">
-                    <input
-                        type="radio"
-                        name="customer_type"
-                        value="company"
-                        {{ old('customer_type') === 'company' ? 'checked' : '' }}
-                        onchange="document.getElementById('register-company-fields').classList.remove('hidden')"
-                        class="mt-0.5 text-eht-navy-700 focus:ring-eht-teal-600"
-                    >
-                    <span>
-                        <strong class="block text-slate-900">Company Buyer</strong>
-                        <span class="text-slate-500">Include company billing</span>
-                    </span>
-                </label>
-            </div>
-        </fieldset>
-
-        <div id="register-company-fields" class="{{ old('customer_type') === 'company' ? '' : 'hidden' }} space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p class="text-xs text-slate-600">
-                Company billing details appear on your order receipt. Bookings remain registered to your personal account (D-023).
-            </p>
-            <div>
-                <label for="company_name" class="block text-xs font-semibold text-slate-800">Company name <span class="text-rose-600">*</span></label>
-                <input
-                    id="company_name"
-                    name="company_name"
-                    type="text"
-                    value="{{ old('company_name') }}"
-                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-eht-teal-600 focus:outline-none"
-                    placeholder="Ecohydro Engineering Sdn. Bhd."
-                >
-            </div>
-            <div>
-                <label for="company_registration_no" class="block text-xs font-semibold text-slate-800">Company registration / SSM No. <span class="text-slate-400 font-normal">(Optional)</span></label>
-                <input
-                    id="company_registration_no"
-                    name="company_registration_no"
-                    type="text"
-                    value="{{ old('company_registration_no') }}"
-                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-eht-teal-600 focus:outline-none"
-                    placeholder="202001012345 (1368665-X)"
-                >
-            </div>
-        </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div>

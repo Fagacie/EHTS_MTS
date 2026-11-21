@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CertificateStatus;
+use App\Enums\PdfGenerationStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\URL;
@@ -32,7 +33,12 @@ class Certificate extends Model
         'pdf_storage_key',
         'pdf_checksum_sha256',
         'pdf_file_size_bytes',
+        'pdf_generation_status',
+        'pdf_generation_attempts',
+        'pdf_generation_error',
         'issued_by',
+        'approved_by',
+        'approved_at',
         'revoked_by',
         'revoked_at',
         'revocation_reason',
@@ -44,7 +50,10 @@ class Certificate extends Model
         return [
             'status' => CertificateStatus::class,
             'completion_date' => 'date',
+            'pdf_generation_status' => PdfGenerationStatus::class,
+            'pdf_generation_attempts' => 'integer',
             'issued_at' => 'datetime',
+            'approved_at' => 'datetime',
             'revoked_at' => 'datetime',
             'pdf_file_size_bytes' => 'integer',
         ];

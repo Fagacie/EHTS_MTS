@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsActive;
-use App\Http\Middleware\EnsureAdministratorMfa;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeadersMiddleware;
@@ -27,7 +26,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active.account' => EnsureAccountIsActive::class,
             'role' => EnsureUserHasRole::class,
-            'admin.mfa' => EnsureAdministratorMfa::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

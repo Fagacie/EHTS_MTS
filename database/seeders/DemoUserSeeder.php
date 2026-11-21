@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CustomerType;
 use App\Enums\RoleSlug;
 use App\Enums\UserStatus;
 use App\Models\User;
@@ -20,14 +19,6 @@ class DemoUserSeeder extends Seeder
                 'password' => Hash::make('Password123!'),
                 'email_verified_at' => now(),
                 'status' => UserStatus::Active->value,
-                'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
-                'two_factor_recovery_codes' => [
-                    'EHT-REC-0001',
-                    'EHT-REC-0002',
-                    'EHT-REC-0003',
-                    'EHT-REC-0004',
-                ],
-                'two_factor_confirmed_at' => now(),
             ],
         );
         $admin->syncRolesBySlugs([RoleSlug::Administrator]);
@@ -46,7 +37,6 @@ class DemoUserSeeder extends Seeder
         $dualStaff->customerProfile()->updateOrCreate(
             ['user_id' => $dualStaff->id],
             [
-                'customer_type' => CustomerType::Individual->value,
                 'phone' => '+6012-388 4501',
                 'job_title' => 'Principal Hydrologist',
                 'billing_country' => 'MY',
@@ -77,11 +67,8 @@ class DemoUserSeeder extends Seeder
         $customer->customerProfile()->updateOrCreate(
             ['user_id' => $customer->id],
             [
-                'customer_type' => CustomerType::Company->value,
                 'phone' => '+6019-245 7710',
                 'job_title' => 'Drainage Design Engineer',
-                'company_name' => 'LembagaPerunding Hidro Sdn. Bhd.',
-                'company_registration_no' => '201801024899 (1286919-W)',
                 'billing_contact_name' => 'Puan Farah Nadia (Accounts)',
                 'billing_email' => 'accounts@perundinghidro.com.my',
                 'billing_phone' => '+603-8925 4400',

@@ -115,7 +115,7 @@
                                 <dd class="mt-0.5 text-sm text-portal-muted">
                                     {{ collect([
                                         $booking->trainingSession->venue_address,
-                                        trim(($booking->trainingSession->venue_postcode ?? '').' '.($booking->trainingSession->venue_city ?? '')),
+                                        $booking->trainingSession->venue_city,
                                         $booking->trainingSession->venue_state,
                                     ])->filter()->implode(', ') }}
                                 </dd>
@@ -143,21 +143,6 @@
                         </div>
                     </dl>
 
-                    @if ($booking->trainingSession->venue_notes || $booking->trainingSession->venue_map_url)
-                        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-portal-border pt-4">
-                            @if ($booking->trainingSession->venue_notes)
-                                <p class="text-sm text-portal-muted">
-                                    <span class="font-medium text-portal-text">Venue notes:</span>
-                                    {{ $booking->trainingSession->venue_notes }}
-                                </p>
-                            @endif
-                            @if ($booking->trainingSession->venue_map_url)
-                                <x-portal.button :href="$booking->trainingSession->venue_map_url" target="_blank" rel="noopener noreferrer" variant="secondary" size="sm">
-                                    Open Venue Map
-                                </x-portal.button>
-                            @endif
-                        </div>
-                    @endif
                 </x-portal.card>
 
                 {{-- Attendance & Session Completion Status --}}
@@ -212,7 +197,6 @@
                             <div class="flex items-center justify-between gap-3">
                                 <dt class="text-portal-muted">Registration Type</dt>
                                 <dd class="font-medium text-portal-text">
-                                    {{ ucwords(str_replace('_', ' ', (string) $booking->order->customer_type)) }}
                                 </dd>
                             </div>
                             @if ($booking->order->company_name)

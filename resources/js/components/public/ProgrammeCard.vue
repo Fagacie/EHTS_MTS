@@ -13,7 +13,7 @@ defineProps<{
 <template>
     <Link
         :href="module.detailUrl"
-        class="group flex flex-col overflow-hidden rounded-xl border border-[#272d38]/12 bg-white shadow-[0_1px_2px_rgba(39,45,56,0.04)] transition-colors duration-150 hover:border-[#272d38]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
+        class="group flex flex-col overflow-hidden rounded-lg border border-[#252238]/12 bg-white shadow-[0_4px_18px_rgba(37,34,56,0.05)] transition-all duration-150 hover:-translate-y-1 hover:border-[#7057D9]/30 hover:shadow-[0_12px_28px_rgba(37,34,56,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/30"
     >
         <ProgrammeBanner
             :cover-image-url="module.coverImageUrl"
@@ -23,10 +23,10 @@ defineProps<{
 
         <div class="flex flex-1 flex-col justify-between p-6">
             <div>
-                <p class="text-[14px] text-[#272d38]/65">
+                <p class="text-[12px] font-bold uppercase tracking-[0.08em] text-[#159CAA]">
                     {{ module.categoryName }}
                 </p>
-                <h3 class="mt-1.5 line-clamp-2 text-[19px] font-bold leading-snug text-[#272d38]">
+                <h3 class="mt-2 line-clamp-2 text-[18px] font-extrabold leading-snug text-[#252238]">
                     {{ module.title }}
                 </h3>
             </div>

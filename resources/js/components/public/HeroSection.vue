@@ -13,15 +13,15 @@ const { routes } = useRoutes();
 
 <template>
     <section
-        class="border-b border-[#272d38]/10 bg-white py-16 lg:py-24"
+        class="relative overflow-hidden border-b border-[#252238]/10 bg-[#F7F8FC] py-16 lg:py-24"
         aria-labelledby="home-hero-title"
     >
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="grid items-center gap-12 lg:grid-cols-12 lg:gap-14">
-                <div class="lg:col-span-6">
+                <div class="public-enter lg:col-span-6">
                     <h1
                         id="home-hero-title"
-                        class="text-4xl font-bold text-[#272d38] sm:text-5xl lg:text-[50px] lg:leading-[1.12] text-balance"
+                        class="text-4xl font-extrabold text-[#252238] sm:text-5xl lg:text-[54px] lg:leading-[1.08] text-balance"
                     >
                         Technical training in water, environment, and engineering.
                     </h1>
@@ -31,7 +31,7 @@ const { routes } = useRoutes();
                     </p>
 
                     <div class="mt-8 flex flex-wrap items-center gap-3">
-                        <Button as-child size="lg">
+                        <Button as-child size="lg" class="rounded-md bg-[#7057D9] shadow-none hover:bg-[#5942B5]">
                             <Link :href="routes.sessions">Browse Physical Sessions</Link>
                         </Button>
                         <Button as-child variant="outline" size="lg">
@@ -40,8 +40,8 @@ const { routes } = useRoutes();
                     </div>
                 </div>
 
-                <div class="lg:col-span-6">
-                    <div class="overflow-hidden rounded-xl border border-[#272d38]/12 bg-white shadow-[0_1px_2px_rgba(39,45,56,0.04)]">
+                <div class="public-enter lg:col-span-6" style="animation-delay:80ms">
+                    <div class="relative overflow-hidden rounded-lg border border-[#252238]/12 bg-white shadow-[0_12px_36px_rgba(37,34,56,0.10)]">
                         <picture>
                             <source
                                 v-if="assets.heroPhotoWebpUrl"

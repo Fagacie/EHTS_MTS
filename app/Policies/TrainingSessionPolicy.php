@@ -33,7 +33,14 @@ class TrainingSessionPolicy
 
     public function delete(User $user, TrainingSession $trainingSession): bool
     {
-        if ($trainingSession->bookings()->exists() || $trainingSession->certificates()->exists()) {
+        if (
+            $trainingSession->bookings()->exists()
+            || $trainingSession->certificates()->exists()
+            || $trainingSession->attendances()->exists()
+            || $trainingSession->recordings()->exists()
+            || $trainingSession->materials()->exists()
+            || $trainingSession->sessionDocumentEntitlements()->exists()
+        ) {
             return false;
         }
 

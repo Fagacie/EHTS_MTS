@@ -308,7 +308,6 @@ class Stage6PaymentsOrdersAndRefundsTest extends TestCase
             'venue_address' => 'Address',
             'venue_city' => 'Shah Alam',
             'venue_state' => 'Selangor',
-            'venue_postcode' => '40000',
             'capacity' => 1,
             'reserved_seats_count' => 0,
             'confirmed_seats_count' => 0,

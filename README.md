@@ -45,13 +45,13 @@ A web-based platform for Ecohydrotech Solution to manage physical training sessi
    ```sh
    docker compose exec -u www-data app php artisan test
    ```
-6. Open the application at `http://localhost:8080` (Admin Panel at `http://localhost:8080/admin`).
+6. Open the application at `http://localhost:8080` (Administrator Workspace at `http://localhost:8080/admin-vue`).
 
 ### Local Demo Accounts (Password: `Password123!`)
 
 | Account | Email | Role(s) | Notes |
 |---|---|---|---|
-| **Administrator** | `admin@ecohydrotech.com.my` | `administrator` | TOTP MFA secret: `JBSWY3DPEHPK3PXP` (or recovery codes `EHT-REC-0001`..`0004`) |
+| **Administrator** | `admin@ecohydrotech.com.my` | `administrator` | TOTP MFA secret: `JBSWY3DPEHPK3PXP` (or recovery codes ``..`0004`) |
 | **Multi-Role Staff (D-026)** | `staff.trainee@ecohydrotech.com.my` | `instructor`, `customer` | Demonstrates Portal Switcher across `/instructor` and `/portal` |
 | **Instructor** | `instructor@ecohydrotech.com.my` | `instructor` | Scoped to `/instructor` |
 | **Trainee / Customer** | `trainee@ecohydrotech.com.my` | `customer` | Scoped to `/portal` |
@@ -62,7 +62,7 @@ A web-based platform for Ecohydrotech Solution to manage physical training sessi
 - Individual and company customers use the same customer registration and checkout workflow.
 - No corporate portal, organisation/member management or employee assignment in the initial release.
 - Staff members (`administrator` or `instructor`) may also hold the `customer` role when purchasing training (`D-026`).
-- Administrator accounts require verified email and TOTP Multi-Factor Authentication before accessing `/admin`.
+- Administrator accounts require verified email and TOTP Multi-Factor Authentication before accessing `/admin-vue`.
 - A training module may have multiple physical sessions; physical session purchases and independent module purchases are separate.
 - Purchased modules provide lifetime access; physical certificates require verified attendance and administrator approval.
 - Payment confirmation must come from a verified server-side gateway callback (Billplz).

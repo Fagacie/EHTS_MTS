@@ -297,14 +297,6 @@ function completeOnlinePayment(): void {
                                     <dt class="text-[12.5px] font-semibold text-[#625D6D]">Phone</dt>
                                     <dd class="mt-0.5 text-[#292536] tabular-nums">{{ order.billing.customerPhone }}</dd>
                                 </div>
-                                <div>
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Account Category</dt>
-                                    <dd class="mt-0.5 text-[#292536]">{{ order.billing.customerTypeLabel }}</dd>
-                                </div>
-                                <div v-if="order.billing.companyName">
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Company / Organisation</dt>
-                                    <dd class="mt-0.5 font-bold text-[#282338]">{{ order.billing.companyName }}</dd>
-                                </div>
                                 <div v-if="order.billing.billingAddress">
                                     <dt class="text-[12.5px] font-semibold text-[#625D6D]">Billing Address</dt>
                                     <dd class="mt-0.5 text-[13px] leading-relaxed text-[#403B4B]">

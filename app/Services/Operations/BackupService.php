@@ -45,7 +45,7 @@ class BackupService
         File::ensureDirectoryExists("{$backupRoot}/storage");
         File::ensureDirectoryExists("{$backupRoot}/database");
 
-        $stamp = now('Asia/Kuala_Lumpur')->format('Ymd-His');
+        $stamp = now('Asia/Kuala_Lumpur')->format('Ymd-His-u');
 
         // 1. Archive private storage directories (materials, videos, recordings, certificates) + public assets
         $storageArchivePath = "{$backupRoot}/storage/etms-storage-{$stamp}.zip";
@@ -97,9 +97,15 @@ class BackupService
 
     protected function createStorageArchive(string $storageRoot, string $publicRoot, string $archivePath): int
     {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'etms-storage-');
+        if ($temporaryPath === false) {
+            throw new RuntimeException('Unable to allocate a temporary ETMS storage archive.');
+        }
+
         $zip = new ZipArchive;
-        if ($zip->open($archivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new RuntimeException("Unable to open backup zip archive at [{$archivePath}].");
+        if ($zip->open($temporaryPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            @unlink($temporaryPath);
+            throw new RuntimeException("Unable to open temporary backup zip archive.");
         }
 
         $count = 0;
@@ -141,7 +147,15 @@ class BackupService
             $zip->addFromString('EMPTY_STORAGE_MARKER.txt', "ETMS storage backup created at ".now()->toIso8601String()."\n");
         }
 
-        $zip->close();
+        if ($zip->close() !== true) {
+            @unlink($temporaryPath);
+            throw new RuntimeException("Unable to finalise backup zip archive at [{$archivePath}].");
+        }
+
+        if (! rename($temporaryPath, $archivePath)) {
+            @unlink($temporaryPath);
+            throw new RuntimeException("Unable to move backup zip archive to [{$archivePath}].");
+        }
 
         return $count;
     }

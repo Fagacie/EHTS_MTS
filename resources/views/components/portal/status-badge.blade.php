@@ -7,7 +7,6 @@
 @php
     $normalized = $status instanceof \BackedEnum ? (string) $status->value : strtolower((string) $status);
 
-    // Semantic status colors consistent with Filament Admin (.fi-badge)
     $resolvedVariant = $variant ?? match ($normalized) {
         'active', 'published', 'confirmed', 'paid', 'successful', 'issued', 'present', 'verified', 'completed', 'ready', 'valid', 'success' => 'success',
         'pending', 'pending_payment', 'pending_review', 'full', 'requested', 'queued', 'sending', 'excused', 'warning' => 'warning',

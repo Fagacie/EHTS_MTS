@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Portal;
 
-use App\Enums\CustomerType;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\CustomerProfile;
@@ -11,6 +10,7 @@ use App\Support\PortalPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -24,7 +24,6 @@ class ProfileController extends Controller
 
         $profile = $user->customerProfile ?? new CustomerProfile([
             'user_id' => $user->id,
-            'customer_type' => CustomerType::Individual,
             'billing_country' => 'MY',
         ]);
 
@@ -46,11 +45,8 @@ class ProfileController extends Controller
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
-            'customer_type' => ['required', 'string', Rule::in(['individual', 'company'])],
             'phone' => ['nullable', 'string', 'max:30'],
             'job_title' => ['nullable', 'string', 'max:120'],
-            'company_name' => ['nullable', 'required_if:customer_type,company', 'string', 'max:200'],
-            'company_registration_no' => ['nullable', 'string', 'max:50'],
             'billing_contact_name' => ['nullable', 'string', 'max:150'],
             'billing_email' => ['nullable', 'email', 'max:255'],
             'billing_phone' => ['nullable', 'string', 'max:30'],
@@ -60,9 +56,10 @@ class ProfileController extends Controller
             'billing_state' => ['nullable', 'string', 'max:100'],
             'billing_postcode' => ['nullable', 'string', 'max:20'],
             'billing_country' => ['nullable', 'string', 'size:2'],
+            'photo' => ['nullable', 'image', 'max:5120'],
         ]);
 
-        DB::transaction(function () use ($user, $validated): void {
+        DB::transaction(function () use ($request, $user, $validated): void {
             $emailChanged = $user->email !== $validated['email'];
 
             $user->fill([
@@ -76,16 +73,23 @@ class ProfileController extends Controller
 
             $user->save();
 
+            if ($request->hasFile('photo')) {
+                $oldKey = $user->photo_storage_key;
+                $user->photo_storage_disk = 'public';
+                $user->photo_storage_key = $request->file('photo')->store('users/avatars', 'public');
+                $user->save();
+                if ($oldKey && $oldKey !== $user->photo_storage_key) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($oldKey);
+                }
+            }
+
             if ($emailChanged) {
                 $user->sendEmailVerificationNotification();
             }
 
             $profileData = [
-                'customer_type' => $validated['customer_type'],
                 'phone' => $validated['phone'] ?? null,
                 'job_title' => $validated['job_title'] ?? null,
-                'company_name' => $validated['company_name'] ?? null,
-                'company_registration_no' => $validated['company_registration_no'] ?? null,
                 'billing_contact_name' => $validated['billing_contact_name'] ?? null,
                 'billing_email' => $validated['billing_email'] ?? null,
                 'billing_phone' => $validated['billing_phone'] ?? null,
@@ -108,8 +112,6 @@ class ProfileController extends Controller
                 auditableId: $profile->id,
                 newValues: [
                     'name' => $user->name,
-                    'customer_type' => $profileData['customer_type'],
-                    'company_name' => $profileData['company_name'],
                 ],
                 actor: $user,
             );

@@ -14,11 +14,12 @@ defineProps<InstructorsIndexProps>();
     <Head title="Faculty & Instructors" />
 
     <PublicLayout>
-        <section class="border-b border-[#272d38]/10 bg-white py-12 lg:py-16">
+        <section class="border-b border-[#252238]/10 bg-[#F7F8FC] py-14 lg:py-20">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                     <div class="max-w-2xl">
-                        <h1 class="text-3xl font-bold text-[#272d38] sm:text-4xl">
+                        <p class="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-[#159CAA]">Training faculty</p>
+                        <h1 class="text-4xl font-extrabold text-[#252238] sm:text-5xl">
                             Faculty &amp; Instructors
                         </h1>
                         <p class="mt-3 text-[16px] leading-relaxed text-[#272d38]/70">
@@ -47,7 +48,7 @@ defineProps<InstructorsIndexProps>();
                     <Card
                         v-for="instructor in instructors"
                         :key="instructor.id"
-                        class="group flex flex-col justify-between p-6 transition-colors duration-150 hover:border-[#272d38]/30"
+                        class="group flex flex-col justify-between rounded-lg p-6 transition-all duration-150 hover:-translate-y-1 hover:border-[#7057D9]/30 hover:shadow-lg"
                     >
                         <div>
                             <div class="flex items-center gap-4">
@@ -55,11 +56,11 @@ defineProps<InstructorsIndexProps>();
                                     v-if="instructor.photoUrl"
                                     :src="instructor.photoUrl"
                                     :alt="instructor.displayName"
-                                    class="h-14 w-14 shrink-0 rounded-full border border-[#272d38]/12 object-cover"
+                                    class="h-20 w-20 shrink-0 rounded-full border-4 border-white object-cover shadow-md"
                                 >
                                 <span
                                     v-else
-                                    class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#272d38] text-base font-bold tracking-wide text-white"
+                                    class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#7057D9] text-xl font-bold tracking-wide text-white shadow-md"
                                 >
                                     {{ getInitials(instructor.displayName) }}
                                 </span>
@@ -82,33 +83,6 @@ defineProps<InstructorsIndexProps>();
                                 </div>
                             </div>
 
-                            <p
-                                v-if="instructor.qualifications"
-                                class="mt-4 text-[14px] font-semibold text-[#272d38]"
-                            >
-                                {{ instructor.qualifications }}
-                            </p>
-
-                            <p
-                                v-if="instructor.shortBio"
-                                class="mt-2.5 line-clamp-2 text-[15px] leading-relaxed text-[#272d38]/70"
-                            >
-                                {{ instructor.shortBio }}
-                            </p>
-
-                            <div
-                                v-if="instructor.specialisations.length > 0"
-                                class="mt-4 flex flex-wrap gap-2"
-                            >
-                                <Badge
-                                    v-for="spec in instructor.specialisations.slice(0, 3)"
-                                    :key="spec"
-                                    variant="secondary"
-                                    class="font-normal"
-                                >
-                                    {{ spec }}
-                                </Badge>
-                            </div>
                         </div>
 
                         <div class="mt-6 flex items-center justify-between gap-4 border-t border-[#272d38]/10 pt-4">

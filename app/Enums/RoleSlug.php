@@ -20,7 +20,7 @@ enum RoleSlug: string
     public function defaultPortalRoute(): string
     {
         return match ($this) {
-            self::Administrator => 'filament.admin.pages.dashboard',
+            self::Administrator => 'admin-vue.dashboard',
             self::Instructor => 'instructor.dashboard',
             self::Customer => 'portal.dashboard',
         };

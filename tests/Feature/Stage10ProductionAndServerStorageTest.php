@@ -11,6 +11,7 @@ use App\Enums\RecordingStatus;
 use App\Enums\RoleSlug;
 use App\Jobs\ProcessVideoToHlsJob;
 use App\Models\Booking;
+use App\Models\Attendance;
 use App\Models\Module;
 use App\Models\ModuleVideo;
 use App\Models\Payment;
@@ -293,8 +294,33 @@ class Stage10ProductionAndServerStorageTest extends TestCase
         $this->postJson(route('webhooks.billplz'), $payload)->assertOk();
         $this->assertSame(BookingStatus::Confirmed, $booking->fresh()->status);
 
-        // Issue Certificate & verify download + notification
         $admin = User::query()->where('email', 'admin@ecohydrotech.com.my')->firstOrFail();
+        $instructor = User::query()->where('email', 'instructor@ecohydrotech.com.my')->firstOrFail();
+        $session->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'completed_by' => $admin->id,
+            'completion_notes' => 'End-to-end test completion approval.',
+        ]);
+        Attendance::query()->updateOrCreate(
+            [
+                'training_session_id' => $session->id,
+                'booking_id' => $booking->id,
+            ],
+            [
+                'user_id' => $user->id,
+                'attendance_status' => AttendanceStatus::Present->value,
+                'review_status' => AttendanceReviewStatus::Verified->value,
+                'recorded_by' => $instructor->id,
+                'recorded_at' => now(),
+                'submitted_by' => $instructor->id,
+                'submitted_at' => now(),
+                'verified_by' => $admin->id,
+                'verified_at' => now(),
+            ],
+        );
+
+        // Issue Certificate & verify download + notification
         $certificate = app(CertificateService::class)->issueCertificate(
             admin: $admin,
             trainee: $user,

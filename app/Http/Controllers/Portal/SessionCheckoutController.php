@@ -57,9 +57,7 @@ class SessionCheckoutController extends Controller
         PaymentOrchestrationService $paymentService,
     ): RedirectResponse|SymfonyResponse {
         $validated = $request->validate([
-            'customer_type' => ['required', 'in:individual,company,company_sponsored'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'company_name' => ['nullable', 'required_if:customer_type,company_sponsored,company', 'string', 'max:200'],
             'billing_address_line1' => ['nullable', 'string', 'max:255'],
             'billing_city' => ['nullable', 'string', 'max:100'],
             'billing_state' => ['nullable', 'string', 'max:100'],
@@ -68,9 +66,7 @@ class SessionCheckoutController extends Controller
 
         try {
             $booking = $bookingService->reserveSeat($request->user(), $session, [
-                'customer_type' => $validated['customer_type'],
                 'phone' => $validated['phone'] ?? null,
-                'company_name' => $validated['company_name'] ?? null,
                 'billing_address' => array_filter([
                     'line1' => $validated['billing_address_line1'] ?? null,
                     'city' => $validated['billing_city'] ?? null,

@@ -16,6 +16,7 @@ use App\Models\Module;
 use App\Models\ModuleEntitlement;
 use App\Models\ModuleVideo;
 use App\Models\SessionRecording;
+use App\Models\SessionDocumentEntitlement;
 use App\Services\Media\SelfHostedVideoService;
 use App\Support\PortalPresenter;
 use Illuminate\Http\Request;
@@ -59,6 +60,29 @@ class LearningPortalController extends Controller
         return Inertia::render('Portal/Modules/Index', [
             'activeEntitlements' => $activeEntitlements,
             'revokedEntitlements' => $revokedEntitlements,
+            'sessionDocuments' => SessionDocumentEntitlement::query()
+                ->with(['trainingSession', 'material'])
+                ->where('user_id', $user->id)
+                ->where('status', EntitlementStatus::Active->value)
+                ->latest('granted_at')
+                ->get()
+                ->map(static function (SessionDocumentEntitlement $entitlement): array {
+                    return [
+                        'id' => $entitlement->id,
+                        'sessionTitle' => $entitlement->trainingSession?->title ?? 'Training session',
+                        'documentTitle' => $entitlement->material?->title ?? 'Session document',
+                        'grantedDateLabel' => $entitlement->granted_at?->format('j M Y') ?? '—',
+                        'downloadUrl' => $entitlement->material
+                            ? URL::temporarySignedRoute(
+                                'session-materials.download',
+                                now()->addMinutes(10),
+                                ['material' => $entitlement->material],
+                            )
+                            : null,
+                    ];
+                })
+                ->values()
+                ->all(),
         ]);
     }
 

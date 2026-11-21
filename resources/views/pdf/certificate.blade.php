@@ -210,6 +210,9 @@
                     </td>
                     <td class="footer-cell signatory-box">
                         <div class="signature-rule">
+                            @if(! empty($signatureDataUri))
+                                <img src="{{ $signatureDataUri }}" alt="Authorised signature" style="display:block; max-height:36px; max-width:160px; margin:0 auto 4px;">
+                            @endif
                             <p class="signatory-name">{{ $certificate->signatory_name_snapshot }}</p>
                             <p class="signatory-title">{{ $certificate->signatory_title_snapshot }}</p>
                         </div>

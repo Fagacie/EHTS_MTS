@@ -161,10 +161,7 @@ class Stage4CatalogueAndProfilesTest extends TestCase
     {
         Storage::fake('materials');
 
-        $admin = User::factory()->create([
-            'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
-            'two_factor_confirmed_at' => now(),
-        ]);
+        $admin = User::factory()->create();
         $admin->assignRole(RoleSlug::Administrator);
 
         $customer = User::factory()->create();

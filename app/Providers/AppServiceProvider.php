@@ -48,6 +48,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Symfony\Component\Mime\Email;
 
 class AppServiceProvider extends ServiceProvider
@@ -59,6 +60,24 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $argv = $_SERVER['argv'] ?? [];
+            $command = isset($argv[1]) ? (string) $argv[1] : '';
+            $destructiveCommands = ['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe'];
+            $allowDestructive = filter_var(env('ETMS_ALLOW_DESTRUCTIVE_MIGRATIONS', false), FILTER_VALIDATE_BOOLEAN);
+            $testingDatabase = (string) config('database.connections.mysql.database') === 'etms_test';
+
+            if (! $allowDestructive
+                && in_array($command, $destructiveCommands, true)
+                && ! $testingDatabase
+                && ! app()->environment('testing')) {
+                throw new RuntimeException(
+                    'Destructive migrations are blocked outside the etms_test database. '
+                    .'Use PHPunit/RefreshDatabase or set ETMS_ALLOW_DESTRUCTIVE_MIGRATIONS=true only for an explicitly disposable database.',
+                );
+            }
+        }
+
         if (app()->isProduction() || str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }

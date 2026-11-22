@@ -46,14 +46,6 @@ class ModuleVideoPolicy
         }
 
         if (
-            $user->isInstructor()
-            && $video->module !== null
-            && $video->module->trainingSessions()->whereHas('instructors', fn ($q) => $q->where('users.id', $user->id))->exists()
-        ) {
-            return true;
-        }
-
-        if (
             $video->status !== MaterialStatus::Published
             || $video->encoding_status !== EncodingStatus::Ready
             || $video->module === null

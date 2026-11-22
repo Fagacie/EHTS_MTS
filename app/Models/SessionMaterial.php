@@ -26,6 +26,7 @@ class SessionMaterial extends Model
         'file_size_bytes',
         'checksum_sha256',
         'is_downloadable',
+        'sort_order',
         'is_main_document',
         'status',
         'uploaded_by',
@@ -41,6 +42,7 @@ class SessionMaterial extends Model
             'material_type' => MaterialType::class,
             'file_size_bytes' => 'integer',
             'is_downloadable' => 'boolean',
+            'sort_order' => 'integer',
             'is_main_document' => 'boolean',
             'status' => SessionMaterialStatus::class,
             'reviewed_at' => 'datetime',
@@ -48,36 +50,21 @@ class SessionMaterial extends Model
         ];
     }
 
-    protected static function booted(): void
+    public function formattedFileSize(): string
     {
-        static::saved(function (SessionMaterial $material): void {
-            if ($material->is_main_document) {
-                static::query()
-                    ->where('training_session_id', $material->training_session_id)
-                    ->whereKeyNot($material->id)
-                    ->update(['is_main_document' => false]);
+        $bytes = (int) ($this->file_size_bytes ?? 0);
+        if ($bytes <= 0) {
+            return '—';
+        }
+        if ($bytes < 1024) {
+            return "{$bytes} B";
+        }
+        $kb = $bytes / 1024;
+        if ($kb < 1024) {
+            return number_format($kb, 1).' KB';
+        }
 
-                $material->trainingSession()->update([
-                    'main_document_material_id' => $material->id,
-                ]);
-
-                return;
-            }
-
-            if ($material->trainingSession?->main_document_material_id === $material->id) {
-                $material->trainingSession()->update([
-                    'main_document_material_id' => null,
-                ]);
-            }
-        });
-
-        static::deleted(function (SessionMaterial $material): void {
-            if ($material->trainingSession?->main_document_material_id === $material->id) {
-                $material->trainingSession()->update([
-                    'main_document_material_id' => null,
-                ]);
-            }
-        });
+        return number_format($kb / 1024, 2).' MB';
     }
 
     public function trainingSession(): BelongsTo

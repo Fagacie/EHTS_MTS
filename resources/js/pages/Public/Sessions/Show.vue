@@ -63,12 +63,6 @@ const seatAvailabilityPercent = computed(() => {
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
-                            <BreadcrumbLink :href="session.module.detailUrl" class="line-clamp-1">
-                                {{ session.module.title }}
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
                             <BreadcrumbPage class="line-clamp-1">{{ session.title }}</BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
@@ -83,7 +77,7 @@ const seatAvailabilityPercent = computed(() => {
                         <div>
                             <div class="flex flex-wrap items-center gap-3">
                                 <p class="text-[14px] text-[#272d38]/65">
-                                    {{ session.module.categoryName }} &middot; In-Person Workshop
+                                    {{ session.sessionCode }} &middot; In-Person Physical Session
                                 </p>
                                 <Badge variant="secondary">
                                     {{ session.statusLabel }}
@@ -93,16 +87,6 @@ const seatAvailabilityPercent = computed(() => {
                             <h1 class="mt-2.5 text-3xl font-bold text-[#272d38] sm:text-4xl">
                                 {{ session.title }}
                             </h1>
-
-                            <p class="mt-3 text-[16px] text-[#272d38]/70">
-                                Part of
-                                <Link
-                                    :href="session.module.detailUrl"
-                                    class="font-bold text-[#272d38] hover:underline underline-offset-4"
-                                >
-                                    {{ session.module.title }}
-                                </Link>
-                            </p>
 
                             <dl class="mt-8 grid gap-4 rounded-xl border border-[#272d38]/12 bg-white p-5 shadow-[0_1px_2px_rgba(39,45,56,0.04)] sm:grid-cols-2 sm:p-6">
                                 <div class="flex items-start gap-3">
@@ -218,39 +202,6 @@ const seatAvailabilityPercent = computed(() => {
                                 <li class="flex items-start gap-2.5 text-[15px] leading-relaxed text-[#272d38]">
                                     <Check class="mt-1 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
                                     <span>Printable invoice &amp; receipt for individual or corporate claims</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div class="border-t border-[#272d38]/10 pt-8">
-                            <div class="flex flex-wrap items-end justify-between gap-4">
-                                <h2 class="text-[22px] font-bold text-[#272d38]">
-                                    {{ session.module.title }}
-                                </h2>
-                                <Link
-                                    :href="session.module.detailUrl"
-                                    class="group inline-flex items-center gap-1.5 text-[15px] font-bold text-[#272d38] hover:underline underline-offset-4"
-                                >
-                                    <span>Full programme syllabus</span>
-                                    <ArrowRight class="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
-                                </Link>
-                            </div>
-
-                            <p v-if="session.module.summary" class="mt-3 text-[16px] leading-relaxed text-[#272d38]/70">
-                                {{ session.module.summary }}
-                            </p>
-
-                            <ul
-                                v-if="session.module.learningObjectives.length > 0"
-                                class="mt-5 grid gap-3 sm:grid-cols-2"
-                            >
-                                <li
-                                    v-for="objective in session.module.learningObjectives.slice(0, 4)"
-                                    :key="objective"
-                                    class="flex items-start gap-2.5 text-[15px] leading-relaxed text-[#272d38]"
-                                >
-                                    <Check class="mt-1 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
-                                    <span>{{ objective }}</span>
                                 </li>
                             </ul>
                         </div>
@@ -378,7 +329,12 @@ const seatAvailabilityPercent = computed(() => {
                                         </p>
                                     </template>
                                     <template v-else>
-                                        <Button as-child class="w-full">
+                                        <Button v-if="session.bookUrl" as-child class="w-full">
+                                            <a :href="session.bookUrl">
+                                                Sign in to Reserve Seat ({{ formatDisplayFee(session.priceLabel) }})
+                                            </a>
+                                        </Button>
+                                        <Button v-else as-child class="w-full">
                                             <Link :href="routes.login">
                                                 Sign in to Reserve Seat ({{ formatDisplayFee(session.priceLabel) }})
                                             </Link>
@@ -392,32 +348,6 @@ const seatAvailabilityPercent = computed(() => {
                                     </Button>
                                 </template>
                             </div>
-                        </Card>
-
-                        <Card
-                            v-if="session.module.isAvailableIndependently && session.module.independentPriceLabel"
-                            class="p-6"
-                        >
-                            <div class="flex items-center gap-2 text-[14px] font-bold text-[#272d38]">
-                                <BookOpen class="h-4 w-4 text-[#272d38]" aria-hidden="true" />
-                                <span>Independent Option</span>
-                            </div>
-                            <h2 class="mt-3 text-[18px] font-bold text-[#272d38]">
-                                Need the session document only?
-                            </h2>
-                            <p class="mt-1.5 text-[14px] leading-relaxed text-[#272d38]/70">
-                                Purchase the main session document separately from
-                                <span class="font-bold text-[#272d38] tabular-nums">
-                                    {{ formatDisplayFee(session.module.independentPriceLabel) }}
-                                </span>
-                                booking a physical workshop seat.
-                            </p>
-                            <Button as-child variant="outline" class="mt-4 w-full">
-                                <Link :href="session.module.detailUrl">
-                                    <span>Purchase Session Document</span>
-                                    <ArrowRight class="h-4 w-4" aria-hidden="true" />
-                                </Link>
-                            </Button>
                         </Card>
                     </aside>
                 </div>

@@ -82,10 +82,10 @@ class Stage7LearningMaterialsVideosAndRecordingsTest extends TestCase
             ->get(route('portal.modules.videos.watch', ['module' => $module, 'video' => $video]))
             ->assertForbidden();
 
-        // 2. Assigned instructor for a session of EHT-HYD-101 is permitted to download materials (Section 6.3)
+        // 2. Standalone module materials are administrator-managed and NOT accessible via physical session instructor assignment
         $this->actingAs($instructor)
             ->get(route('materials.download', $material))
-            ->assertOk();
+            ->assertForbidden();
 
         // 3. Grant manual module entitlement to customer (ADM-16)
         ModuleEntitlement::query()->create([

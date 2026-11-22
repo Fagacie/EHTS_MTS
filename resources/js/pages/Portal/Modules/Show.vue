@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Check, Download, Film } from 'lucide-vue-next';
+import { ArrowLeft, Check, Download, FileText, Film, PlayCircle } from 'lucide-vue-next';
 import HlsVideoPlayer from '@/components/portal/HlsVideoPlayer.vue';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { useRoutes } from '@/composables/useRoutes';
 import PortalLayout from '@/layouts/PortalLayout.vue';
 import { cn } from '@/lib/utils';
@@ -26,118 +18,113 @@ const { routes } = useRoutes();
     <Head :title="`${module.title} — Learning Workspace`" />
 
     <PortalLayout :breadcrumb="module.code">
-        <div class="mx-auto max-w-[1440px] space-y-6">
-            <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" class="tabular-nums">
-                            {{ module.code }}
-                        </Badge>
-                        <PortalStatusBadge status="active" label="Lifetime Access" />
-                    </div>
-                    <h1 class="text-[24px] font-extrabold leading-tight tracking-tight text-[#282338] sm:text-[26px]">
-                        {{ module.title }}
-                    </h1>
-                    <p
-                        v-if="entitlement?.grantedAtLabel"
-                        class="text-[13.5px] text-[#625D6D] tabular-nums"
-                    >
-                        Access granted on {{ entitlement.grantedAtLabel }}
-                    </p>
+        <div class="mx-auto max-w-5xl space-y-6">
+            <div>
+                <Link
+                    :href="routes.portalModules"
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors duration-150 hover:text-[#0F4C81]"
+                >
+                    <ArrowLeft class="h-4 w-4" aria-hidden="true" />
+                    <span>Back to My Modules</span>
+                </Link>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2.5">
+                    <span class="rounded-[6px] border border-neutral-200 bg-white px-2.5 py-0.5 font-mono text-xs font-medium text-neutral-700">
+                        {{ module.code }}
+                    </span>
+                    <span class="rounded-[6px] border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                        Lifetime Access
+                    </span>
                 </div>
 
-                <Button as-child variant="outline" size="sm" class="shrink-0">
-                    <Link :href="routes.portalModules">
-                        <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-                        <span>Back to My Learning</span>
-                    </Link>
-                </Button>
-            </header>
+                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+                    {{ module.title }}
+                </h1>
+                <p
+                    v-if="entitlement?.grantedAtLabel"
+                    class="mt-1 text-sm text-neutral-500 tabular-nums"
+                >
+                    Access granted {{ entitlement.grantedAtLabel }}
+                </p>
+            </div>
 
-            <div class="grid gap-6 lg:grid-cols-12">
-                <div class="space-y-5 lg:col-span-8">
-                    <Card v-if="activeVideo && streamManifestUrl">
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>{{ activeVideo.title }}</CardTitle>
-                            <CardDescription class="tabular-nums">
+            <div class="grid gap-6 lg:grid-cols-12 lg:items-start">
+                <div :class="cn('space-y-6', videos.length > 0 ? 'lg:col-span-8' : 'lg:col-span-12')">
+                    <div
+                        v-if="activeVideo && streamManifestUrl"
+                        class="overflow-hidden rounded-lg border border-neutral-200 bg-white"
+                    >
+                        <div class="border-b border-neutral-200 px-6 py-4">
+                            <h2 class="text-base font-semibold text-neutral-900">{{ activeVideo.title }}</h2>
+                            <p class="mt-0.5 text-xs text-neutral-500 tabular-nums">
                                 Duration: {{ activeVideo.durationLabel }}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent class="pt-4">
+                            </p>
+                        </div>
+                        <div class="p-6">
                             <HlsVideoPlayer
                                 :src="streamManifestUrl"
                                 :title="activeVideo.title"
                             />
                             <p
                                 v-if="activeVideo.description"
-                                class="mt-4 text-[13.5px] leading-relaxed text-[#403B4B]"
+                                class="mt-4 text-sm leading-relaxed text-neutral-600"
                             >
                                 {{ activeVideo.description }}
                             </p>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
-                    <Card
+                    <div
                         v-else-if="videos.length > 0"
                         role="status"
-                        class="border-[#E4DFF1] bg-[#F1EDFB] p-4 shadow-none sm:px-5"
+                        class="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4 text-sm"
                     >
-                        <div class="flex items-start gap-3">
-                            <Film class="mt-0.5 h-5 w-5 shrink-0 text-[#5942B5]" aria-hidden="true" />
-                            <div>
-                                <p class="text-[14.5px] font-bold text-[#282338]">
-                                    Video Curriculum Preparing
-                                </p>
-                                <p class="mt-1 text-[13px] text-[#403B4B]">
-                                    Video lessons for this module are currently being prepared for playback. Please check back shortly.
-                                </p>
-                            </div>
+                        <Film class="mt-0.5 h-4 w-4 shrink-0 text-[#0F4C81]" aria-hidden="true" />
+                        <div>
+                            <p class="font-semibold text-neutral-900">Video Curriculum Preparing</p>
+                            <p class="mt-0.5 text-neutral-600">
+                                Video lessons for this module are currently being prepared for playback. Please check back shortly.
+                            </p>
                         </div>
-                    </Card>
+                    </div>
 
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle class="tabular-nums">
-                                Learning Materials ({{ materials.length }})
-                            </CardTitle>
-                            <CardDescription>
-                                Time-limited secure downloads for your enrolled module
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <p
-                                v-if="materials.length === 0"
-                                class="text-[13.5px] text-[#625D6D]"
-                            >
+                    <div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
+                        <section class="p-6">
+                            <div class="flex items-center justify-between gap-2">
+                                <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500 tabular-nums">
+                                    Learning Materials ({{ materials.length }})
+                                </h2>
+                                <span class="text-xs text-neutral-500">Secure time-limited downloads</span>
+                            </div>
+
+                            <p v-if="materials.length === 0" class="mt-3 text-sm text-neutral-500">
                                 No downloadable materials have been published for this module yet.
                             </p>
 
-                            <div v-else class="divide-y divide-[#EEEAF2]">
+                            <div v-else class="mt-4 divide-y divide-neutral-100">
                                 <div
                                     v-for="material in materials"
                                     :key="material.id"
                                     class="flex flex-col gap-3 py-3.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                                 >
-                                    <div class="min-w-0 space-y-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="text-[14.5px] font-bold text-[#282338]">
-                                                {{ material.title }}
-                                            </span>
-                                            <Badge variant="outline">
-                                                {{ material.typeLabel }}
-                                            </Badge>
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <FileText class="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="text-sm font-semibold text-neutral-900">
+                                                    {{ material.title }}
+                                                </span>
+                                                <span class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[11px] font-medium text-neutral-600">
+                                                    {{ material.typeLabel }}
+                                                </span>
+                                            </div>
+                                            <p v-if="material.description" class="mt-0.5 text-xs text-neutral-600">
+                                                {{ material.description }}
+                                            </p>
+                                            <p class="mt-1 font-mono text-xs text-neutral-500 tabular-nums">
+                                                {{ material.originalFilename }} &middot; {{ material.fileSizeLabel }}
+                                            </p>
                                         </div>
-
-                                        <p
-                                            v-if="material.description"
-                                            class="text-[13px] leading-relaxed text-[#403B4B]"
-                                        >
-                                            {{ material.description }}
-                                        </p>
-
-                                        <p class="text-[12px] text-[#625D6D] tabular-nums">
-                                            {{ material.originalFilename }} &middot; {{ material.fileSizeLabel }}
-                                        </p>
                                     </div>
 
                                     <div class="shrink-0">
@@ -146,119 +133,110 @@ const { routes } = useRoutes();
                                             as="a"
                                             :href="material.downloadUrl"
                                             size="sm"
+                                            class="h-9 rounded-[6px] bg-[#0F4C81] px-3.5 text-xs font-medium text-white hover:bg-[#0F4C81]/90"
                                         >
                                             <Download class="h-3.5 w-3.5" aria-hidden="true" />
                                             <span>Download ({{ material.fileSizeLabel }})</span>
                                         </Button>
-
-                                        <Badge v-else variant="outline">
-                                            Download Unavailable
-                                        </Badge>
+                                        <span
+                                            v-else
+                                            class="rounded-[6px] border border-neutral-200 px-2.5 py-1 text-xs text-neutral-500"
+                                        >
+                                            Unavailable
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </section>
 
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Syllabus &amp; Learning Objectives</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-4 pt-4">
-                            <ul
-                                v-if="module.learningObjectives.length > 0"
-                                class="space-y-2 text-[13.5px] leading-relaxed text-[#292536]"
-                            >
+                        <section v-if="module.learningObjectives.length > 0" class="p-6">
+                            <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                                Learning Objectives
+                            </h2>
+                            <ul class="mt-4 grid gap-2.5 text-sm leading-relaxed text-neutral-700 sm:grid-cols-2">
                                 <li
                                     v-for="(objective, idx) in module.learningObjectives"
                                     :key="idx"
                                     class="flex items-start gap-2.5"
                                 >
-                                    <Check class="mt-0.5 h-4 w-4 shrink-0 text-[#5942B5]" aria-hidden="true" />
+                                    <Check class="mt-0.5 h-4 w-4 shrink-0 text-[#0F4C81]" aria-hidden="true" />
                                     <span>{{ objective }}</span>
                                 </li>
                             </ul>
+                        </section>
 
-                            <div
-                                :class="
-                                    cn(
-                                        'text-[13.5px] leading-relaxed whitespace-pre-line text-[#403B4B]',
-                                        module.learningObjectives.length > 0 && 'border-t border-[#EEEAF2] pt-4',
-                                    )
-                                "
-                            >
+                        <section class="p-6">
+                            <h2 class="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                                Syllabus &amp; Overview
+                            </h2>
+                            <div class="mt-3 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
                                 {{ module.description }}
                             </div>
-                        </CardContent>
-                    </Card>
+                        </section>
+                    </div>
                 </div>
 
-                <aside class="lg:col-span-4">
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle class="tabular-nums">
-                                Video Lessons ({{ videos.length }})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <p
-                                v-if="videos.length === 0"
-                                class="text-[13.5px] leading-relaxed text-[#625D6D]"
-                            >
-                                This programme is delivered through the downloadable workbooks and technical documents on this page.
-                            </p>
+                <aside v-if="videos.length > 0" class="rounded-lg border border-neutral-200 bg-white lg:col-span-4">
+                    <div class="border-b border-neutral-200 px-5 py-4">
+                        <h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500 tabular-nums">
+                            <PlayCircle class="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                            <span>Video Lessons ({{ videos.length }})</span>
+                        </h2>
+                    </div>
 
-                            <div v-else class="space-y-2.5">
-                                <div
-                                    v-for="(video, index) in videos"
-                                    :key="video.id"
+                    <div class="divide-y divide-neutral-100">
+                        <div
+                            v-for="(video, index) in videos"
+                            :key="video.id"
+                            :class="
+                                cn(
+                                    'p-4 transition-colors duration-150',
+                                    video.isCurrent ? 'bg-[#0F4C81]/[0.04]' : 'bg-white',
+                                )
+                            "
+                        >
+                            <div class="flex items-start justify-between gap-2">
+                                <p class="text-sm font-semibold leading-snug text-neutral-900">
+                                    <span class="mr-1 font-mono text-xs text-[#0F4C81] tabular-nums">
+                                        {{ index + 1 }}.
+                                    </span>
+                                    {{ video.title }}
+                                </p>
+                                <span class="shrink-0 font-mono text-xs text-neutral-500 tabular-nums">
+                                    {{ video.durationLabel }}
+                                </span>
+                            </div>
+
+                            <div class="mt-2.5 flex items-center justify-between gap-2">
+                                <span class="text-xs text-neutral-500">
+                                    {{ video.encodingStatusLabel }}
+                                </span>
+
+                                <Button
+                                    v-if="video.isPlayable && video.watchUrl"
+                                    as-child
+                                    :variant="video.isCurrent ? 'default' : 'outline'"
+                                    size="sm"
                                     :class="
                                         cn(
-                                            'rounded-xl border p-3.5 transition-colors',
-                                            video.isCurrent
-                                                ? 'border-[#7057D9] bg-[#F1EDFB]/70'
-                                                : 'border-[#E5E1EB] bg-white',
+                                            'h-8 rounded-[6px] text-xs',
+                                            video.isCurrent && 'bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90',
                                         )
                                     "
                                 >
-                                    <div class="flex items-start justify-between gap-2">
-                                        <p class="text-[13.5px] font-bold leading-snug text-[#282338]">
-                                            <span class="mr-1 font-semibold text-[#5942B5] tabular-nums">
-                                                {{ index + 1 }}.
-                                            </span>
-                                            {{ video.title }}
-                                        </p>
-                                        <span class="shrink-0 text-[12px] font-semibold text-[#625D6D] tabular-nums">
-                                            {{ video.durationLabel }}
-                                        </span>
-                                    </div>
+                                    <Link :href="video.watchUrl" preserve-scroll>
+                                        {{ video.isCurrent ? 'Playing' : 'Watch Lesson' }}
+                                    </Link>
+                                </Button>
 
-                                    <div class="mt-2.5 flex items-center justify-between gap-2">
-                                        <span class="text-[12px] text-[#625D6D]">
-                                            {{ video.encodingStatusLabel }}
-                                        </span>
-
-                                        <Button
-                                            v-if="video.isPlayable && video.watchUrl"
-                                            as-child
-                                            :variant="video.isCurrent ? 'default' : 'outline'"
-                                            size="sm"
-                                        >
-                                            <Link :href="video.watchUrl" preserve-scroll>
-                                                {{ video.isCurrent ? 'Playing' : 'Watch Lesson' }}
-                                            </Link>
-                                        </Button>
-
-                                        <PortalStatusBadge
-                                            v-else
-                                            status="processing"
-                                            label="Processing"
-                                        />
-                                    </div>
-                                </div>
+                                <PortalStatusBadge
+                                    v-else
+                                    status="processing"
+                                    label="Processing"
+                                />
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </aside>
             </div>
         </div>

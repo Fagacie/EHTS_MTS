@@ -37,6 +37,7 @@ class InstructorSessionController extends Controller
             ->withCount([
                 'bookings as confirmed_participants_count' => fn ($q) => $q->where('status', BookingStatus::Confirmed->value),
                 'recordings',
+                'materials',
             ])
             ->orderBy('starts_at');
 
@@ -65,6 +66,7 @@ class InstructorSessionController extends Controller
             'confirmedBookings.user.customerProfile',
             'confirmedBookings.attendance',
             'recordings',
+            'materials',
         ]);
 
         return Inertia::render('Instructor/Sessions/Show', [
@@ -72,6 +74,16 @@ class InstructorSessionController extends Controller
             'roster' => $session->confirmedBookings->map(
                 static fn (Booking $booking): array => InstructorPresenter::rosterParticipant($booking),
             )->values()->all(),
+            'materials' => $session->materials->map(
+                static fn (SessionMaterial $material): array => InstructorPresenter::materialItem($material, $session),
+            )->values()->all(),
+            'materialTypes' => collect(\App\Enums\MaterialType::cases())->map(
+                static fn (\App\Enums\MaterialType $type): array => [
+                    'value' => $type->value,
+                    'label' => $type->label(),
+                ],
+            )->values()->all(),
+            'submitMaterialUrl' => route('instructor.sessions.materials.store', $session),
         ]);
     }
 
@@ -387,17 +399,23 @@ class InstructorSessionController extends Controller
         $user = $request->user();
         $this->ensureAssigned($user, $session);
 
+        if ($session->status === SessionStatus::Cancelled) {
+            return redirect()
+                ->route('instructor.sessions.show', $session)
+                ->with('error', 'Teaching materials cannot be uploaded to a cancelled training session.');
+        }
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:2000'],
             'material_type' => ['required', 'in:pdf,presentation,document,image,worksheet,other'],
-            'material_file' => ['required', 'file', 'max:102400'],
+            'material_file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,csv,txt,zip,png,jpg,jpeg', 'max:102400'],
         ]);
 
         $file = $request->file('material_file');
         $storageKey = $file->store("sessions/{$session->id}", 'session-materials');
 
-        SessionMaterial::query()->create([
+        $material = SessionMaterial::query()->create([
             'training_session_id' => $session->id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -408,13 +426,69 @@ class InstructorSessionController extends Controller
             'mime_type' => $file->getClientMimeType(),
             'file_size_bytes' => $file->getSize(),
             'checksum_sha256' => hash_file('sha256', $file->getRealPath()),
+            'is_downloadable' => true,
+            'is_main_document' => false,
             'status' => \App\Enums\SessionMaterialStatus::PendingReview,
             'uploaded_by' => $user->id,
         ]);
 
+        AuditLog::record(
+            event: 'session_material.submitted',
+            auditableType: SessionMaterial::class,
+            auditableId: $material->id,
+            oldValues: null,
+            newValues: [
+                'training_session_id' => $session->id,
+                'title' => $material->title,
+                'material_type' => $validated['material_type'],
+                'original_filename' => $material->original_filename,
+                'status' => \App\Enums\SessionMaterialStatus::PendingReview->value,
+            ],
+            reason: 'Instructor uploaded session teaching material for administrator review.',
+            actor: $user,
+        );
+
         return redirect()
             ->route('instructor.sessions.show', $session)
             ->with('status', 'Session material submitted for administrator review.');
+    }
+
+    public function destroyMaterial(Request $request, TrainingSession $session, SessionMaterial $material): RedirectResponse
+    {
+        $user = $request->user();
+        $this->ensureAssigned($user, $session);
+        abort_unless($material->training_session_id === $session->id, 404);
+
+        if (! in_array($material->status, [
+            \App\Enums\SessionMaterialStatus::PendingReview,
+            \App\Enums\SessionMaterialStatus::Rejected,
+        ], true)) {
+            return redirect()
+                ->route('instructor.sessions.show', $session)
+                ->with('error', 'Published session materials can only be removed by an administrator.');
+        }
+
+        $key = $material->storage_key;
+        $title = $material->title;
+        $material->delete();
+
+        if ($key) {
+            \Illuminate\Support\Facades\Storage::disk('session-materials')->delete($key);
+        }
+
+        AuditLog::record(
+            event: 'session_material.deleted_by_instructor',
+            auditableType: SessionMaterial::class,
+            auditableId: $material->id,
+            oldValues: ['title' => $title],
+            newValues: null,
+            reason: 'Instructor removed unapproved session teaching material.',
+            actor: $user,
+        );
+
+        return redirect()
+            ->route('instructor.sessions.show', $session)
+            ->with('status', 'Session material removed.');
     }
 
     protected function ensureAssigned(User $user, TrainingSession $session): void

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight, BookOpen, Calendar, Check, Download, FileText, Lock, PlayCircle } from 'lucide-vue-next';
+import { BookOpen, Check, Download, FileText, Lock, PlayCircle } from 'lucide-vue-next';
 import ProgrammeBanner from '@/components/public/ProgrammeBanner.vue';
-import SessionsDataTable from '@/components/public/SessionsDataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import {
     Breadcrumb,
@@ -26,13 +25,6 @@ const props = defineProps<CatalogueShowProps>();
 const { routes } = useRoutes();
 const { isAuthenticated } = useAuth();
 
-const nextOpenSession = computed(
-    () =>
-        props.upcomingSessions.find((session) => session.isOpenForBooking) ??
-        props.upcomingSessions[0] ??
-        null,
-);
-
 const hasLessonPreview = computed(
     () => props.materials.length > 0 || props.videos.length > 0,
 );
@@ -47,11 +39,7 @@ const hasLessonPreview = computed(
                 <Breadcrumb>
                     <BreadcrumbList>
                         <BreadcrumbItem>
-                            <BreadcrumbLink :href="routes.catalogue">Catalogue</BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
-                            <BreadcrumbLink :href="module.categoryUrl">{{ module.categoryName }}</BreadcrumbLink>
+                            <BreadcrumbLink :href="routes.catalogue">Standalone Modules</BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
@@ -79,7 +67,7 @@ const hasLessonPreview = computed(
 
                             <div class="mt-6">
                                 <p class="text-[14px] text-[#272d38]/65 tabular-nums">
-                                    {{ module.categoryName }} &middot; {{ module.code }}
+                                    Standalone Learning Module &middot; {{ module.code }}
                                 </p>
                                 <h1 class="mt-2 text-3xl font-bold text-[#272d38] sm:text-4xl">
                                     {{ module.title }}
@@ -210,41 +198,6 @@ const hasLessonPreview = computed(
                                 Technical workbooks and reference materials are provided directly inside your learning portal.
                             </p>
                         </div>
-
-                        <div id="programme-sessions" class="border-t border-[#272d38]/10 pt-8">
-                            <div class="flex flex-wrap items-end justify-between gap-4">
-                                <h2 class="text-2xl font-bold text-[#272d38]">
-                                    Upcoming Physical Sessions
-                                </h2>
-
-                                <Link
-                                    :href="routes.sessions"
-                                    class="group inline-flex items-center gap-1.5 text-[15px] font-bold text-[#272d38] hover:underline underline-offset-4"
-                                >
-                                    <span>All sessions</span>
-                                    <ArrowRight class="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
-                                </Link>
-                            </div>
-
-                            <SessionsDataTable
-                                v-if="upcomingSessions.length > 0"
-                                :sessions="upcomingSessions"
-                                class="mt-6"
-                            />
-
-                            <Card
-                                v-else
-                                class="mt-5 p-6 text-[16px] text-[#272d38]/70"
-                            >
-                                No upcoming physical cohorts are currently scheduled for this programme.
-                                <Link
-                                    :href="routes.sessions"
-                                    class="ml-1 font-bold text-[#272d38] underline underline-offset-4 hover:opacity-80"
-                                >
-                                    View all scheduled workshops
-                                </Link>
-                            </Card>
-                        </div>
                     </div>
 
                     <aside class="space-y-6 lg:sticky lg:top-24 lg:col-span-4">
@@ -303,7 +256,12 @@ const hasLessonPreview = computed(
                                     </p>
                                 </template>
                                 <template v-else>
-                                    <Button as-child class="w-full">
+                                    <Button v-if="module.checkoutUrl" as-child class="w-full">
+                                        <a :href="module.checkoutUrl">
+                                            Sign in to Purchase ({{ formatDisplayFee(module.independentPriceLabel) }})
+                                        </a>
+                                    </Button>
+                                    <Button v-else as-child class="w-full">
                                         <Link :href="routes.login">
                                             Sign in to Purchase ({{ formatDisplayFee(module.independentPriceLabel) }})
                                         </Link>
@@ -314,77 +272,6 @@ const hasLessonPreview = computed(
                             <p class="mt-4 text-[14px] leading-relaxed text-[#272d38]/65">
                                 Self-paced module access is separate from physical session registration and attendance certificates.
                             </p>
-                        </Card>
-
-                        <Card class="p-6">
-                            <div class="flex items-center gap-2 text-[14px] font-bold text-[#272d38]">
-                                <Calendar class="h-4 w-4 text-[#272d38]" aria-hidden="true" />
-                                <span>Physical Workshops</span>
-                            </div>
-
-                            <h2 class="mt-3 text-[19px] font-bold text-[#272d38]">
-                                {{
-                                    upcomingSessions.length > 0
-                                        ? `${upcomingSessions.length} ${pluralize(upcomingSessions.length, 'scheduled cohort')}`
-                                        : 'In-Person Delivery'
-                                }}
-                            </h2>
-
-                            <p
-                                v-if="!module.isAvailableIndependently"
-                                class="mt-2 text-[14px] leading-relaxed text-[#272d38]/70"
-                            >
-                                This programme is delivered exclusively through instructor-led physical sessions.
-                            </p>
-
-                            <template v-if="nextOpenSession">
-                                <div class="mt-4 rounded-xl border border-[#272d38]/12 bg-[#272d38]/[0.025] p-4">
-                                    <p class="text-[13px] font-bold text-[#272d38]/70">
-                                        Next Cohort
-                                    </p>
-                                    <p class="mt-1 text-[15px] font-bold text-[#272d38] tabular-nums">
-                                        {{ nextOpenSession.dateRangeLabel }}
-                                    </p>
-                                    <p class="mt-0.5 text-[14px] text-[#272d38]/70">
-                                        {{ nextOpenSession.venueName }}
-                                        <template v-if="nextOpenSession.venueLocation">
-                                            &middot; {{ nextOpenSession.venueLocation }}
-                                        </template>
-                                    </p>
-                                    <div class="mt-3 flex items-center justify-between border-t border-[#272d38]/10 pt-3 text-[14px]">
-                                        <span class="font-bold text-[#272d38] tabular-nums">
-                                            {{ formatDisplayFee(nextOpenSession.priceLabel) }}
-                                        </span>
-                                        <span class="text-[#272d38]/65 tabular-nums">
-                                            {{ nextOpenSession.remainingSeats }} / {{ nextOpenSession.capacity }} seats
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="mt-4 flex flex-col gap-2.5">
-                                    <Button as-child variant="outline" class="w-full">
-                                        <Link :href="nextOpenSession.detailUrl">
-                                            <span>View session details</span>
-                                            <ArrowRight class="h-4 w-4" aria-hidden="true" />
-                                        </Link>
-                                    </Button>
-                                    <a
-                                        href="#programme-sessions"
-                                        class="text-center text-[14px] font-bold text-[#272d38] hover:underline underline-offset-4"
-                                    >
-                                        See all scheduled dates below
-                                    </a>
-                                </div>
-                            </template>
-
-                            <div v-else class="mt-4">
-                                <Button as-child variant="outline" class="w-full">
-                                    <Link :href="routes.sessions">
-                                        <span>Browse all physical sessions</span>
-                                        <ArrowRight class="h-4 w-4" aria-hidden="true" />
-                                    </Link>
-                                </Button>
-                            </div>
                         </Card>
                     </aside>
                 </div>

@@ -97,7 +97,6 @@ class LearningPortalController extends Controller
         $isAuthorized = $user->isActive() && (
             $user->hasActiveModuleEntitlement($module->id)
             || ($user->isAdministrator() && $user->hasPermission('modules.manage'))
-            || ($user->isInstructor() && $module->trainingSessions()->whereHas('instructors', fn ($q) => $q->where('users.id', $user->id))->exists())
         );
 
         abort_unless(
@@ -250,11 +249,11 @@ class LearningPortalController extends Controller
 
         $bookings = Booking::query()
             ->with([
-                'trainingSession.module',
                 'trainingSession.recordings' => fn ($q) => $q
                     ->where('status', RecordingStatus::Published->value)
                     ->orderBy('sort_order')
                     ->orderBy('id'),
+                'trainingSession.publishedMaterials',
                 'attendance',
             ])
             ->where('user_id', $user->id)

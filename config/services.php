@@ -2,6 +2,8 @@
 
 return [
 
+    'payment_provider' => env('PAYMENT_PROVIDER', 'paystack'),
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -37,6 +39,14 @@ return [
         'endpoint' => env('BILLPLZ_SANDBOX', true)
             ? 'https://www.billplz-sandbox.com/api/v3'
             : 'https://www.billplz.com/api/v3',
+    ],
+
+    'paystack' => [
+        'public_key' => env('PAYSTACK_PUBLIC_KEY'),
+        'secret_key' => env('PAYSTACK_SECRET_KEY'),
+        'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
+        'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+        'environment' => env('PAYSTACK_ENVIRONMENT', 'test'),
     ],
 
 ];

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RecordingAccessPolicy;
+use App\Enums\SessionMaterialStatus;
 use App\Enums\SessionStatus;
 use App\Models\SessionDocumentEntitlement;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class TrainingSession extends Model
 {
@@ -20,6 +22,8 @@ class TrainingSession extends Model
         'title',
         'slug',
         'description',
+        'cover_image_disk',
+        'cover_image_path',
         'starts_at',
         'ends_at',
         'duration_minutes',
@@ -117,7 +121,15 @@ class TrainingSession extends Model
 
     public function materials(): HasMany
     {
-        return $this->hasMany(SessionMaterial::class)->latest('id');
+        return $this->hasMany(SessionMaterial::class)->orderBy('sort_order')->latest('id');
+    }
+
+    public function publishedMaterials(): HasMany
+    {
+        return $this->hasMany(SessionMaterial::class)
+            ->where('status', SessionMaterialStatus::Published->value)
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function mainDocumentMaterial(): BelongsTo
@@ -161,7 +173,18 @@ class TrainingSession extends Model
             SessionStatus::Published->value,
             SessionStatus::Full->value,
             SessionStatus::RegistrationClosed->value,
-        ])->whereHas('module', fn (Builder $q) => $q->published());
+        ]);
+    }
+
+    public function coverImageUrl(): ?string
+    {
+        if (! blank($this->cover_image_path)) {
+            $disk = $this->cover_image_disk ?: 'public';
+
+            return Storage::disk($disk)->url($this->cover_image_path);
+        }
+
+        return $this->module?->coverImageUrl();
     }
 
     public function scopeUpcomingPublic(Builder $query): Builder
@@ -205,14 +228,14 @@ class TrainingSession extends Model
 
     public function formattedPrice(): string
     {
-        return 'RM '.number_format((float) $this->price, 2);
+        return ($this->currency ?: config('etms.currency')).' '.number_format((float) $this->price, 2);
     }
 
     public function formattedIndependentPrice(): ?string
     {
         return $this->independent_price === null
             ? null
-            : 'RM '.number_format((float) $this->independent_price, 2);
+            : ($this->currency ?: config('etms.currency')).' '.number_format((float) $this->independent_price, 2);
     }
 
     public function formattedDuration(): string

@@ -23,7 +23,10 @@ class ModuleCheckoutController extends Controller
         $module->loadMissing(['category', 'publishedMaterials', 'publishedVideos']);
 
         abort_unless(
-            $module->isPublished() && $module->category?->is_active && $module->is_available_independently && $module->independent_price !== null,
+            $module->isPublished()
+            && ($module->category_id === null || (bool) $module->category?->is_active)
+            && $module->is_available_independently
+            && $module->independent_price !== null,
             404,
         );
 
@@ -90,6 +93,6 @@ class ModuleCheckoutController extends Controller
 
         return redirect()
             ->route('portal.orders.show', $order)
-            ->with('status', 'Module order created. Proceed to Billplz payment below.');
+            ->with('status', 'Module order created. Proceed to Paystack payment below.');
     }
 }

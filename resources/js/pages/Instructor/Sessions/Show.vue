@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
-    CalendarDays,
     CheckCircle2,
-    Clock,
-    FileCheck2,
+    Download,
     FileText,
-    MapPin,
-    ShieldCheck,
+    Trash2,
+    UploadCloud,
     Users,
     Video,
 } from 'lucide-vue-next';
@@ -17,6 +16,44 @@ import InstructorLayout from '@/layouts/InstructorLayout.vue';
 import type { InstructorSessionShowProps } from '@/types/etms';
 
 const props = defineProps<InstructorSessionShowProps>();
+
+const materialFileKey = ref(0);
+const materialForm = useForm({
+    title: '',
+    description: '',
+    material_type: 'pdf',
+    material_file: null as File | null,
+});
+
+function onMaterialFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    materialForm.material_file = input.files?.[0] ?? null;
+}
+
+function submitMaterial(): void {
+    if (!props.submitMaterialUrl || !materialForm.material_file) {
+        return;
+    }
+
+    materialForm.post(props.submitMaterialUrl, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            materialForm.reset('title', 'description', 'material_file');
+            materialFileKey.value++;
+        },
+    });
+}
+
+function deleteMaterial(deleteUrl: string): void {
+    if (!window.confirm('Remove this unapproved teaching material?')) {
+        return;
+    }
+
+    router.delete(deleteUrl, {
+        preserveScroll: true,
+    });
+}
 </script>
 
 <template>
@@ -25,7 +62,7 @@ const props = defineProps<InstructorSessionShowProps>();
     <InstructorLayout
         :breadcrumb="session.sessionCode"
         :title="session.title"
-        :subtitle="`Module: ${session.moduleCode ?? ''} — ${session.moduleTitle ?? ''}`"
+        :subtitle="`${session.scheduleLabel} · ${session.venueName}`"
     >
         <div class="space-y-6">
             <!-- Header Card with Actions -->
@@ -43,16 +80,13 @@ const props = defineProps<InstructorSessionShowProps>();
                     <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#292536]">
                         {{ session.title }}
                     </h1>
-                    <p class="mt-1 text-sm text-[#625D6D]">
-                        Module: <strong class="text-[#292536]">{{ session.moduleCode }} — {{ session.moduleTitle }}</strong>
-                    </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
                     <Button as-child size="sm" class="h-9 rounded-xl bg-[#7057D9] px-4 text-xs font-semibold text-white shadow-none hover:bg-[#5942B5]">
                         <Link :href="session.attendanceUrl">
                             <CheckCircle2 class="mr-1.5 h-4 w-4" />
-                            Record & Submit Attendance
+                            Record &amp; Submit Attendance
                         </Link>
                     </Button>
                     <Button as-child variant="outline" size="sm" class="h-9 rounded-xl border-[#E5E1EB] px-3.5 text-xs font-semibold text-[#292536] hover:bg-[#F7F6FA]">
@@ -72,9 +106,9 @@ const props = defineProps<InstructorSessionShowProps>();
 
             <!-- Main Layout Grid -->
             <div class="grid gap-6 lg:grid-cols-12">
-                <!-- Main Content (Roster + Completion Notes) -->
+                <!-- Main Content (Roster + Session Teaching Materials + Completion Notes) -->
                 <div class="space-y-6 lg:col-span-8">
-                    <!-- Confirmed Participant Roster Card (INS-03) -->
+                    <!-- Confirmed Participant Roster Card -->
                     <div class="rounded-2xl border border-[#E5E1EB] bg-white shadow-sm overflow-hidden">
                         <div class="border-b border-[#E5E1EB] p-5 sm:p-6">
                             <div class="flex items-center justify-between">
@@ -83,7 +117,7 @@ const props = defineProps<InstructorSessionShowProps>();
                                         Confirmed Participant Roster ({{ roster.length }} / {{ session.capacity }})
                                     </h2>
                                     <p class="mt-0.5 text-xs text-[#625D6D]">
-                                        Participants holding confirmed bookings for this physical session (commercial payment details hidden per SRS Sec. 2.2).
+                                        Participants holding confirmed bookings for this physical session.
                                     </p>
                                 </div>
                                 <span class="rounded-full bg-[#EAE5F8] px-2.5 py-0.5 font-mono text-xs font-bold text-[#5942B5]">
@@ -142,6 +176,156 @@ const props = defineProps<InstructorSessionShowProps>();
                         </div>
                     </div>
 
+                    <!-- Session Teaching Materials Card -->
+                    <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
+                        <div class="border-b border-[#E5E1EB] pb-4">
+                            <h2 class="text-base font-bold text-[#292536]">
+                                Session Teaching Materials ({{ materials?.length ?? 0 }})
+                            </h2>
+                            <p class="mt-0.5 text-xs text-[#625D6D]">
+                                Upload lecture slides, calculation worksheets, and field manuals for this session. Submitted files are reviewed and published by an administrator for confirmed attendees.
+                            </p>
+                        </div>
+
+                        <form
+                            v-if="submitMaterialUrl && session.statusValue !== 'cancelled'"
+                            class="mt-4 grid gap-3 rounded-xl border border-[#E5E1EB] bg-[#F7F6FA] p-4 sm:grid-cols-2"
+                            @submit.prevent="submitMaterial"
+                        >
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
+                                    Material Title <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="materialForm.title"
+                                    type="text"
+                                    required
+                                    maxlength="200"
+                                    placeholder="e.g. Workshop Slides & Worked Examples"
+                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-sm text-[#292536]"
+                                />
+                                <p v-if="materialForm.errors.title" class="mt-1 text-xs text-red-600">
+                                    {{ materialForm.errors.title }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
+                                    Material Type
+                                </label>
+                                <select
+                                    v-model="materialForm.material_type"
+                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-sm text-[#292536]"
+                                >
+                                    <option
+                                        v-for="type in materialTypes ?? [
+                                            { value: 'pdf', label: 'PDF Document' },
+                                            { value: 'presentation', label: 'Presentation' },
+                                            { value: 'worksheet', label: 'Worksheet' },
+                                            { value: 'document', label: 'Reference Document' },
+                                        ]"
+                                        :key="type.value"
+                                        :value="type.value"
+                                    >
+                                        {{ type.label }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
+                                    File (PDF, Office, ZIP, Image — up to 100 MB) <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    :key="materialFileKey"
+                                    type="file"
+                                    required
+                                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.zip,.png,.jpg,.jpeg"
+                                    class="mt-1 block w-full rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-xs text-[#292536]"
+                                    @change="onMaterialFileSelected"
+                                />
+                                <p v-if="materialForm.errors.material_file" class="mt-1 text-xs text-red-600">
+                                    {{ materialForm.errors.material_file }}
+                                </p>
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
+                                    Description (Optional)
+                                </label>
+                                <textarea
+                                    v-model="materialForm.description"
+                                    rows="2"
+                                    placeholder="Short notes for attendees or administrator review..."
+                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white p-2.5 text-sm text-[#292536]"
+                                />
+                            </div>
+
+                            <div class="flex justify-end sm:col-span-2">
+                                <Button
+                                    type="submit"
+                                    :disabled="materialForm.processing || !materialForm.material_file || !materialForm.title.trim()"
+                                    size="sm"
+                                    class="rounded-xl bg-[#7057D9] px-4 text-xs font-bold text-white hover:bg-[#5942B5]"
+                                >
+                                    <UploadCloud class="mr-1.5 h-4 w-4" />
+                                    {{ materialForm.processing ? 'Uploading…' : 'Upload Teaching Material' }}
+                                </Button>
+                            </div>
+                        </form>
+
+                        <div v-if="materials && materials.length > 0" class="mt-4 divide-y divide-[#E5E1EB]">
+                            <div
+                                v-for="mat in materials"
+                                :key="mat.id"
+                                class="flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center"
+                            >
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-sm font-bold text-[#292536]">{{ mat.title }}</span>
+                                        <span class="rounded-md border border-[#E5E1EB] bg-[#F7F6FA] px-2 py-0.5 text-[11px] font-semibold text-[#625D6D]">
+                                            {{ mat.typeLabel }}
+                                        </span>
+                                        <PortalStatusBadge :status="mat.status" :label="mat.statusLabel" />
+                                    </div>
+                                    <p v-if="mat.description" class="mt-1 text-xs text-[#625D6D]">
+                                        {{ mat.description }}
+                                    </p>
+                                    <p class="mt-1 font-mono text-[11px] text-[#625D6D]">
+                                        {{ mat.originalFilename }} · {{ mat.fileSizeLabel }}
+                                    </p>
+                                    <p v-if="mat.reviewNotes" class="mt-1 text-xs font-medium text-amber-800">
+                                        Administrator review note: {{ mat.reviewNotes }}
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <a
+                                        v-if="mat.downloadUrl"
+                                        :href="mat.downloadUrl"
+                                        class="inline-flex items-center gap-1 rounded-xl border border-[#E5E1EB] px-3 py-1.5 text-xs font-semibold text-[#292536] hover:bg-[#F7F6FA]"
+                                    >
+                                        <Download class="h-3.5 w-3.5" />
+                                        Download
+                                    </a>
+                                    <button
+                                        v-if="mat.canDelete"
+                                        type="button"
+                                        class="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                        @click="deleteMaterial(mat.deleteUrl)"
+                                    >
+                                        <Trash2 class="h-3.5 w-3.5" />
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p v-else class="mt-4 text-center text-xs text-[#625D6D]">
+                            No teaching materials have been uploaded for this session yet.
+                        </p>
+                    </div>
+
                     <!-- Completion Notes Preview Card -->
                     <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
                         <div class="flex items-center justify-between border-b border-[#E5E1EB] pb-4">
@@ -182,12 +366,12 @@ const props = defineProps<InstructorSessionShowProps>();
                 <div class="space-y-6 lg:col-span-4">
                     <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 shadow-sm">
                         <h2 class="text-base font-bold text-[#292536] border-b border-[#E5E1EB] pb-3">
-                            Schedule & Venue Logistics
+                            Schedule &amp; Venue Logistics
                         </h2>
 
                         <dl class="mt-4 space-y-4 text-xs">
                             <div>
-                                <dt class="font-bold uppercase tracking-wider text-[#625D6D]">Date & Time (MYT)</dt>
+                                <dt class="font-bold uppercase tracking-wider text-[#625D6D]">Date &amp; Time (MYT)</dt>
                                 <dd class="mt-1 text-sm font-semibold text-[#292536]">{{ session.scheduleLabel }}</dd>
                             </div>
 
@@ -197,7 +381,7 @@ const props = defineProps<InstructorSessionShowProps>();
                             </div>
 
                             <div>
-                                <dt class="font-bold uppercase tracking-wider text-[#625D6D]">Venue & Location</dt>
+                                <dt class="font-bold uppercase tracking-wider text-[#625D6D]">Venue &amp; Location</dt>
                                 <dd class="mt-1 font-semibold text-[#292536]">{{ session.venueName }}</dd>
                                 <dd class="mt-0.5 text-[#625D6D]">{{ session.venueAddress }}, {{ session.venueCity }}, {{ session.venueState }}</dd>
                             </div>

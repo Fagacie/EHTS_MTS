@@ -290,14 +290,13 @@ class Stage3BPortalPagesInertiaTest extends TestCase
     public function test_order_pay_and_notification_open_respect_inertia_and_blade_boundaries(): void
     {
         Http::fake([
-            '*/bills' => Http::response([
-                'id' => 'bpz_stage3b_01',
-                'collection_id' => config('services.billplz.collection_id'),
-                'paid' => false,
-                'state' => 'due',
-                'amount' => 89000,
-                'paid_amount' => 0,
-                'url' => 'https://www.billplz-sandbox.com/bills/bpz_stage3b_01',
+            '*/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => [
+                    'authorization_url' => 'https://checkout.paystack.com/paystage3b',
+                    'access_code' => 'paystage3b',
+                    'reference' => 'PAY-STAGE3B-01',
+                ],
             ], 200),
         ]);
 
@@ -312,19 +311,19 @@ class Stage3BPortalPagesInertiaTest extends TestCase
             'status' => OrderStatus::PendingPayment->value,
             'subtotal_amount' => '890.00',
             'total_amount' => '890.00',
-            'currency' => 'MYR',
+            'currency' => 'NGN',
             'customer_type' => 'individual',
             'customer_name' => $trainee->name,
             'customer_email' => $trainee->email,
             'expires_at' => now()->addMinutes(15),
         ]);
 
-        // Inertia XHR gets 409 X-Inertia-Location for external Billplz URL (prevents CORS error)
+        // Inertia XHR gets 409 X-Inertia-Location for the external Paystack URL.
         $this->actingAs($trainee)
             ->withHeader('X-Inertia', 'true')
             ->post(route('portal.orders.pay', $pendingOrder))
             ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', 'https://www.billplz-sandbox.com/bills/bpz_stage3b_01');
+            ->assertHeader('X-Inertia-Location', 'https://checkout.paystack.com/paystage3b');
 
         // Migrated Stage 4 module workspace target now returns standard Inertia redirect
         app(EtmsNotificationService::class)->notifyUser(
@@ -453,20 +452,22 @@ class Stage3BPortalPagesInertiaTest extends TestCase
         $session = $booking->trainingSession()->with('module')->firstOrFail();
         $order = Order::query()->where('order_number', 'ORD-2026-DEMO01')->firstOrFail();
 
-        // 1. Confirmed booking without active module entitlement does NOT expose 403 workspace URL,
-        //    exposes catalogue URL & recordings URL, and populates instructor professional title.
+        // 1. Confirmed physical session booking stays strictly decoupled from standalone module pages,
+        //    exposes public session detail URL & recordings URL, and populates instructor professional title.
         $this->actingAs($trainee)
             ->get(route('portal.bookings.show', $booking))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Portal/Bookings/Show')
                 ->where('booking.session.modulePortalUrl', null)
-                ->where('booking.session.moduleCatalogueUrl', route('catalogue.modules.show', $session->module))
+                ->where('booking.session.moduleCatalogueUrl', null)
+                ->where('booking.session.sessionDetailUrl', route('sessions.show', $session))
                 ->where('booking.session.recordingsUrl', route('portal.recordings.index'))
                 ->where('booking.session.instructors.0.title', fn (?string $title): bool => is_string($title) && $title !== ''),
             );
 
-        // 2. Granting active module entitlement unlocks modulePortalUrl on the booking detail page.
+        // 2. Granting a standalone module entitlement grants portal module access independently without coupling
+        //    onto the physical session booking detail view.
         $moduleOrder = Order::query()->create([
             'order_number' => 'ORD-2026-MODCHK',
             'user_id' => $trainee->id,
@@ -510,16 +511,20 @@ class Stage3BPortalPagesInertiaTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Portal/Bookings/Show')
-                ->where('booking.session.modulePortalUrl', route('portal.modules.show', $session->module)),
+                ->where('booking.session.modulePortalUrl', null),
             );
 
-        // 3. Order detail formats MYR line totals as RM and hides moduleUrl when entitlement is revoked.
+        $this->actingAs($trainee)
+            ->get(route('portal.modules.show', $session->module))
+            ->assertOk();
+
+        // 3. Order detail preserves the stored currency and hides moduleUrl when entitlement is revoked.
         $this->actingAs($trainee)
             ->get(route('portal.orders.show', $order))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Portal/Orders/Show')
-                ->where('order.items.0.lineTotalLabel', 'RM 780.00'),
+                ->where('order.items.0.lineTotalLabel', 'NGN 780.00'),
             );
 
         $this->actingAs($trainee)
@@ -527,7 +532,7 @@ class Stage3BPortalPagesInertiaTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Portal/Orders/Show')
-                ->where('order.items.0.lineTotalLabel', 'RM 780.00')
+                ->where('order.items.0.lineTotalLabel', 'MYR 780.00')
                 ->where('order.entitlements.0.isActive', true)
                 ->where('order.entitlements.0.moduleUrl', route('portal.modules.show', $session->module)),
             );

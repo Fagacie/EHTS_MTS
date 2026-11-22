@@ -7,7 +7,6 @@ import SessionsDataTable from '@/components/public/SessionsDataTable.vue';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRoutes } from '@/composables/useRoutes';
 import PublicLayout from '@/layouts/PublicLayout.vue';
@@ -19,7 +18,6 @@ const props = defineProps<SessionsIndexProps>();
 const { routes } = useRoutes();
 
 const search = ref(props.filters.q ?? '');
-const category = ref(props.filters.category ?? '');
 const availability = ref(props.filters.availability ?? 'all');
 const isFiltering = ref(false);
 
@@ -31,7 +29,6 @@ watch(
     (next) => {
         syncingFromProps = true;
         search.value = next.q ?? '';
-        category.value = next.category ?? '';
         availability.value = next.availability ?? 'all';
         syncingFromProps = false;
     },
@@ -45,14 +42,7 @@ const availabilityTabs = [
 ] as const;
 
 const hasActiveFilters = computed(
-    () =>
-        search.value.trim() !== '' ||
-        category.value !== '' ||
-        availability.value !== 'all',
-);
-
-const activeCategories = computed(() =>
-    props.categories.filter((cat) => cat.publishedModulesCount > 0 || cat.slug === category.value),
+    () => search.value.trim() !== '' || availability.value !== 'all',
 );
 
 function visitSessions(): void {
@@ -60,10 +50,6 @@ function visitSessions(): void {
 
     if (search.value.trim() !== '') {
         query.q = search.value.trim();
-    }
-
-    if (category.value !== '') {
-        query.category = category.value;
     }
 
     if (availability.value !== 'all') {
@@ -103,11 +89,6 @@ onBeforeUnmount(() => {
     }
 });
 
-function setCategory(nextCategory: string): void {
-    category.value = nextCategory;
-    visitSessions();
-}
-
 function setAvailability(nextAvailability: string | number): void {
     const resolved = String(nextAvailability);
     if (availability.value === resolved) {
@@ -134,7 +115,6 @@ function clearFilters(): void {
 
     syncingFromProps = true;
     search.value = '';
-    category.value = '';
     availability.value = 'all';
     syncingFromProps = false;
 
@@ -176,52 +156,30 @@ function clearFilters(): void {
         <section class="bg-white py-12 lg:py-16" aria-label="Upcoming training sessions">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-4 border-b border-[#272d38]/10 pb-6">
-                    <div class="grid gap-3 md:grid-cols-12 md:items-center">
-                        <div class="relative md:col-span-7">
-                            <label for="sessions-search-input" class="sr-only">
-                                Search physical sessions
-                            </label>
-                            <Search
-                                class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#272d38]/50"
-                                aria-hidden="true"
-                            />
-                            <Input
-                                id="sessions-search-input"
-                                v-model="search"
-                                type="search"
-                                placeholder="Search by workshop title, programme, or city..."
-                                class="pr-9 pl-10"
-                            />
-                            <button
-                                v-if="search !== ''"
-                                type="button"
-                                aria-label="Clear search"
-                                class="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#272d38]/50 transition-colors hover:text-[#272d38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
-                                @click="clearSearch"
-                            >
-                                <X class="h-4 w-4" aria-hidden="true" />
-                            </button>
-                        </div>
-
-                        <div class="md:col-span-5">
-                            <label for="sessions-category-select" class="sr-only">
-                                Filter sessions by category
-                            </label>
-                            <NativeSelect
-                                id="sessions-category-select"
-                                :model-value="category"
-                                @update:model-value="setCategory"
-                            >
-                                <option value="">All Training Categories</option>
-                                <option
-                                    v-for="cat in activeCategories"
-                                    :key="cat.slug"
-                                    :value="cat.slug"
-                                >
-                                    {{ cat.name }}
-                                </option>
-                            </NativeSelect>
-                        </div>
+                    <div class="relative">
+                        <label for="sessions-search-input" class="sr-only">
+                            Search physical sessions
+                        </label>
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#272d38]/50"
+                            aria-hidden="true"
+                        />
+                        <Input
+                            id="sessions-search-input"
+                            v-model="search"
+                            type="search"
+                            placeholder="Search by session title, code, venue, or city..."
+                            class="pr-9 pl-10"
+                        />
+                        <button
+                            v-if="search !== ''"
+                            type="button"
+                            aria-label="Clear search"
+                            class="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#272d38]/50 transition-colors hover:text-[#272d38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
+                            @click="clearSearch"
+                        >
+                            <X class="h-4 w-4" aria-hidden="true" />
+                        </button>
                     </div>
 
                     <div class="flex flex-wrap items-center justify-between gap-4 pt-1">
@@ -286,7 +244,7 @@ function clearFilters(): void {
                             Clear filters
                         </Button>
                         <Button as-child>
-                            <Link :href="routes.catalogue">Browse Training Catalogue</Link>
+                            <Link :href="routes.catalogue">Browse Standalone Modules</Link>
                         </Button>
                     </div>
                 </Card>

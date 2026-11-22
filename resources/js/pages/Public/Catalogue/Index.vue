@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRoutes } from '@/composables/useRoutes';
 import PublicLayout from '@/layouts/PublicLayout.vue';
 import { cn, pluralize } from '@/lib/utils';
@@ -19,8 +18,6 @@ const props = defineProps<CatalogueIndexProps>();
 const { routes } = useRoutes();
 
 const search = ref(props.filters.q ?? '');
-const category = ref(props.filters.category ?? '');
-const availability = ref(props.filters.availability ?? 'all');
 const sort = ref(props.filters.sort ?? 'newest');
 const isFiltering = ref(false);
 
@@ -32,30 +29,14 @@ watch(
     (next) => {
         syncingFromProps = true;
         search.value = next.q ?? '';
-        category.value = next.category ?? '';
-        availability.value = next.availability ?? 'all';
         sort.value = next.sort ?? 'newest';
         syncingFromProps = false;
     },
     { deep: true },
 );
 
-const availabilityOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'independent', label: 'Independent Modules' },
-    { value: 'session_only', label: 'Physical Sessions' },
-] as const;
-
 const hasActiveFilters = computed(
-    () =>
-        search.value.trim() !== '' ||
-        category.value !== '' ||
-        availability.value !== 'all' ||
-        sort.value !== 'newest',
-);
-
-const activeCategories = computed(() =>
-    props.categories.filter((cat) => cat.publishedModulesCount > 0 || cat.slug === category.value),
+    () => search.value.trim() !== '' || sort.value !== 'newest',
 );
 
 function visitCatalogue(): void {
@@ -63,14 +44,6 @@ function visitCatalogue(): void {
 
     if (search.value.trim() !== '') {
         query.q = search.value.trim();
-    }
-
-    if (category.value !== '') {
-        query.category = category.value;
-    }
-
-    if (availability.value !== 'all') {
-        query.availability = availability.value;
     }
 
     if (sort.value !== 'newest') {
@@ -110,21 +83,6 @@ onBeforeUnmount(() => {
     }
 });
 
-function setCategory(nextCategory: string): void {
-    category.value = nextCategory;
-    visitCatalogue();
-}
-
-function setAvailability(nextAvailability: string | number): void {
-    const resolved = String(nextAvailability);
-    if (availability.value === resolved) {
-        return;
-    }
-
-    availability.value = resolved;
-    visitCatalogue();
-}
-
 function setSort(nextSort: string): void {
     sort.value = nextSort;
     visitCatalogue();
@@ -146,8 +104,6 @@ function clearFilters(): void {
 
     syncingFromProps = true;
     search.value = '';
-    category.value = '';
-    availability.value = 'all';
     sort.value = 'newest';
     syncingFromProps = false;
 
@@ -156,19 +112,19 @@ function clearFilters(): void {
 </script>
 
 <template>
-    <Head title="Training Catalogue" />
+    <Head title="Standalone Learning Modules" />
 
     <PublicLayout>
         <section class="border-b border-[#252238]/10 bg-[#F7F8FC] py-14 lg:py-20">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                     <div class="max-w-2xl">
-                        <p class="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-[#159CAA]">Training programmes</p>
+                        <p class="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-[#159CAA]">Self-paced digital learning</p>
                         <h1 class="text-4xl font-extrabold text-[#252238] sm:text-5xl">
-                            Training Catalogue
+                            Standalone Learning Modules
                         </h1>
                         <p class="mt-3 text-[16px] leading-relaxed text-[#272d38]/70">
-                            Technical courses in hydrology, flood modelling, and water engineering for in-person cohorts and independent study.
+                            Independent digital learning modules with downloadable workbooks, technical references, and video lessons you can purchase without attending a physical session.
                         </p>
                     </div>
 
@@ -177,7 +133,7 @@ function clearFilters(): void {
                             {{ pagination.total }}
                         </p>
                         <p class="text-[14px] text-[#272d38]/65 tabular-nums">
-                            {{ pluralize(pagination.total, 'programme') }}
+                            {{ pluralize(pagination.total, 'module') }}
                             <template v-if="hasActiveFilters">
                                 of {{ totalPublishedCount }}
                             </template>
@@ -187,13 +143,13 @@ function clearFilters(): void {
             </div>
         </section>
 
-        <section class="bg-white py-12 lg:py-16" aria-label="Training programmes">
+        <section class="bg-white py-12 lg:py-16" aria-label="Standalone learning modules">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-4 rounded-lg border border-[#252238]/10 bg-[#F7F8FC] p-4">
                     <div class="grid gap-3 md:grid-cols-12 md:items-center">
-                        <div class="relative md:col-span-5">
+                        <div class="relative md:col-span-8">
                             <label for="catalogue-search-input" class="sr-only">
-                                Search training programmes
+                                Search standalone learning modules
                             </label>
                             <Search
                                 class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#272d38]/50"
@@ -203,7 +159,7 @@ function clearFilters(): void {
                                 id="catalogue-search-input"
                                 v-model="search"
                                 type="search"
-                                placeholder="Search programmes or topics..."
+                                placeholder="Search standalone modules by title, code, or topic..."
                                 class="pr-9 pl-10"
                             />
                             <button
@@ -218,28 +174,8 @@ function clearFilters(): void {
                         </div>
 
                         <div class="md:col-span-4">
-                            <label for="catalogue-category-select" class="sr-only">
-                                Filter by category
-                            </label>
-                            <NativeSelect
-                                id="catalogue-category-select"
-                                :model-value="category"
-                                @update:model-value="setCategory"
-                            >
-                                <option value="">All Categories</option>
-                                <option
-                                    v-for="cat in activeCategories"
-                                    :key="cat.slug"
-                                    :value="cat.slug"
-                                >
-                                    {{ cat.name }} ({{ cat.publishedModulesCount }})
-                                </option>
-                            </NativeSelect>
-                        </div>
-
-                        <div class="md:col-span-3">
                             <label for="catalogue-sort-select" class="sr-only">
-                                Sort programmes
+                                Sort standalone modules
                             </label>
                             <NativeSelect
                                 id="catalogue-sort-select"
@@ -253,39 +189,22 @@ function clearFilters(): void {
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center justify-between gap-4 pt-1">
-                        <Tabs
-                            :model-value="availability"
-                            @update:model-value="setAvailability"
+                    <div v-if="isFiltering || hasActiveFilters" class="flex items-center justify-end gap-4 pt-1">
+                        <span
+                            v-if="isFiltering"
+                            class="text-[14px] text-[#272d38]/65"
+                            aria-live="polite"
                         >
-                            <TabsList aria-label="Filter by delivery format">
-                                <TabsTrigger
-                                    v-for="option in availabilityOptions"
-                                    :key="option.value"
-                                    :value="option.value"
-                                >
-                                    {{ option.label }}
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
-
-                        <div class="flex items-center gap-4">
-                            <span
-                                v-if="isFiltering"
-                                class="text-[14px] text-[#272d38]/65"
-                                aria-live="polite"
-                            >
-                                Updating...
-                            </span>
-                            <button
-                                v-if="hasActiveFilters"
-                                type="button"
-                                class="rounded-md text-[15px] font-bold text-[#272d38] transition-colors hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
-                                @click="clearFilters"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
+                            Updating...
+                        </span>
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="rounded-md text-[15px] font-bold text-[#272d38] transition-colors hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
+                            @click="clearFilters"
+                        >
+                            Clear filters
+                        </button>
                     </div>
                 </div>
 
@@ -310,10 +229,10 @@ function clearFilters(): void {
                     class="mt-8 px-6 py-14 text-center"
                 >
                     <h2 class="text-[19px] font-bold text-[#272d38]">
-                        No matching training programmes
+                        No matching standalone learning modules
                     </h2>
                     <p class="mx-auto mt-2 max-w-md text-[16px] text-[#272d38]/65">
-                        No published programmes match your current search or filter selection.
+                        No published standalone modules match your current search or filter selection.
                     </p>
                     <div class="mt-6">
                         <Button
@@ -329,7 +248,7 @@ function clearFilters(): void {
 
                 <PublicPagination
                     :pagination="pagination"
-                    :item-label="pluralize(pagination.total, 'programme')"
+                    :item-label="pluralize(pagination.total, 'module')"
                 />
             </div>
         </section>

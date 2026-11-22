@@ -102,20 +102,27 @@ class AdminTrainingSessionController extends Controller
                 'verifiedAt' => $record->verified_at?->toIso8601String(),
                 'submittedBy' => $record->submitter?->name,
                 'verifiedBy' => $record->verifier?->name,
+                'remarks' => $record->remarks,
                 'notes' => $record->verification_notes,
             ]);
 
         $materials = $trainingSession->materials()
+            ->with(['uploader:id,name', 'reviewer:id,name'])
             ->get()
             ->map(static fn (SessionMaterial $material): array => [
                 'id' => $material->id,
                 'title' => $material->title,
                 'fileName' => $material->original_filename,
+                'fileSizeLabel' => $material->formattedFileSize(),
                 'description' => $material->description,
                 'type' => $material->material_type?->label(),
+                'typeValue' => $material->material_type?->value,
                 'status' => $material->status?->value,
-                'isMainDocument' => $material->is_main_document,
                 'isDownloadable' => $material->is_downloadable,
+                'uploadedBy' => $material->uploader?->name,
+                'reviewedBy' => $material->reviewer?->name,
+                'reviewNotes' => $material->review_notes,
+                'downloadUrl' => $material->temporaryDownloadUrl(15),
             ])
             ->values()
             ->all();
@@ -137,17 +144,31 @@ class AdminTrainingSessionController extends Controller
             ->values()
             ->all();
 
-        $eligibleCount = $trainingSession->attendances()
+        $eligibleAttendances = $trainingSession->attendances()
+            ->with('user:id,name,email')
             ->where('attendance_status', 'present')
             ->where('review_status', 'verified')
-            ->count();
-        $certificateCount = $trainingSession->certificates()->count();
-        $eligibleUserIds = $trainingSession->attendances()
-            ->where('attendance_status', 'present')
-            ->where('review_status', 'verified')
+            ->get();
+        $eligibleCount = $eligibleAttendances->count();
+        $issuedCertUserIds = $trainingSession->certificates()
+            ->whereIn('status', ['pending', 'issued'])
+            ->pluck('user_id')
+            ->all();
+        $certificateCount = count($issuedCertUserIds);
+        $eligibleUserIds = $eligibleAttendances
             ->pluck('user_id')
             ->unique()
             ->values();
+        $eligibleParticipants = $eligibleAttendances
+            ->unique('user_id')
+            ->map(static fn (Attendance $att): array => [
+                'userId' => $att->user_id,
+                'name' => $att->user?->name ?? "Participant #{$att->user_id}",
+                'email' => $att->user?->email,
+                'hasCertificate' => in_array($att->user_id, $issuedCertUserIds, true),
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('Admin/TrainingSessions/Show', [
             'session' => [
@@ -169,19 +190,12 @@ class AdminTrainingSessionController extends Controller
                 'confirmedCount' => (int) $trainingSession->confirmed_seats_count,
                 'reservedCount' => (int) $trainingSession->reserved_seats_count,
                 'price' => number_format((float) $trainingSession->price, 2, '.', ''),
-                'module' => $trainingSession->module ? ['code' => $trainingSession->module->code, 'title' => $trainingSession->module->title] : null,
+                'recordingAccessPolicy' => $trainingSession->recording_access_policy?->label() ?? 'Attendees Only',
+                'coverImageUrl' => $trainingSession->coverImageUrl(),
                 'instructors' => $trainingSession->instructors->map(fn (User $instructor): array => [
                     'name' => $instructor->name,
                     'role' => $instructor->pivot?->role_label,
                 ])->values()->all(),
-                'isAvailableIndependently' => $trainingSession->is_available_independently,
-                'independentPrice' => $trainingSession->independent_price === null ? null : number_format((float) $trainingSession->independent_price, 2, '.', ''),
-                'mainDocument' => $trainingSession->mainDocumentMaterial ? [
-                    'id' => $trainingSession->mainDocumentMaterial->id,
-                    'title' => $trainingSession->mainDocumentMaterial->title,
-                    'fileName' => $trainingSession->mainDocumentMaterial->original_filename,
-                    'status' => $trainingSession->mainDocumentMaterial->status?->value,
-                ] : null,
                 'editUrl' => route('admin-vue.sessions.edit', $trainingSession),
             ],
             'participants' => $participants,
@@ -198,6 +212,7 @@ class AdminTrainingSessionController extends Controller
                 'status' => $trainingSession->status instanceof SessionStatus ? $trainingSession->status->value : (string) $trainingSession->status,
                 'eligibleParticipantCount' => $eligibleCount,
                 'eligibleUserIds' => $eligibleUserIds,
+                'eligibleParticipants' => $eligibleParticipants,
                 'issuedCertificateCount' => $certificateCount,
             ],
             'materialTypes' => collect(MaterialType::cases())->map(fn (MaterialType $type): array => ['value' => $type->value, 'label' => $type->label()])->values()->all(),
@@ -219,64 +234,65 @@ class AdminTrainingSessionController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', TrainingSession::class);
-        $data = $request->validate($this->sessionRules(false));
+        $data = $request->validate($this->sessionRules(false, $request));
         $startsAt = Carbon::parse($data['starts_at']);
         $endsAt = Carbon::parse($data['ends_at']);
         $status = SessionStatus::from($data['status']);
         $sessionCode = 'SES-'.now()->format('Y').'-'.strtoupper(Str::random(6));
-        $compatibilityModule = $this->createCompatibilityModule(
-            title: $data['title'],
-            description: $data['description'] ?? null,
-            code: $sessionCode,
-            actorId: $request->user()->id,
-            coverPath: $request->hasFile('cover_image')
-                ? $request->file('cover_image')->store('modules/covers', 'public')
-                : null,
-        );
-        $session = TrainingSession::query()->create([
-            'module_id' => $compatibilityModule->id,
-            'session_code' => $sessionCode,
-            'title' => $data['title'],
-            'slug' => Str::slug($data['title']).'-'.strtolower(Str::random(6)),
-            'description' => $data['description'] ?? null,
-            'starts_at' => $startsAt,
-            'ends_at' => $endsAt,
-            'duration_minutes' => $startsAt->diffInMinutes($endsAt),
-            'timezone' => config('etms.display_timezone', 'Asia/Kuala_Lumpur'),
-            'registration_opens_at' => filled($data['registration_opens_at'] ?? null) ? Carbon::parse($data['registration_opens_at']) : null,
-            'registration_closes_at' => Carbon::parse($data['registration_closes_at']),
-            'venue_name' => $data['venue_name'],
-            'venue_address' => $data['venue_address'],
-            'venue_city' => $data['venue_city'],
-            'venue_state' => $data['venue_state'],
-            'capacity' => $data['capacity'],
-            'reserved_seats_count' => 0,
-            'confirmed_seats_count' => 0,
-            'price' => $data['price'],
-            'currency' => 'MYR',
-            'recording_access_policy' => $data['recording_access_policy'] ?? RecordingAccessPolicy::AttendeesOnly->value,
-            'is_available_independently' => (bool) ($data['is_available_independently'] ?? false),
-            'independent_price' => ($data['is_available_independently'] ?? false) ? ($data['independent_price'] ?? null) : null,
-            'status' => $status,
-            'published_at' => $status === SessionStatus::Published ? now() : null,
-            'created_by' => $request->user()->id,
-            'updated_by' => $request->user()->id,
-        ]);
-        $this->syncInstructors($session, $data['instructors'] ?? [], $request->user()->id);
-        AuditLog::record(
-            event: 'session.created',
-            auditableType: TrainingSession::class,
-            auditableId: $session->id,
-            newValues: ['session_code' => $session->session_code, 'title' => $session->title, 'status' => $status->value],
-            actor: $request->user(),
-        );
+        $coverPath = $request->hasFile('cover_image')
+            ? $request->file('cover_image')->store('sessions/covers', 'public')
+            : null;
+
+        DB::transaction(function () use ($data, $startsAt, $endsAt, $status, $sessionCode, $coverPath, $request): TrainingSession {
+            $session = TrainingSession::query()->create([
+                'module_id' => null,
+                'session_code' => $sessionCode,
+                'title' => $data['title'],
+                'slug' => Str::slug($data['title']).'-'.strtolower(Str::random(6)),
+                'description' => $data['description'] ?? null,
+                'cover_image_disk' => $coverPath ? 'public' : null,
+                'cover_image_path' => $coverPath,
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'duration_minutes' => $startsAt->diffInMinutes($endsAt),
+                'timezone' => config('etms.display_timezone', 'Asia/Kuala_Lumpur'),
+                'registration_opens_at' => filled($data['registration_opens_at'] ?? null) ? Carbon::parse($data['registration_opens_at']) : null,
+                'registration_closes_at' => Carbon::parse($data['registration_closes_at']),
+                'venue_name' => $data['venue_name'],
+                'venue_address' => $data['venue_address'],
+                'venue_city' => $data['venue_city'],
+                'venue_state' => $data['venue_state'],
+                'capacity' => $data['capacity'],
+                'reserved_seats_count' => 0,
+                'confirmed_seats_count' => 0,
+                'price' => $data['price'],
+                'currency' => config('etms.currency'),
+                'recording_access_policy' => $data['recording_access_policy'] ?? RecordingAccessPolicy::AttendeesOnly->value,
+                'is_available_independently' => false,
+                'independent_price' => null,
+                'main_document_material_id' => null,
+                'status' => $status,
+                'published_at' => $status === SessionStatus::Published ? now() : null,
+                'created_by' => $request->user()->id,
+                'updated_by' => $request->user()->id,
+            ]);
+            $this->syncInstructors($session, $data['instructors'] ?? [], $request->user()->id);
+            AuditLog::record(
+                event: 'session.created',
+                auditableType: TrainingSession::class,
+                auditableId: $session->id,
+                newValues: ['session_code' => $session->session_code, 'title' => $session->title, 'status' => $status->value],
+                actor: $request->user(),
+            );
+            return $session;
+        });
         return redirect()->route('admin-vue.sessions.index')->with('status', 'Training session created.');
     }
 
     public function edit(TrainingSession $trainingSession): Response
     {
         $this->authorize('update', $trainingSession);
-        $trainingSession->load(['module:id,cover_image_disk,cover_image_path', 'instructors:id,name', 'materials:id,training_session_id,title,description,material_type,status,original_filename,is_downloadable,is_main_document']);
+        $trainingSession->load(['instructors:id,name', 'materials:id,training_session_id,title,description,material_type,status,original_filename,is_downloadable']);
         return Inertia::render('Admin/TrainingSessions/Form', [
             'mode' => 'edit',
             'session' => [
@@ -294,10 +310,7 @@ class AdminTrainingSessionController extends Controller
                 'capacity' => $trainingSession->capacity,
                 'price' => $trainingSession->price,
                 'recording_access_policy' => $trainingSession->recording_access_policy->value,
-                'is_available_independently' => $trainingSession->is_available_independently,
-                'independent_price' => $trainingSession->independent_price,
-                'main_document_material_id' => $trainingSession->main_document_material_id,
-                'cover_image_url' => $trainingSession->module?->coverImageUrl(),
+                'cover_image_url' => $trainingSession->coverImageUrl(),
                 'status' => $trainingSession->status->value,
                 'instructors' => $trainingSession->sessionInstructors()->with('instructor:id,name')->get()->map(fn (SessionInstructor $assignment): array => [
                     'instructor_id' => (string) $assignment->instructor_id,
@@ -311,7 +324,6 @@ class AdminTrainingSessionController extends Controller
                     'status' => $material->status->value,
                     'original_filename' => $material->original_filename,
                     'is_downloadable' => $material->is_downloadable,
-                    'is_main_document' => $material->is_main_document,
                 ])->values()->all(),
             ],
             'statuses' => collect(SessionStatus::cases())->map(fn (SessionStatus $status): array => ['value' => $status->value, 'label' => $status->label()])->values()->all(),
@@ -325,44 +337,23 @@ class AdminTrainingSessionController extends Controller
     public function update(Request $request, TrainingSession $trainingSession): RedirectResponse
     {
         $this->authorize('update', $trainingSession);
-        $data = $request->validate($this->sessionRules(true));
+        $data = $request->validate($this->sessionRules(true, $request));
         $startsAt = Carbon::parse($data['starts_at']);
         $endsAt = Carbon::parse($data['ends_at']);
         $oldStatus = $trainingSession->status->value;
         $status = SessionStatus::from($data['status']);
-        $compatibilityModule = $trainingSession->module_id
-            ? $trainingSession->module()->first()
-            : null;
-        if (! $compatibilityModule) {
-            $compatibilityModule = $this->createCompatibilityModule(
-                title: $data['title'],
-                description: $data['description'] ?? null,
-                code: $trainingSession->session_code,
-                actorId: $request->user()->id,
-                coverPath: $request->hasFile('cover_image')
-                    ? $request->file('cover_image')->store('modules/covers', 'public')
-                    : null,
-            );
-        } else {
-            $oldCover = $compatibilityModule->cover_image_path;
-            $newCover = $request->hasFile('cover_image')
-                ? $request->file('cover_image')->store('modules/covers', 'public')
-                : null;
-            $compatibilityModule->update([
-                'title' => $data['title'],
-                'description' => $data['description'] ?? $compatibilityModule->description,
-                'updated_by' => $request->user()->id,
-                ...($newCover ? [
-                    'cover_image_disk' => 'public',
-                    'cover_image_path' => $newCover,
-                ] : []),
-            ]);
-            if ($oldCover && $newCover && $oldCover !== $newCover) {
+
+        $oldCover = $trainingSession->cover_image_path;
+        if ($request->hasFile('cover_image')) {
+            $newCover = $request->file('cover_image')->store('sessions/covers', 'public');
+            $trainingSession->cover_image_disk = 'public';
+            $trainingSession->cover_image_path = $newCover;
+            if ($oldCover && $oldCover !== $newCover) {
                 Storage::disk('public')->delete($oldCover);
             }
         }
+
         $trainingSession->fill([
-            'module_id' => $compatibilityModule->id,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'starts_at' => $startsAt,
@@ -377,9 +368,6 @@ class AdminTrainingSessionController extends Controller
             'capacity' => $data['capacity'],
             'price' => $data['price'],
             'recording_access_policy' => $data['recording_access_policy'] ?? RecordingAccessPolicy::AttendeesOnly->value,
-            'is_available_independently' => (bool) ($data['is_available_independently'] ?? false),
-            'independent_price' => ($data['is_available_independently'] ?? false) ? ($data['independent_price'] ?? null) : null,
-            'main_document_material_id' => ($data['is_available_independently'] ?? false) ? ($data['main_document_material_id'] ?? null) : null,
             'status' => $status,
             'published_at' => $status === SessionStatus::Published ? ($trainingSession->published_at ?? now()) : $trainingSession->published_at,
             'updated_by' => $request->user()->id,
@@ -421,34 +409,17 @@ class AdminTrainingSessionController extends Controller
         $this->authorize('delete', $trainingSession);
         $code = $trainingSession->session_code;
         $title = $trainingSession->title;
-        $compatibilityModule = $trainingSession->module;
 
-        DB::transaction(function () use ($trainingSession, $compatibilityModule): void {
+        DB::transaction(function () use ($trainingSession): void {
             $trainingSession->sessionInstructors()->delete();
             $trainingSession->delete();
-
-            if (
-                $compatibilityModule
-                && $compatibilityModule->category?->slug === 'training-sessions'
-                && $compatibilityModule->trainingSessions()->count() === 0
-                && ! $compatibilityModule->entitlements()->exists()
-                && ! $compatibilityModule->certificates()->exists()
-                && ! $compatibilityModule->materials()->exists()
-                && ! $compatibilityModule->videos()->exists()
-            ) {
-                $category = $compatibilityModule->category;
-                $compatibilityModule->forceDelete();
-                if ($category && $category->slug === 'training-sessions' && ! $category->modules()->exists()) {
-                    $category->delete();
-                }
-            }
         });
 
         AuditLog::record(
             event: 'session.deleted',
             auditableType: TrainingSession::class,
             auditableId: $trainingSession->id,
-            oldValues: ['session_code' => $code, 'title' => $trainingSession->title],
+            oldValues: ['session_code' => $code, 'title' => $title],
             actor: $request->user(),
         );
         return redirect()->route('admin-vue.sessions.index')->with('status', 'Training session deleted.');
@@ -480,15 +451,7 @@ class AdminTrainingSessionController extends Controller
             'material_type' => ['required', 'in:'.implode(',', array_column(MaterialType::cases(), 'value'))],
             'status' => ['required', 'in:'.implode(',', array_column(SessionMaterialStatus::cases(), 'value'))],
             'is_downloadable' => ['required', 'boolean'],
-            'is_main_document' => ['required', 'boolean'],
-            'is_available_independently' => ['nullable', 'boolean'],
-            'independent_price' => ['nullable', 'numeric', 'min:0'],
             'file' => ['required', 'file', 'mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,csv,txt,zip,png,jpg,jpeg', 'max:102400'],
-        ]);
-        $independentEnabled = (bool) ($data['is_available_independently'] ?? $trainingSession->is_available_independently);
-        $trainingSession->update([
-            'is_available_independently' => $independentEnabled,
-            'independent_price' => $independentEnabled ? ($data['independent_price'] ?? $trainingSession->independent_price) : null,
         ]);
         $file = $request->file('file');
         $key = $file->store('sessions/'.$trainingSession->id, 'session-materials');
@@ -504,13 +467,43 @@ class AdminTrainingSessionController extends Controller
             'file_size_bytes' => $file->getSize(),
             'checksum_sha256' => hash_file('sha256', $file->getRealPath()) ?: null,
             'is_downloadable' => (bool) $data['is_downloadable'],
-            'is_main_document' => (bool) $data['is_main_document'],
+            'is_main_document' => false,
             'status' => $data['status'],
             'uploaded_by' => $request->user()->id,
+            'reviewed_by' => $data['status'] === SessionMaterialStatus::Published->value ? $request->user()->id : null,
+            'reviewed_at' => $data['status'] === SessionMaterialStatus::Published->value ? now() : null,
             'published_at' => $data['status'] === SessionMaterialStatus::Published->value ? now() : null,
         ]);
-        AuditLog::record(event: 'session.material_uploaded', auditableType: SessionMaterial::class, auditableId: $material->id, newValues: ['title' => $material->title], actor: $request->user());
+        AuditLog::record(event: 'session.material_uploaded', auditableType: SessionMaterial::class, auditableId: $material->id, newValues: ['title' => $material->title, 'status' => $material->status->value], actor: $request->user());
         return back()->with('status', 'Session material uploaded.');
+    }
+
+    public function reviewMaterial(Request $request, TrainingSession $trainingSession, SessionMaterial $material): RedirectResponse
+    {
+        abort_unless($material->training_session_id === $trainingSession->id, 404);
+        $this->authorize('update', $trainingSession);
+        $data = $request->validate([
+            'status' => ['required', 'in:published,rejected,archived'],
+            'review_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+        $oldStatus = $material->status?->value;
+        $material->update([
+            'status' => $data['status'],
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+            'review_notes' => $data['review_notes'] ?? null,
+            'published_at' => $data['status'] === SessionMaterialStatus::Published->value ? ($material->published_at ?? now()) : $material->published_at,
+        ]);
+        AuditLog::record(
+            event: 'session.material_reviewed',
+            auditableType: SessionMaterial::class,
+            auditableId: $material->id,
+            oldValues: ['status' => $oldStatus],
+            newValues: ['status' => $data['status']],
+            reason: $data['review_notes'] ?? null,
+            actor: $request->user(),
+        );
+        return back()->with('status', 'Session material review updated.');
     }
 
     public function destroyMaterial(Request $request, TrainingSession $trainingSession, SessionMaterial $material): RedirectResponse
@@ -536,9 +529,6 @@ class AdminTrainingSessionController extends Controller
             'material_type' => ['required', 'in:'.implode(',', array_column(MaterialType::cases(), 'value'))],
             'status' => ['required', 'in:'.implode(',', array_column(SessionMaterialStatus::cases(), 'value'))],
             'is_downloadable' => ['required', 'boolean'],
-            'is_main_document' => ['required', 'boolean'],
-            'is_available_independently' => ['nullable', 'boolean'],
-            'independent_price' => ['nullable', 'numeric', 'min:0'],
             'file' => ['nullable', 'file', 'mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,csv,txt,zip,png,jpg,jpeg', 'max:102400'],
         ]);
         if ($request->hasFile('file')) {
@@ -559,29 +549,21 @@ class AdminTrainingSessionController extends Controller
             'material_type' => $data['material_type'],
             'status' => $data['status'],
             'is_downloadable' => (bool) $data['is_downloadable'],
-            'is_main_document' => (bool) $data['is_main_document'],
             'published_at' => $data['status'] === SessionMaterialStatus::Published->value ? ($material->published_at ?? now()) : $material->published_at,
         ]);
         $material->save();
-        if (array_key_exists('is_available_independently', $data)) {
-            $independentEnabled=(bool)$data['is_available_independently'];
-            $trainingSession->update([
-                'is_available_independently'=>$independentEnabled,
-                'independent_price'=>$independentEnabled?($data['independent_price']??$trainingSession->independent_price):null,
-            ]);
-        }
         AuditLog::record(event: 'session.material_updated', auditableType: SessionMaterial::class, auditableId: $material->id, newValues: ['title' => $material->title, 'status' => $material->status->value], actor: $request->user());
         return back()->with('status', 'Session material updated.');
     }
 
-    private function sessionRules(bool $editing): array
+    private function sessionRules(bool $editing, Request $request): array
     {
         return [
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
-            'registration_opens_at' => ['nullable', 'date'],
+            'registration_opens_at' => ['nullable', 'date', 'before_or_equal:registration_closes_at'],
             'registration_closes_at' => ['required', 'date', 'before:starts_at'],
             'venue_name' => ['required', 'string', 'max:200'],
             'venue_address' => ['required', 'string', 'max:255'],
@@ -590,47 +572,12 @@ class AdminTrainingSessionController extends Controller
             'capacity' => ['required', 'integer', 'min:1'],
             'price' => ['required', 'numeric', 'min:0'],
             'recording_access_policy' => ['nullable', 'in:'.implode(',', array_column(RecordingAccessPolicy::cases(), 'value'))],
-            'is_available_independently' => ['required', 'boolean'],
-            'independent_price' => ['nullable', 'numeric', 'min:0'],
-            'main_document_material_id' => ['nullable', 'integer', 'exists:session_materials,id'],
             'status' => ['required', 'in:'.implode(',', array_column(SessionStatus::cases(), 'value'))],
             'instructors' => ['nullable', 'array'],
             'instructors.*.instructor_id' => ['required', 'integer', 'exists:users,id'],
             'instructors.*.role_label' => ['required', 'string', 'max:80'],
             'cover_image' => ['nullable', 'image', 'max:5120'],
         ];
-    }
-
-    private function createCompatibilityModule(string $title, ?string $description, string $code, int $actorId, ?string $coverPath = null): Module
-    {
-        $category = Category::query()->firstOrCreate(
-            ['slug' => 'training-sessions'],
-            [
-                'name' => 'Training Sessions',
-                'description' => 'Compatibility catalogue category for physical training sessions.',
-                'sort_order' => 0,
-                'is_active' => true,
-            ],
-        );
-
-        return Module::query()->create([
-            'category_id' => $category->id,
-            'code' => $code,
-            'title' => $title,
-            'slug' => Str::slug($title).'-'.strtolower(Str::random(6)),
-            'summary' => $description ? Str::limit(strip_tags($description), 500) : null,
-            'description' => $description ?: $title,
-            'learning_objectives' => null,
-            'cover_image_disk' => $coverPath ? 'public' : null,
-            'cover_image_path' => $coverPath,
-            'is_available_independently' => false,
-            'independent_price' => null,
-            'currency' => 'MYR',
-            'status' => 'published',
-            'published_at' => now(),
-            'created_by' => $actorId,
-            'updated_by' => $actorId,
-        ]);
     }
 
     private function instructorOptions(): array
@@ -716,6 +663,7 @@ class AdminTrainingSessionController extends Controller
 
     public function publish(TrainingSession $trainingSession): \Illuminate\Http\RedirectResponse
     {
+        $this->authorize('update', $trainingSession);
         abort_unless(in_array($trainingSession->status, [SessionStatus::Draft, SessionStatus::RegistrationClosed], true), 422, 'This session cannot be published from its current status.');
 
         $oldStatus = $trainingSession->status->value;
@@ -737,6 +685,7 @@ class AdminTrainingSessionController extends Controller
 
     public function closeRegistration(TrainingSession $trainingSession): \Illuminate\Http\RedirectResponse
     {
+        $this->authorize('update', $trainingSession);
         abort_unless(in_array($trainingSession->status, [SessionStatus::Published, SessionStatus::Full], true), 422, 'Registration cannot be closed from the current status.');
 
         $oldStatus = $trainingSession->status->value;
@@ -757,6 +706,7 @@ class AdminTrainingSessionController extends Controller
 
     public function markCompleted(TrainingSession $trainingSession): \Illuminate\Http\RedirectResponse
     {
+        $this->authorize('update', $trainingSession);
         abort_unless(in_array($trainingSession->status, [SessionStatus::Published, SessionStatus::Full, SessionStatus::RegistrationClosed, SessionStatus::InProgress], true), 422, 'This session cannot be completed from its current status.');
         abort_unless(filled($trainingSession->completion_submitted_at) && filled($trainingSession->completion_notes), 422, 'The instructor completion report is required before approval.');
 
@@ -780,6 +730,7 @@ class AdminTrainingSessionController extends Controller
 
     public function cancel(Request $request, TrainingSession $trainingSession, SessionBookingService $service): \Illuminate\Http\RedirectResponse
     {
+        $this->authorize('update', $trainingSession);
         $data = $request->validate(['cancellation_reason' => ['required', 'string', 'max:500']]);
 
         try {
@@ -793,6 +744,7 @@ class AdminTrainingSessionController extends Controller
 
     public function notifyParticipants(Request $request, TrainingSession $trainingSession, EtmsNotificationService $notifier): \Illuminate\Http\RedirectResponse
     {
+        $this->authorize('update', $trainingSession);
         $data = $request->validate(['update_message' => ['required', 'string', 'max:800']]);
         $summary = trim($data['update_message']);
         $sent = 0;

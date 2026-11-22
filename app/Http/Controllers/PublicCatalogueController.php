@@ -29,8 +29,9 @@ class PublicCatalogueController extends Controller
 
         $featuredModules = Module::query()
             ->published()
+            ->where('is_available_independently', true)
             ->with('category')
-            ->withCount(['publishedMaterials', 'publishedVideos', 'upcomingSessions'])
+            ->withCount(['publishedMaterials', 'publishedVideos'])
             ->orderByDesc('published_at')
             ->limit(6)
             ->get();
@@ -111,8 +112,9 @@ class PublicCatalogueController extends Controller
 
         $query = Module::query()
             ->published()
+            ->where('is_available_independently', true)
             ->with('category')
-            ->withCount(['publishedMaterials', 'publishedVideos', 'upcomingSessions']);
+            ->withCount(['publishedMaterials', 'publishedVideos']);
 
         if ($search !== '') {
             $term = "%{$search}%";
@@ -126,12 +128,6 @@ class PublicCatalogueController extends Controller
 
         if ($categorySlug !== '') {
             $query->whereHas('category', fn (Builder $q) => $q->where('slug', $categorySlug)->where('is_active', true));
-        }
-
-        if ($availability === 'independent') {
-            $query->where('is_available_independently', true);
-        } elseif ($availability === 'session_only') {
-            $query->where('is_available_independently', false);
         }
 
         match ($sort) {
@@ -174,11 +170,12 @@ class PublicCatalogueController extends Controller
             'category',
             'publishedMaterials',
             'publishedVideos',
-            'upcomingSessions.instructors.instructorProfile',
         ]);
 
+        $categoryActive = $module->category_id === null || (bool) $module->category?->is_active;
+
         abort_unless(
-            $module->isPublished() && $module->category?->is_active,
+            $module->isPublished() && $categoryActive,
             404,
         );
 
@@ -197,9 +194,11 @@ class PublicCatalogueController extends Controller
                 'summary' => $module->summary,
                 'description' => $module->description,
                 'learningObjectives' => array_values(array_filter(is_array($module->learning_objectives) ? $module->learning_objectives : [])),
-                'categoryName' => $module->category->name,
-                'categorySlug' => $module->category->slug,
-                'categoryUrl' => route('catalogue.index', ['category' => $module->category->slug]),
+                'categoryName' => $module->category?->name ?? 'Standalone Module',
+                'categorySlug' => $module->category?->slug ?? 'standalone-module',
+                'categoryUrl' => $module->category
+                    ? route('catalogue.index', ['category' => $module->category->slug])
+                    : route('catalogue.index'),
                 'coverImageUrl' => $module->coverImageUrl(),
                 'isAvailableIndependently' => $isAvailableIndependently,
                 'independentPriceLabel' => $price,
@@ -228,11 +227,7 @@ class PublicCatalogueController extends Controller
                 'durationLabel' => $video->formattedDuration(),
                 'isReady' => $video->isPlayable(),
             ])->values()->all(),
-            'upcomingSessions' => $module->upcomingSessions->map(function (TrainingSession $session) use ($module, $displayTimezone): array {
-                $session->setRelation('module', $module);
-
-                return PublicCataloguePresenter::sessionListItem($session, $displayTimezone);
-            })->values()->all(),
+            'upcomingSessions' => [],
         ]);
     }
 }

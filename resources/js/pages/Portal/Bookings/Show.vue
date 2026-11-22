@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, ArrowRight, ExternalLink } from 'lucide-vue-next';
+import { AlertCircle, ArrowLeft, ArrowRight, Calendar, Clock, Download, ExternalLink, MapPin } from 'lucide-vue-next';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRoutes } from '@/composables/useRoutes';
+import FocusedLayout from '@/layouts/FocusedLayout.vue';
 import PortalLayout from '@/layouts/PortalLayout.vue';
 import type { PortalBookingShowProps } from '@/types/etms';
 
@@ -36,7 +37,114 @@ function triggerOnlinePayment(): void {
 <template>
     <Head :title="`Booking ${booking.bookingReference}`" />
 
-    <PortalLayout :breadcrumb="booking.bookingReference">
+    <FocusedLayout v-if="booking.isHoldActive">
+        <div class="mx-auto max-w-3xl space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <Link
+                    :href="routes.portalBookings"
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors duration-150 hover:text-[#0F4C81]"
+                >
+                    <ArrowLeft class="h-4 w-4" aria-hidden="true" />
+                    <span>Back to My Bookings</span>
+                </Link>
+
+                <span class="rounded-[6px] border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                    {{ booking.statusLabel }}
+                </span>
+            </div>
+
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span
+                        v-if="booking.session.sessionCode"
+                        class="rounded-[6px] border border-neutral-200 bg-white px-2.5 py-0.5 font-mono text-xs font-medium text-neutral-700"
+                    >
+                        {{ booking.session.sessionCode }}
+                    </span>
+                    <span class="font-mono text-xs text-neutral-500 tabular-nums">
+                        {{ booking.bookingReference }}
+                    </span>
+                </div>
+                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+                    {{ booking.session.title }}
+                </h1>
+            </div>
+
+            <div
+                role="status"
+                class="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50/70 p-5 sm:flex-row sm:items-center sm:justify-between"
+            >
+                <div class="flex items-start gap-3">
+                    <Clock class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+                    <div>
+                        <p class="text-sm font-semibold text-neutral-900 tabular-nums">
+                            Complete Payment Before {{ booking.holdExpiresLabel }}
+                        </p>
+                        <p class="mt-1 text-sm text-neutral-700">
+                            Your seat is held for 15 minutes. Complete online payment to confirm your registration.
+                        </p>
+                    </div>
+                </div>
+
+                <Button
+                    v-if="booking.order"
+                    type="button"
+                    class="h-10 shrink-0 rounded-[6px] bg-[#0F4C81] px-5 text-sm font-medium text-white transition-colors duration-150 hover:bg-[#0F4C81]/90"
+                    :disabled="paying"
+                    @click="triggerOnlinePayment"
+                >
+                    {{ paying ? 'Connecting...' : 'Pay Online Now' }}
+                </Button>
+            </div>
+
+            <div class="rounded-lg border border-neutral-200 bg-white p-6">
+                <dl class="grid gap-5 sm:grid-cols-2">
+                    <div class="flex items-start gap-2.5">
+                        <Calendar class="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                        <div>
+                            <dt class="text-xs font-medium text-neutral-500">Schedule</dt>
+                            <dd class="mt-1 text-sm font-semibold text-neutral-900 tabular-nums">
+                                {{ booking.session.scheduleLabel }}
+                            </dd>
+                            <dd class="mt-0.5 text-xs text-neutral-500 tabular-nums">
+                                {{ booking.session.durationLabel }}
+                            </dd>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-2.5">
+                        <MapPin class="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                        <div>
+                            <dt class="text-xs font-medium text-neutral-500">Venue</dt>
+                            <dd class="mt-1 text-sm font-semibold text-neutral-900">
+                                {{ booking.session.venueName }}
+                            </dd>
+                            <dd v-if="booking.session.venueAddressLine" class="mt-0.5 text-xs text-neutral-500">
+                                {{ booking.session.venueAddressLine }}
+                            </dd>
+                        </div>
+                    </div>
+                </dl>
+
+                <div
+                    v-if="booking.order"
+                    class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-200 pt-5"
+                >
+                    <div class="text-sm text-neutral-600">
+                        Order <span class="font-mono font-medium text-neutral-900">{{ booking.order.orderNumber }}</span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-sm text-neutral-600">Total Payable</span>
+                        <span class="text-xl font-bold text-neutral-900 tabular-nums">
+                            {{ booking.order.totalLabel }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </FocusedLayout>
+
+    <PortalLayout v-else :breadcrumb="booking.bookingReference">
         <div class="mx-auto max-w-[1440px] space-y-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <Link
@@ -73,20 +181,12 @@ function triggerOnlinePayment(): void {
 
                 <div class="flex flex-wrap items-center gap-2.5">
                     <Button
-                        v-if="booking.isConfirmed && booking.session.modulePortalUrl"
-                        as-child
-                    >
-                        <Link :href="booking.session.modulePortalUrl">
-                            Open Module Materials
-                        </Link>
-                    </Button>
-                    <Button
-                        v-else-if="booking.session.moduleCatalogueUrl"
+                        v-if="booking.session.sessionDetailUrl"
                         as-child
                         variant="outline"
                     >
-                        <Link :href="booking.session.moduleCatalogueUrl">
-                            View Programme
+                        <Link :href="booking.session.sessionDetailUrl">
+                            View Session Details
                         </Link>
                     </Button>
                 </div>
@@ -226,18 +326,21 @@ function triggerOnlinePayment(): void {
                                     <dd class="mt-1 text-[13.5px] text-[#292536]">
                                         <ul
                                             v-if="booking.session.instructors.length > 0"
-                                            class="space-y-1"
+                                            class="space-y-2"
                                         >
                                             <li
                                                 v-for="instructor in booking.session.instructors"
                                                 :key="instructor.name"
+                                                class="flex items-center gap-2.5"
                                             >
-                                                <span class="font-bold text-[#282338]">{{ instructor.name }}</span>
-                                                <span
-                                                    v-if="instructor.title"
-                                                    class="text-[12.5px] text-[#625D6D]"
-                                                >
-                                                    &mdash; {{ instructor.title }}
+                                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#F1EDFB] text-[11px] font-extrabold text-[#5942B5]">
+                                                    {{ instructor.initials }}
+                                                </span>
+                                                <span class="min-w-0">
+                                                    <span class="block font-bold text-[#282338]">{{ instructor.name }}</span>
+                                                    <span v-if="instructor.title" class="block text-[12.5px] text-[#625D6D]">
+                                                        {{ instructor.title }}
+                                                    </span>
                                                 </span>
                                             </li>
                                         </ul>
@@ -317,6 +420,60 @@ function triggerOnlinePayment(): void {
 
                             <p v-else class="text-[13.5px] text-[#625D6D]">
                                 Attendance has not been recorded for this session yet.
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card v-if="booking.isConfirmed">
+                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
+                            <CardTitle>
+                                Session Teaching Materials ({{ booking.session.materials?.length ?? 0 }})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent class="pt-4">
+                            <div
+                                v-if="booking.session.materials && booking.session.materials.length > 0"
+                                class="divide-y divide-[#EEEAF2]"
+                            >
+                                <div
+                                    v-for="material in booking.session.materials"
+                                    :key="material.id"
+                                    class="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                    <div class="min-w-0 space-y-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="text-[14px] font-bold text-[#282338]">
+                                                {{ material.title }}
+                                            </span>
+                                            <Badge variant="outline">
+                                                {{ material.typeLabel }}
+                                            </Badge>
+                                        </div>
+                                        <p
+                                            v-if="material.description"
+                                            class="text-[13px] text-[#403B4B]"
+                                        >
+                                            {{ material.description }}
+                                        </p>
+                                        <p class="text-[12px] text-[#625D6D] tabular-nums">
+                                            {{ material.originalFilename }} &middot; {{ material.fileSizeLabel }}
+                                        </p>
+                                    </div>
+                                    <div class="shrink-0">
+                                        <Button
+                                            v-if="material.isDownloadable && material.downloadUrl"
+                                            as="a"
+                                            :href="material.downloadUrl"
+                                            size="sm"
+                                        >
+                                            <Download class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span>Download</span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="text-[13.5px] text-[#625D6D]">
+                                No teaching materials have been published for this training session yet.
                             </p>
                         </CardContent>
                     </Card>

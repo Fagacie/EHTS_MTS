@@ -71,15 +71,13 @@ class BookingController extends Controller
         $booking->load([
             'trainingSession.module.category',
             'trainingSession.instructors.instructorProfile',
+            'trainingSession.publishedMaterials',
             'order.items',
             'attendance',
         ]);
 
-        $hasModuleEntitlement = $booking->trainingSession?->module_id !== null
-            && $request->user()->hasActiveModuleEntitlement((int) $booking->trainingSession->module_id);
-
         return Inertia::render('Portal/Bookings/Show', [
-            'booking' => PortalPresenter::bookingDetail($booking, $hasModuleEntitlement),
+            'booking' => PortalPresenter::bookingDetail($booking),
         ]);
     }
 }

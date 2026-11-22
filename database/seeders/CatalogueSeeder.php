@@ -144,7 +144,7 @@ class CatalogueSeeder extends Seeder
                 ['code' => $modData['code']],
                 array_merge($modData, [
                     'category_id' => $category->id,
-                    'currency' => 'MYR',
+                    'currency' => config('etms.currency'),
                     'created_by' => $admin->id,
                     'updated_by' => $admin->id,
                 ]),

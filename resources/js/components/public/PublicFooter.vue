@@ -43,18 +43,18 @@ const { routes } = useRoutes();
                     <ul class="mt-3.5 space-y-2.5 text-[15px] text-white/70">
                         <li>
                             <Link
-                                :href="routes.catalogue"
+                                :href="routes.sessions"
                                 class="rounded-md transition-colors duration-150 hover:text-white hover:underline underline-offset-4"
                             >
-                                Catalogue
+                                Physical Sessions
                             </Link>
                         </li>
                         <li>
                             <Link
-                                :href="routes.sessions"
+                                :href="routes.catalogue"
                                 class="rounded-md transition-colors duration-150 hover:text-white hover:underline underline-offset-4"
                             >
-                                Sessions
+                                Standalone Modules
                             </Link>
                         </li>
                         <li>

@@ -90,11 +90,11 @@ class Payment extends Model
 
     public function formattedAmount(): string
     {
-        return 'RM '.number_format((float) $this->amount, 2);
+        return $this->currency.' '.number_format((float) $this->amount, 2);
     }
 
     public function formattedRefundedAmount(): string
     {
-        return 'RM '.number_format((float) $this->refunded_amount, 2);
+        return $this->currency.' '.number_format((float) $this->refunded_amount, 2);
     }
 }

@@ -125,11 +125,14 @@ function submitRecording() {
                                     {{ rec.description }}
                                 </p>
 
+                                <p v-if="rec.reviewNotes" class="mt-1 text-xs font-medium text-amber-800">
+                                    Administrator review note: {{ rec.reviewNotes }}
+                                </p>
+
                                 <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-[#625D6D]">
-                                    <span>Stream ID: <strong class="text-[#292536]">{{ rec.providerVideoId }}</strong></span>
-                                    <span>Disk: {{ rec.storageDisk }}</span>
                                     <span v-if="rec.originalFilename">File: {{ rec.originalFilename }}</span>
                                     <span v-if="rec.durationLabel">Duration: {{ rec.durationLabel }}</span>
+                                    <span v-if="rec.submittedAtLabel">Submitted: {{ rec.submittedAtLabel }}</span>
                                 </div>
                             </div>
                         </div>
@@ -166,11 +169,12 @@ function submitRecording() {
 
                             <div>
                                 <label for="video_file" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Video File (MP4 / MOV / MKV / WebM)
+                                    Video File (MP4 / MOV / MKV / WebM) <span class="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="video_file"
                                     type="file"
+                                    required
                                     accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
                                     @change="onFileSelected"
                                     class="mt-1 block w-full rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-xs text-[#292536] file:mr-3 file:rounded-lg file:border-0 file:bg-[#F1EDFB] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[#5942B5] hover:file:bg-[#EAE5F8]"
@@ -178,35 +182,6 @@ function submitRecording() {
                                 <p v-if="form.errors.video_file" class="mt-1 text-xs text-red-600">
                                     {{ form.errors.video_file }}
                                 </p>
-                            </div>
-
-                            <div>
-                                <label for="provider_video_id" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Custom Stream Reference ID (Optional)
-                                </label>
-                                <input
-                                    id="provider_video_id"
-                                    type="text"
-                                    v-model="form.provider_video_id"
-                                    placeholder="rec-ses-2026-001-p1"
-                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white px-3.5 py-2 font-mono text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9]"
-                                />
-                                <p v-if="form.errors.provider_video_id" class="mt-1 text-xs text-red-600">
-                                    {{ form.errors.provider_video_id }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <label for="duration_seconds" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Duration in Seconds (Auto-detected on transcode)
-                                </label>
-                                <input
-                                    id="duration_seconds"
-                                    type="number"
-                                    v-model="form.duration_seconds"
-                                    min="1"
-                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white px-3.5 py-2 font-mono text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9]"
-                                />
                             </div>
 
                             <div>

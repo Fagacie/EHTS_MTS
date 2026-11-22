@@ -4,7 +4,7 @@ return [
     'brand_name' => 'Ecohydrotech Solution',
     'short_name' => 'ETMS',
     'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Asia/Kuala_Lumpur'),
-    'currency' => env('APP_CURRENCY', 'MYR'),
+    'currency' => env('PAYMENT_CURRENCY', env('APP_CURRENCY', 'NGN')),
     'support_email' => env('MAIL_FROM_ADDRESS', 'no-reply@ecohydrotech.com.my'),
 
     /*

@@ -11,7 +11,7 @@ class SessionMaterialPolicy
 {
     public function download(User $user, SessionMaterial $material): bool
     {
-        if (! $user->isActive() || $material->status !== SessionMaterialStatus::Published || ! $material->is_downloadable) {
+        if (! $user->isActive()) {
             return false;
         }
 
@@ -19,11 +19,15 @@ class SessionMaterialPolicy
             return true;
         }
 
-        if ($material->trainingSession?->instructors()->where('users.id', $user->id)->exists()) {
+        if ($user->isInstructor() && $material->trainingSession?->instructors()->where('users.id', $user->id)->exists()) {
             return true;
         }
 
-        if ($material->trainingSession?->main_document_material_id === $material->id && $material->entitlements()
+        if ($material->status !== SessionMaterialStatus::Published || ! $material->is_downloadable) {
+            return false;
+        }
+
+        if ($material->entitlements()
             ->where('user_id', $user->id)
             ->where('status', 'active')
             ->exists()) {

@@ -43,10 +43,10 @@ class PublicSessionController extends Controller
             $sessionsQuery->where(function ($q) use ($search): void {
                 $q->where('session_code', 'like', "%{$search}%")
                     ->orWhere('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
                     ->orWhere('venue_name', 'like', "%{$search}%")
                     ->orWhere('venue_city', 'like', "%{$search}%")
-                    ->orWhere('venue_state', 'like', "%{$search}%")
-                    ->orWhereHas('module', fn ($mq) => $mq->where('code', 'like', "%{$search}%")->orWhere('title', 'like', "%{$search}%"));
+                    ->orWhere('venue_state', 'like', "%{$search}%");
             });
         }
 
@@ -93,7 +93,7 @@ class PublicSessionController extends Controller
         $displayTimezone = (string) config('etms.display_timezone', 'Asia/Kuala_Lumpur');
 
         $session = $bookingService->reconcileSessionCounters($session->id);
-        $session->load(['module.category', 'instructors.instructorProfile', 'mainDocumentMaterial']);
+        $session->load(['module.category', 'instructors.instructorProfile']);
 
         $isPublicStatus = in_array($session->status, [
             SessionStatus::Published,
@@ -101,10 +101,7 @@ class PublicSessionController extends Controller
             SessionStatus::RegistrationClosed,
         ], true);
 
-        abort_unless(
-            $isPublicStatus && $session->module && $session->module->isPublished() && $session->module->category?->is_active,
-            404,
-        );
+        abort_unless($isPublicStatus, 404);
 
         $existingBooking = null;
         if ($request->user()) {
@@ -148,9 +145,6 @@ class PublicSessionController extends Controller
             'Malaysia',
         ])->filter()->implode(', ');
 
-        $module = $session->module;
-        $independentPrice = $session->formattedIndependentPrice();
-
         $recordingPolicyLabel = $session->recording_access_policy === RecordingAccessPolicy::AttendeesOnly
             ? 'Post-session recordings included for verified present attendees'
             : 'In-person live instruction only';
@@ -162,6 +156,7 @@ class PublicSessionController extends Controller
                 'title' => $session->title,
                 'slug' => $session->slug,
                 'description' => $session->description,
+                'coverImageUrl' => $session->coverImageUrl(),
                 'dateRangeLabel' => $dateRangeLabel,
                 'timeLabel' => $timeLabel,
                 'scheduleLabel' => $session->formattedSchedule(),
@@ -182,25 +177,7 @@ class PublicSessionController extends Controller
                 'priceLabel' => $session->formattedPrice(),
                 'recordingPolicyLabel' => $recordingPolicyLabel,
                 'bookUrl' => $isOpenForBooking ? route('checkout.session.show', $session) : null,
-                'module' => [
-                    'id' => $module->id,
-                    'code' => $module->code,
-                    'title' => $module->title,
-                    'slug' => $module->slug,
-                    'summary' => $module->summary,
-                    'description' => $module->description,
-                    'learningObjectives' => array_values(array_filter(is_array($module->learning_objectives) ? $module->learning_objectives : [])),
-                    'categoryName' => $module->category?->name ?? 'Training Programme',
-                    'categorySlug' => $module->category?->slug ?? 'general',
-                    'categoryUrl' => $module->category
-                        ? route('catalogue.index', ['category' => $module->category->slug])
-                        : route('catalogue.index'),
-                    'detailUrl' => route('checkout.session-document.show', $session),
-                    'isAvailableIndependently' => (bool) $session->is_available_independently
-                        && $session->main_document_material_id !== null
-                        && $independentPrice !== null,
-                    'independentPriceLabel' => $independentPrice,
-                ],
+                'module' => null,
                 'instructors' => $session->instructors->map(function ($instructorUser): array {
                     $profile = $instructorUser->instructorProfile;
                     $canLinkProfile = $profile && $profile->is_public && $instructorUser->isActive();

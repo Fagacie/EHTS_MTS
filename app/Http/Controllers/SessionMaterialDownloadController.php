@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\SessionMaterial;
 use App\Services\Media\SelfHostedVideoService;
 use Illuminate\Http\Request;
@@ -19,6 +20,20 @@ class SessionMaterialDownloadController extends Controller
 
         $disk = $material->storage_disk ?: 'session-materials';
         abort_unless(Storage::disk($disk)->exists($material->storage_key), 404, 'The requested session material is not available.');
+
+        AuditLog::record(
+            event: 'session_material.downloaded',
+            auditableType: SessionMaterial::class,
+            auditableId: $material->id,
+            oldValues: null,
+            newValues: [
+                'training_session_id' => $material->training_session_id,
+                'title' => $material->title,
+                'original_filename' => $material->original_filename,
+            ],
+            reason: 'Authorized user downloaded session teaching material.',
+            actor: $request->user(),
+        );
 
         return $storageStreamer->streamProtectedFile(
             request: $request,

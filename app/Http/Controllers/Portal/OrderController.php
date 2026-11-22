@@ -135,7 +135,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Customer browser return page after Billplz checkout (`/checkout/return`, TRN-06).
+     * Customer browser return page after Paystack checkout (`/checkout/return`, TRN-06).
      * Strictly read-only: NEVER trusts browser query parameters as payment authority (Section 6.2).
      */
     public function returnPage(Request $request, SessionBookingService $bookingService): InertiaResponse
@@ -146,6 +146,7 @@ class OrderController extends Controller
         $billId = is_array($billplzParams) && isset($billplzParams['id'])
             ? (string) $billplzParams['id']
             : trim((string) $request->query('bill_id', ''));
+        $paystackReference = trim((string) $request->query('reference', ''));
 
         $order = null;
         $payment = null;
@@ -165,6 +166,15 @@ class OrderController extends Controller
             $order = $payment?->order;
         }
 
+        if ($order === null && $paystackReference !== '') {
+            $payment = Payment::query()
+                ->where('user_id', $user->id)
+                ->where('gateway', 'paystack')
+                ->where('gateway_bill_id', $paystackReference)
+                ->first();
+            $order = $payment?->order;
+        }
+
         abort_if($order === null, 404);
 
         if ($order->order_type === OrderType::SessionBooking) {
@@ -176,8 +186,22 @@ class OrderController extends Controller
         }
 
         $order->load(['items', 'payments', 'bookings.trainingSession', 'moduleEntitlements.module']);
-        $latestPayment = $payment ?? $order->payments->first();
-        $redirectReportedPaid = is_array($billplzParams) && (($billplzParams['paid'] ?? '') === 'true');
+        $latestPayment = $payment
+            ?? ($paystackReference !== ''
+                ? $order->payments->firstWhere('gateway_bill_id', $paystackReference)
+                : $order->payments->first());
+        if ($latestPayment?->gateway === 'paystack'
+            && $latestPayment->status === \App\Enums\PaymentStatus::Pending
+            && ($paystackReference === '' || $paystackReference === $latestPayment->gateway_bill_id)) {
+            try {
+                $latestPayment = app(PaymentOrchestrationService::class)->verifyPaystackPayment($latestPayment);
+                $order->refresh()->load(['items', 'payments', 'bookings.trainingSession', 'moduleEntitlements.module']);
+            } catch (DomainException|RuntimeException) {
+                // The page remains pending until a webhook or a later verification succeeds.
+            }
+        }
+        $redirectReportedPaid = is_array($billplzParams) && (($billplzParams['paid'] ?? '') === 'true')
+            || $paystackReference !== '' && $latestPayment?->status === \App\Enums\PaymentStatus::Successful;
 
         return Inertia::render(
             'Checkout/Return',

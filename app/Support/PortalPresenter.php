@@ -206,13 +206,36 @@ class PortalPresenter
         ]);
 
         $instructors = $session
-            ? $session->instructors->map(static fn ($instructor): array => [
-                'name' => $instructor->instructorProfile?->resolvedDisplayName() ?: $instructor->name,
-                'title' => $instructor->instructorProfile?->professional_title,
-            ])->values()->all()
+            ? $session->instructors->map(static function ($instructor): array {
+                $name = $instructor->instructorProfile?->resolvedDisplayName() ?: $instructor->name;
+                $initials = collect(preg_split('/\s+/', trim((string) $name)) ?: [])
+                    ->filter()
+                    ->take(2)
+                    ->map(static fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)))
+                    ->implode('');
+                return [
+                    'name' => $name,
+                    'title' => $instructor->instructorProfile?->professional_title,
+                    'initials' => $initials ?: 'IN',
+                ];
+            })->values()->all()
             : [];
 
         $isOpenForBooking = $session?->isOpenForBooking() ?? false;
+        $isConfirmed = $booking->status === BookingStatus::Confirmed;
+
+        $sessionMaterials = ($isConfirmed && $session && $session->relationLoaded('publishedMaterials'))
+            ? $session->publishedMaterials->map(static fn (\App\Models\SessionMaterial $material): array => [
+                'id' => $material->id,
+                'title' => $material->title,
+                'description' => $material->description,
+                'typeLabel' => $material->material_type?->label() ?? 'Document',
+                'originalFilename' => $material->original_filename,
+                'fileSizeLabel' => $material->formattedFileSize(),
+                'isDownloadable' => (bool) $material->is_downloadable,
+                'downloadUrl' => $material->is_downloadable ? $material->temporaryDownloadUrl(15) : null,
+            ])->values()->all()
+            : [];
 
         return [
             'id' => $booking->id,
@@ -220,7 +243,7 @@ class PortalPresenter
             'statusValue' => $booking->status->value,
             'statusLabel' => $booking->status->label(),
             'isHoldActive' => $isHoldActive,
-            'isConfirmed' => $booking->status === BookingStatus::Confirmed,
+            'isConfirmed' => $isConfirmed,
             'isExpired' => $booking->status === BookingStatus::Expired,
             'isCancelled' => $booking->status === BookingStatus::Cancelled,
             'isRefunded' => $booking->status === BookingStatus::Refunded,
@@ -238,12 +261,12 @@ class PortalPresenter
                 'venueAddressLine' => $venueAddressParts !== [] ? implode(', ', $venueAddressParts) : null,
                 'isOpenForBooking' => $isOpenForBooking,
                 'bookAgainUrl' => $session && $isOpenForBooking ? route('checkout.session.show', $session) : null,
-                'modulePortalUrl' => $booking->status === BookingStatus::Confirmed && $session?->module && $hasModuleEntitlement
-                    ? route('portal.modules.show', $session->module)
-                    : null,
-                'moduleCatalogueUrl' => $session?->module ? route('catalogue.modules.show', $session->module) : null,
-                'recordingsUrl' => $booking->status === BookingStatus::Confirmed ? route('portal.recordings.index') : null,
+                'sessionDetailUrl' => $session ? route('sessions.show', $session) : null,
+                'modulePortalUrl' => null,
+                'moduleCatalogueUrl' => null,
+                'recordingsUrl' => $isConfirmed ? route('portal.recordings.index') : null,
                 'instructors' => $instructors,
+                'materials' => $sessionMaterials,
             ],
             'attendance' => $attendance ? [
                 'attendanceStatusValue' => $attendance->attendance_status->value,
@@ -307,7 +330,7 @@ class PortalPresenter
             $order->billing_country,
         ])->filter()->implode(', ');
 
-        $currencyPrefix = $order->currency === 'MYR' ? 'RM' : $order->currency;
+        $currencyPrefix = $order->currency;
 
         return [
             'id' => $order->id,
@@ -332,6 +355,7 @@ class PortalPresenter
                 'title' => $item->item_title_snapshot,
                 'code' => $item->item_code_snapshot,
                 'quantity' => (int) $item->quantity,
+                'unitPriceLabel' => "{$currencyPrefix} ".number_format((float) $item->unit_price, 2),
                 'lineTotalLabel' => "{$currencyPrefix} ".number_format((float) $item->line_total, 2),
             ])->values()->all(),
             'bookings' => $order->bookings->map(static fn (Booking $linkedBooking): array => [
@@ -347,6 +371,9 @@ class PortalPresenter
                 'statusValue' => $entitlement->status->value,
                 'statusLabel' => $entitlement->status->label(),
                 'isActive' => $entitlement->status === EntitlementStatus::Active,
+                'accessLabel' => $entitlement->grant_source === 'purchase'
+                    ? 'Lifetime Digital Access'
+                    : 'Administrator-Granted Access',
                 'moduleUrl' => $entitlement->status === EntitlementStatus::Active && $entitlement->module
                     ? route('portal.modules.show', $entitlement->module)
                     : null,
@@ -512,6 +539,18 @@ class PortalPresenter
             'scheduleLabel' => $session?->formattedSchedule() ?? 'Schedule TBA',
             'isEligible' => $isEligible,
             'denialReason' => self::sanitizeReason($item['denialReason'] ?? null),
+            'materials' => ($session && $session->relationLoaded('publishedMaterials'))
+                ? $session->publishedMaterials->map(static fn (\App\Models\SessionMaterial $material): array => [
+                    'id' => $material->id,
+                    'title' => $material->title,
+                    'description' => $material->description,
+                    'typeLabel' => $material->material_type?->label() ?? 'Document',
+                    'originalFilename' => $material->original_filename,
+                    'fileSizeLabel' => $material->formattedFileSize(),
+                    'isDownloadable' => (bool) $material->is_downloadable,
+                    'downloadUrl' => $material->is_downloadable ? $material->temporaryDownloadUrl(15) : null,
+                ])->values()->all()
+                : [],
             'recordings' => $recordings->map(static function (SessionRecording $recording) use ($isEligible): array {
                 $isReady = $recording->encoding_status === EncodingStatus::Ready;
 
@@ -636,8 +675,8 @@ class PortalPresenter
             'session' => [
                 'title' => $session->title,
                 'sessionCode' => $session->session_code,
-                'moduleCode' => $session->module?->code,
-                'moduleTitle' => $session->module?->title,
+                'moduleCode' => null,
+                'moduleTitle' => null,
                 'scheduleLabel' => $session->formattedSchedule(),
                 'venueLabel' => implode(', ', $venueParts),
                 'remainingSeats' => $session->remainingSeats(),
@@ -703,49 +742,13 @@ class PortalPresenter
     /**
      * @return array<string, mixed>
      */
-    public static function checkoutSessionDocumentData(
-        TrainingSession $session,
-        User $user,
-        ?CustomerProfile $profile,
-    ): array {
-        $material = $session->mainDocumentMaterial;
-
-        return [
-            'purchaseKind' => 'session_document',
-            'module' => [
-                'code' => $session->session_code,
-                'title' => $material?->title ?? $session->title,
-                'summary' => $session->description,
-                'categoryName' => 'Session Document',
-                'priceLabel' => $session->formattedIndependentPrice() ?? '—',
-                'materialsCount' => 1,
-                'videosCount' => 0,
-                'detailUrl' => route('sessions.show', $session),
-            ],
-            'learner' => [
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
-            'defaults' => [
-                'phone' => $profile?->phone ?? '',
-                'billingAddressLine1' => $profile?->billing_address_line_1 ?? '',
-                'billingCity' => $profile?->billing_city ?? '',
-                'billingState' => $profile?->billing_state ?? '',
-                'billingPostcode' => $profile?->billing_postcode ?? '',
-            ],
-            'submitUrl' => route('checkout.session-document.store', $session),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     public static function checkoutReturnData(
         Order $order,
         ?Payment $payment,
         bool $redirectReportedPaid,
         string $refreshUrl,
     ): array {
+        $tz = self::displayTimezone();
         return [
             'order' => [
                 'orderNumber' => $order->order_number,
@@ -763,6 +766,9 @@ class PortalPresenter
                 'paymentReference' => $payment->payment_reference,
                 'statusValue' => $payment->status->value,
                 'statusLabel' => $payment->status->label(),
+                'paidAtLabel' => $payment->paid_at
+                    ? $payment->paid_at->copy()->timezone($tz)->format('d M Y, h:i A').' MYT'
+                    : null,
             ] : null,
             'redirectReportedPaid' => $redirectReportedPaid,
             'refreshUrl' => $refreshUrl,

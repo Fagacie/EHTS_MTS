@@ -337,7 +337,8 @@ export interface SessionDetailData {
     priceLabel: string;
     recordingPolicyLabel: string;
     bookUrl: string | null;
-    module: SessionDetailModule;
+    coverImageUrl?: string | null;
+    module: SessionDetailModule | null;
     instructors: SessionDetailInstructor[];
 }
 
@@ -518,6 +519,18 @@ export interface PortalBookingsIndexProps extends EtmsSharedProps {
 export interface PortalBookingDetailInstructor {
     name: string;
     title: string | null;
+    initials: string;
+}
+
+export interface PortalBookingSessionMaterial {
+    id: number;
+    title: string;
+    description: string | null;
+    typeLabel: string;
+    originalFilename: string;
+    fileSizeLabel: string;
+    isDownloadable: boolean;
+    downloadUrl: string | null;
 }
 
 export interface PortalBookingDetailSession {
@@ -528,14 +541,16 @@ export interface PortalBookingDetailSession {
     durationLabel: string;
     venueName: string;
     venueAddressLine: string | null;
-    venueNotes: string | null;
-    venueMapUrl: string | null;
+    venueNotes?: string | null;
+    venueMapUrl?: string | null;
     isOpenForBooking: boolean;
     bookAgainUrl: string | null;
+    sessionDetailUrl?: string | null;
     modulePortalUrl: string | null;
     moduleCatalogueUrl: string | null;
     recordingsUrl: string | null;
     instructors: PortalBookingDetailInstructor[];
+    materials?: PortalBookingSessionMaterial[];
 }
 
 export interface PortalBookingAttendance {
@@ -607,6 +622,7 @@ export interface PortalOrderLineItem {
     title: string;
     code: string | null;
     quantity: number;
+    unitPriceLabel: string;
     lineTotalLabel: string;
 }
 
@@ -624,6 +640,7 @@ export interface PortalOrderLinkedEntitlement {
     statusValue: string;
     statusLabel: string;
     isActive: boolean;
+    accessLabel: string;
     moduleUrl: string | null;
 }
 
@@ -777,6 +794,7 @@ export interface PortalRecordingBookingGroup {
     scheduleLabel: string;
     isEligible: boolean;
     denialReason: string | null;
+    materials?: PortalBookingSessionMaterial[];
     recordings: PortalRecordingItem[];
 }
 
@@ -877,7 +895,7 @@ export interface CheckoutSessionProps extends EtmsSharedProps {
 }
 
 export interface CheckoutModuleProps extends EtmsSharedProps {
-    purchaseKind?: 'module' | 'session_document';
+    purchaseKind?: 'module';
     module: {
         code: string;
         title: string;
@@ -919,6 +937,7 @@ export interface CheckoutReturnProps extends EtmsSharedProps {
         paymentReference: string;
         statusValue: string;
         statusLabel: string;
+        paidAtLabel: string | null;
     } | null;
     redirectReportedPaid: boolean;
     refreshUrl: string;
@@ -1078,9 +1097,29 @@ export interface InstructorRosterParticipant {
     remarks: string | null;
 }
 
+export interface InstructorSessionMaterialItem {
+    id: number;
+    title: string;
+    description: string | null;
+    typeValue: string;
+    typeLabel: string;
+    originalFilename: string;
+    fileSizeLabel: string;
+    status: string;
+    statusLabel: string;
+    reviewNotes: string | null;
+    createdAtLabel: string | null;
+    downloadUrl: string | null;
+    canDelete: boolean;
+    deleteUrl: string;
+}
+
 export interface InstructorSessionShowProps extends EtmsSharedProps {
     session: InstructorSessionItem;
     roster: InstructorRosterParticipant[];
+    materials?: InstructorSessionMaterialItem[];
+    materialTypes?: SelectOption[];
+    submitMaterialUrl?: string;
 }
 
 export interface InstructorAttendanceRecord {
@@ -1125,7 +1164,9 @@ export interface InstructorRecordingItem {
     encodingStatusLabel: string;
     status: string;
     statusLabel: string;
+    reviewNotes?: string | null;
     submittedAtLabel: string | null;
+    canDelete?: boolean;
 }
 
 export interface InstructorRecordingsProps extends EtmsSharedProps {

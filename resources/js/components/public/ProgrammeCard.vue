@@ -23,8 +23,17 @@ defineProps<{
 
         <div class="flex flex-1 flex-col justify-between p-6">
             <div>
-                <p class="text-[12px] font-bold uppercase tracking-[0.08em] text-[#159CAA]">
+                <p
+                    v-if="module.categoryName"
+                    class="text-[12px] font-bold uppercase tracking-[0.08em] text-[#159CAA]"
+                >
                     {{ module.categoryName }}
+                </p>
+                <p
+                    v-else
+                    class="text-[12px] font-bold uppercase tracking-[0.08em] text-[#159CAA]"
+                >
+                    Standalone Module
                 </p>
                 <h3 class="mt-2 line-clamp-2 text-[18px] font-extrabold leading-snug text-[#252238]">
                     {{ module.title }}
@@ -36,7 +45,7 @@ defineProps<{
                     {{
                         module.isAvailableIndependently && module.independentPriceLabel
                             ? formatDisplayFee(module.independentPriceLabel)
-                            : 'Physical sessions'
+                            : 'Self-paced module'
                     }}
                 </span>
                 <span class="inline-flex items-center gap-1.5 text-[15px] font-bold text-[#272d38]">

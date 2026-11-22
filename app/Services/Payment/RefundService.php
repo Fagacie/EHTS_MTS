@@ -22,10 +22,15 @@ use App\Models\TrainingSession;
 use App\Models\User;
 use App\Services\Notification\EtmsNotificationService;
 use DomainException;
+use RuntimeException;
 use Illuminate\Support\Facades\DB;
 
 class RefundService
 {
+    public function __construct(
+        protected PaystackGatewayService $paystack,
+    ) {}
+
     /**
      * Initiate, approve, and complete an administrator-controlled full or partial refund (`D-021`, Section 5.8 & 5.9).
      */
@@ -39,7 +44,7 @@ class RefundService
     ): Refund {
         $normalizedAmount = round($amount, 2);
         if ($normalizedAmount <= 0) {
-            throw new DomainException('Refund amount must be greater than RM 0.00.');
+            throw new DomainException(sprintf('Refund amount must be greater than %s 0.00.', $payment->currency ?: 'NGN'));
         }
 
         $methodValue = $method instanceof RefundMethod ? $method->value : $method;
@@ -48,6 +53,13 @@ class RefundService
         }
 
         $payment->loadMissing(['order.bookings', 'order.items']);
+        if (Refund::query()
+            ->where('payment_id', $payment->id)
+            ->where('amount', $normalizedAmount)
+            ->whereIn('status', [RefundStatus::Processing, RefundStatus::Completed])
+            ->exists()) {
+            throw new DomainException('A refund for this amount is already processing or completed.');
+        }
         $prelimOrder = $payment->order;
         $sessionId = $prelimOrder->bookings->first()?->training_session_id
             ?? $prelimOrder->items->first()?->training_session_id;
@@ -92,10 +104,34 @@ class RefundService
             $refundable = $lockedPayment->refundableBalance();
             if ($normalizedAmount > $refundable) {
                 throw new DomainException(sprintf(
-                    'Refund amount (RM %s) exceeds remaining refundable balance (RM %s).',
+                    'Refund amount (%s %s) exceeds remaining refundable balance (%s %s).',
+                    $lockedPayment->currency ?: 'NGN',
                     number_format($normalizedAmount, 2),
+                    $lockedPayment->currency ?: 'NGN',
                     number_format($refundable, 2),
                 ));
+            }
+
+            if (Refund::query()
+                ->where('payment_id', $lockedPayment->id)
+                ->where('amount', $normalizedAmount)
+                ->whereIn('status', [RefundStatus::Processing, RefundStatus::Completed])
+                ->exists()) {
+                throw new DomainException('A refund for this amount is already processing or completed.');
+            }
+
+            $providerRefund = null;
+            $providerCompleted = true;
+            if ($lockedPayment->gateway === 'paystack') {
+                $providerRefund = $this->paystack->refundTransaction(
+                    $lockedPayment,
+                    PaystackGatewayService::toMinorUnits((string) $normalizedAmount, (string) $lockedPayment->currency),
+                );
+                $providerStatus = strtolower((string) ($providerRefund['status'] ?? ''));
+                if (! in_array($providerStatus, ['processed', 'success', 'completed', 'pending'], true)) {
+                    throw new RuntimeException('Paystack rejected the refund request: '.$providerStatus);
+                }
+                $providerCompleted = in_array($providerStatus, ['processed', 'success', 'completed'], true);
             }
 
             // 4. Lock booking (if session_booking)
@@ -116,27 +152,32 @@ class RefundService
                 'currency' => $lockedPayment->currency ?: 'MYR',
                 'refund_method' => $methodValue,
                 'disbursement_reference' => $disbursementReference,
-                'disbursement_status' => 'completed',
+                'disbursement_status' => $providerCompleted ? 'completed' : 'processing',
+                'provider_disbursement_id' => isset($providerRefund['id']) ? (string) $providerRefund['id'] : null,
+                'disbursement_payload' => $providerRefund,
                 'reason' => $reason,
-                'status' => RefundStatus::Completed,
+                'status' => $providerCompleted ? RefundStatus::Completed : RefundStatus::Processing,
                 'request_source' => 'administrator',
                 'requested_by' => $admin->id,
                 'source_event' => 'admin_refund',
+                'gateway_payload' => $providerRefund,
                 'approved_by' => $admin->id,
-                'processed_by' => $admin->id,
+                'processed_by' => $providerCompleted ? $admin->id : null,
                 'requested_at' => $now,
                 'approved_at' => $now,
-                'processed_at' => $now,
+                'processed_at' => $providerCompleted ? $now : null,
             ]);
 
-            $this->applyCompletedRefundEffectsLocked(
-                lockedSession: $lockedSession,
-                lockedOrder: $lockedOrder,
-                lockedPayment: $lockedPayment,
-                lockedBooking: $lockedBooking,
-                refund: $refund,
-                admin: $admin,
-            );
+            if ($providerCompleted) {
+                $this->applyCompletedRefundEffectsLocked(
+                    lockedSession: $lockedSession,
+                    lockedOrder: $lockedOrder,
+                    lockedPayment: $lockedPayment,
+                    lockedBooking: $lockedBooking,
+                    refund: $refund,
+                    admin: $admin,
+                );
+            }
 
             return $refund->fresh(['order', 'payment', 'booking']);
         });
@@ -217,8 +258,8 @@ class RefundService
                 'status' => RefundStatus::Completed,
                 'approved_by' => $lockedRefund->approved_by ?? $admin->id,
                 'approved_at' => $lockedRefund->approved_at ?? $now,
-                'processed_by' => $admin->id,
-                'processed_at' => $now,
+                'processed_by' => $providerCompleted ? $admin->id : null,
+                'processed_at' => $providerCompleted ? $now : null,
             ]);
 
             $this->applyCompletedRefundEffectsLocked(

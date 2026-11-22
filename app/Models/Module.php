@@ -115,7 +115,10 @@ class Module extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', ModuleStatus::Published->value)
-            ->whereHas('category', fn (Builder $q) => $q->where('is_active', true));
+            ->where(function (Builder $q): void {
+                $q->whereNull('category_id')
+                    ->orWhereHas('category', fn (Builder $cq) => $cq->where('is_active', true));
+            });
     }
 
     public function isPublished(): bool
@@ -129,7 +132,7 @@ class Module extends Model
             return null;
         }
 
-        return 'RM '.number_format((float) $this->independent_price, 2);
+        return ($this->currency ?: config('etms.currency')).' '.number_format((float) $this->independent_price, 2);
     }
 
     public function coverImageUrl(): ?string

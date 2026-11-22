@@ -97,6 +97,6 @@ class Order extends Model
 
     public function formattedTotal(): string
     {
-        return 'RM '.number_format((float) $this->total_amount, 2);
+        return $this->currency.' '.number_format((float) $this->total_amount, 2);
     }
 }

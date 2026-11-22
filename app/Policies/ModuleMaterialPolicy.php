@@ -45,14 +45,6 @@ class ModuleMaterialPolicy
         }
 
         if (
-            $user->isInstructor()
-            && $material->module !== null
-            && $material->module->trainingSessions()->whereHas('instructors', fn ($q) => $q->where('users.id', $user->id))->exists()
-        ) {
-            return true;
-        }
-
-        if (
             $material->status !== MaterialStatus::Published
             || ! $material->is_downloadable
             || $material->module === null

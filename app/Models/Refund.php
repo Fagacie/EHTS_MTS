@@ -98,6 +98,6 @@ class Refund extends Model
 
     public function formattedAmount(): string
     {
-        return 'RM '.number_format((float) $this->amount, 2);
+        return $this->currency.' '.number_format((float) $this->amount, 2);
     }
 }

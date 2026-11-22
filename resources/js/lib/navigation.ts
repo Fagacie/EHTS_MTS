@@ -10,15 +10,15 @@ export interface NavItem {
 export function getPublicNavItems(routes: SharedRoutes): NavItem[] {
     return [
         {
-            label: 'Catalogue',
-            href: routes.catalogue,
-            matchPrefix: '/training',
+            label: 'Physical Sessions',
+            href: routes.sessions,
+            matchPrefix: '/sessions',
             isInertia: true,
         },
         {
-            label: 'Sessions',
-            href: routes.sessions,
-            matchPrefix: '/sessions',
+            label: 'Standalone Modules',
+            href: routes.catalogue,
+            matchPrefix: '/training',
             isInertia: true,
         },
         {

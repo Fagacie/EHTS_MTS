@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\DB;
 class PaymentOrchestrationService
 {
     public function __construct(
+        protected PaystackGatewayService $paystack,
         protected BillplzGatewayService $billplz,
         protected SessionBookingService $bookingService,
     ) {}
@@ -91,7 +92,7 @@ class PaymentOrchestrationService
                 'user_id' => $user->id,
                 'order_type' => OrderType::ModulePurchase,
                 'status' => OrderStatus::PendingPayment,
-                'currency' => $module->currency ?: 'MYR',
+                'currency' => $module->currency ?: config('etms.currency'),
                 'subtotal_amount' => $unitPrice,
                 'total_amount' => $unitPrice,
                 'customer_name' => $user->name,
@@ -122,7 +123,7 @@ class PaymentOrchestrationService
                 'unit_price' => $unitPrice,
                 'quantity' => 1,
                 'line_total' => $unitPrice,
-                'currency' => $module->currency ?: 'MYR',
+                'currency' => $module->currency ?: config('etms.currency'),
                 'metadata_snapshot' => [
                     'category_name' => $module->category?->name,
                     'module_slug' => $module->slug,
@@ -149,81 +150,7 @@ class PaymentOrchestrationService
     }
 
     /**
-     * Create an independent purchase order for a published session-owned document.
-     *
-     * @param  array<string, mixed>  $billingInput
-     */
-    public function createSessionDocumentPurchaseOrder(User $user, TrainingSession $session, array $billingInput = []): Order
-    {
-        $session->loadMissing('mainDocumentMaterial');
-        $material = $session->mainDocumentMaterial;
-
-        if ($session->status !== SessionStatus::Published || ! $session->is_available_independently || $session->independent_price === null || ! $material || $material->status->value !== 'published') {
-            throw new DomainException('This training session document is not available for independent purchase.');
-        }
-
-        if (SessionDocumentEntitlement::query()->where('user_id', $user->id)->where('session_material_id', $material->id)->where('status', EntitlementStatus::Active->value)->exists()) {
-            throw new DomainException('You already hold an active entitlement for this session document.');
-        }
-
-        $existing = Order::query()
-            ->where('user_id', $user->id)
-            ->where('order_type', OrderType::ModulePurchase->value)
-            ->where('status', OrderStatus::PendingPayment->value)
-            ->whereHas('items', fn ($query) => $query->where('session_material_id', $material->id))
-            ->latest('id')
-            ->first();
-        if ($existing !== null) {
-            return $existing->load(['items', 'payments']);
-        }
-
-        return DB::transaction(function () use ($user, $session, $material, $billingInput): Order {
-            $profile = $user->customerProfile;
-            $companyName = null;
-            $customerType = 'individual';
-            $address = $billingInput['billing_address'] ?? [];
-            $price = (float) $session->independent_price;
-
-            $order = Order::query()->create([
-                'order_number' => Order::generateOrderNumber(),
-                'user_id' => $user->id,
-                'order_type' => OrderType::ModulePurchase,
-                'status' => OrderStatus::PendingPayment,
-                'currency' => $session->currency ?: 'MYR',
-                'subtotal_amount' => $price,
-                'total_amount' => $price,
-                'customer_name' => $user->name,
-                'customer_email' => $user->email,
-                'customer_phone' => $billingInput['phone'] ?? $profile?->phone,
-                'customer_type' => $customerType,
-                'company_name' => $companyName,
-                'billing_address_line_1' => $address['line1'] ?? $profile?->billing_address_line_1,
-                'billing_city' => $address['city'] ?? $profile?->billing_city,
-                'billing_state' => $address['state'] ?? $profile?->billing_state,
-                'billing_postcode' => $address['postcode'] ?? $profile?->billing_postcode,
-                'billing_country' => $address['country'] ?? $profile?->billing_country ?? 'MY',
-            ]);
-
-            OrderItem::query()->create([
-                'order_id' => $order->id,
-                'order_type' => OrderType::ModulePurchase,
-                'item_type' => OrderItemType::SessionDocument,
-                'session_material_id' => $material->id,
-                'item_code_snapshot' => $session->session_code,
-                'item_title_snapshot' => $material->title,
-                'unit_price' => $price,
-                'quantity' => 1,
-                'line_total' => $price,
-                'currency' => $session->currency ?: 'MYR',
-                'metadata_snapshot' => ['training_session_id' => $session->id],
-            ]);
-
-            return $order->load('items');
-        });
-    }
-
-    /**
-     * Create or reuse a pending Billplz payment attempt for an order and persist the Billplz Bill ID & checkout URL.
+     * Create or reuse a pending payment attempt for an order and persist the gateway reference & checkout URL.
      */
     public function initiatePaymentForOrder(Order $order): Payment
     {
@@ -248,7 +175,7 @@ class PaymentOrchestrationService
 
         $existingPending = $order->payments()
             ->where('status', PaymentStatus::Pending->value)
-            ->whereNotNull('gateway_bill_id')
+            ->where('gateway', (string) config('services.payment_provider', 'paystack'))
             ->whereNotNull('gateway_payment_url')
             ->first();
 
@@ -266,19 +193,18 @@ class PaymentOrchestrationService
                 'payment_reference' => Payment::generatePaymentReference(),
                 'order_id' => $order->id,
                 'user_id' => $order->user_id,
-                'gateway' => 'billplz',
+                'gateway' => (string) config('services.payment_provider', 'paystack'),
                 'amount' => $order->total_amount,
                 'refunded_amount' => 0.00,
-                'currency' => $order->currency ?: 'MYR',
+                'currency' => $order->currency ?: config('etms.currency'),
                 'status' => PaymentStatus::Pending,
                 'expires_at' => $order->expires_at,
             ]);
         });
 
-        // Call Billplz Create Bill outside database locks (Section 6.1 Step 8)
-        $billResponse = $this->billplz->createBill($payment, $order);
+        $gatewayResponse = $this->paystack->initializeTransaction($payment, $order);
 
-        return DB::transaction(function () use ($payment, $billResponse): Payment {
+        return DB::transaction(function () use ($payment, $gatewayResponse): Payment {
             /** @var Payment $lockedPayment */
             $lockedPayment = Payment::query()
                 ->whereKey($payment->id)
@@ -287,11 +213,11 @@ class PaymentOrchestrationService
 
             if ($lockedPayment->status === PaymentStatus::Pending && blank($lockedPayment->gateway_bill_id)) {
                 $lockedPayment->update([
-                    'gateway_bill_id' => (string) ($billResponse['id'] ?? ''),
-                    'gateway_payment_url' => (string) ($billResponse['url'] ?? ''),
-                    'gateway_reference_1' => (string) ($billResponse['reference_1'] ?? $lockedPayment->payment_reference),
-                    'gateway_state' => (string) ($billResponse['state'] ?? 'due'),
-                    'gateway_payload' => $billResponse,
+                    'gateway_bill_id' => (string) ($gatewayResponse['reference'] ?? ''),
+                    'gateway_payment_url' => (string) ($gatewayResponse['authorization_url'] ?? ''),
+                    'gateway_reference_1' => (string) ($gatewayResponse['reference'] ?? $lockedPayment->payment_reference),
+                    'gateway_state' => 'initialized',
+                    'gateway_payload' => $gatewayResponse,
                 ]);
             }
 
@@ -305,11 +231,232 @@ class PaymentOrchestrationService
                     'gateway_bill_id' => $lockedPayment->gateway_bill_id,
                     'amount' => $lockedPayment->amount,
                 ],
-                reason: 'Billplz Bill created for order checkout.',
+                reason: 'Paystack transaction initialized for order checkout.',
             );
 
             return $lockedPayment->fresh();
         });
+    }
+
+    /**
+     * Process an authenticated Paystack webhook without changing ETMS fulfilment rules.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $headers
+     */
+    public function processPaystackWebhook(
+        array $payload,
+        string $rawBody,
+        ?string $signature,
+        ?string $legacySignature = null,
+        array $headers = [],
+        ?string $sourceIp = null,
+    ): PaymentWebhookEvent {
+        $fingerprint = $this->paystack->computeRequestFingerprint($payload);
+        $eventType = (string) ($payload['event'] ?? '');
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $reference = isset($data['reference']) ? (string) $data['reference'] : null;
+        $transactionId = isset($data['id']) ? (string) $data['id'] : null;
+        $reportedAmount = isset($data['amount']) ? PaystackGatewayService::fromMinorUnits($data['amount']) : null;
+        $reportedCurrency = isset($data['currency']) ? strtoupper((string) $data['currency']) : null;
+        $status = strtolower((string) ($data['status'] ?? ''));
+        $signatureValid = $this->paystack->verifyWebhookSignature($rawBody, $signature, $legacySignature);
+
+        if (! $signatureValid) {
+            return PaymentWebhookEvent::query()->create([
+                'gateway' => 'paystack',
+                'request_fingerprint' => $fingerprint,
+                'event_type' => $eventType ?: 'unknown',
+                'signature_valid' => false,
+                'reported_amount' => $reportedAmount,
+                'reported_paid' => false,
+                'reported_state' => $status ?: null,
+                'reported_currency' => $reportedCurrency,
+                'headers' => $headers,
+                'payload' => $payload,
+                'processing_status' => WebhookProcessingStatus::RejectedInvalidSignature,
+                'rejection_reason' => 'Invalid Paystack webhook signature.',
+                'source_ip' => $sourceIp,
+                'received_at' => now(),
+                'processed_at' => now(),
+            ]);
+        }
+
+        $idempotencyKey = hash('sha256', 'paystack|'.$eventType.'|'.$reference.'|'.$transactionId.'|'.($data['amount'] ?? '').'|'.$status);
+        if (PaymentWebhookEvent::query()->where('gateway', 'paystack')->where('idempotency_key', $idempotencyKey)->exists()) {
+            return PaymentWebhookEvent::query()->create([
+                'gateway' => 'paystack',
+                'idempotency_key' => null,
+                'request_fingerprint' => $fingerprint,
+                'event_type' => $eventType,
+                'signature_valid' => true,
+                'reported_amount' => $reportedAmount,
+                'reported_paid' => $eventType === 'charge.success',
+                'reported_state' => $status ?: null,
+                'reported_currency' => $reportedCurrency,
+                'headers' => $headers,
+                'payload' => $payload,
+                'processing_status' => WebhookProcessingStatus::IgnoredDuplicate,
+                'rejection_reason' => 'Duplicate verified webhook delivery ignored.',
+                'source_ip' => $sourceIp,
+                'received_at' => now(),
+                'processed_at' => now(),
+            ]);
+        }
+
+        $payment = $reference
+            ? Payment::query()->where('gateway', 'paystack')->where('gateway_bill_id', $reference)->first()
+            : null;
+
+        if ($payment === null) {
+            return PaymentWebhookEvent::query()->create([
+                'gateway' => 'paystack',
+                'idempotency_key' => $idempotencyKey,
+                'request_fingerprint' => $fingerprint,
+                'gateway_bill_id' => $reference,
+                'gateway_transaction_id' => $transactionId,
+                'event_type' => $eventType,
+                'signature_valid' => true,
+                'reported_amount' => $reportedAmount,
+                'reported_paid' => $eventType === 'charge.success',
+                'reported_state' => $status ?: null,
+                'reported_currency' => $reportedCurrency,
+                'headers' => $headers,
+                'payload' => $payload,
+                'processing_status' => WebhookProcessingStatus::UnmatchedPending,
+                'rejection_reason' => 'No local payment matched the Paystack reference.',
+                'source_ip' => $sourceIp,
+                'received_at' => now(),
+            ]);
+        }
+
+        $expectedAmount = PaystackGatewayService::toMinorUnits((string) $payment->amount, (string) $payment->currency);
+        $receivedAmount = isset($data['amount']) ? (int) $data['amount'] : -1;
+        $mismatchReason = $reportedCurrency !== strtoupper((string) $payment->currency)
+            ? 'Currency mismatch.'
+            : ($receivedAmount !== $expectedAmount ? 'Amount mismatch.' : null);
+
+        if ($mismatchReason !== null) {
+            return PaymentWebhookEvent::query()->create([
+                'gateway' => 'paystack',
+                'idempotency_key' => $idempotencyKey,
+                'request_fingerprint' => $fingerprint,
+                'gateway_bill_id' => $reference,
+                'gateway_transaction_id' => $transactionId,
+                'payment_id' => $payment->id,
+                'order_id' => $payment->order_id,
+                'event_type' => $eventType,
+                'signature_valid' => true,
+                'reported_amount' => $reportedAmount,
+                'reported_paid' => $eventType === 'charge.success',
+                'reported_state' => $status ?: null,
+                'reported_currency' => $reportedCurrency,
+                'headers' => $headers,
+                'payload' => $payload,
+                'processing_status' => WebhookProcessingStatus::RejectedMismatch,
+                'rejection_reason' => $mismatchReason,
+                'source_ip' => $sourceIp,
+                'received_at' => now(),
+                'processed_at' => now(),
+            ]);
+        }
+
+        if ($eventType === 'charge.success') {
+            try {
+                $this->verifyPaystackPayment($payment);
+            } catch (DomainException|RuntimeException $e) {
+                return PaymentWebhookEvent::query()->create([
+                    'gateway' => 'paystack',
+                    'idempotency_key' => $idempotencyKey,
+                    'request_fingerprint' => $fingerprint,
+                    'gateway_bill_id' => $reference,
+                    'gateway_transaction_id' => $transactionId,
+                    'payment_id' => $payment->id,
+                    'order_id' => $payment->order_id,
+                    'event_type' => $eventType,
+                    'signature_valid' => true,
+                    'reported_amount' => $reportedAmount,
+                    'reported_paid' => true,
+                    'reported_state' => $status ?: null,
+                    'reported_currency' => $reportedCurrency,
+                    'headers' => $headers,
+                    'payload' => $payload,
+                    'processing_status' => WebhookProcessingStatus::Failed,
+                    'rejection_reason' => 'Paystack server-side verification failed: '.$e->getMessage(),
+                    'source_ip' => $sourceIp,
+                    'received_at' => now(),
+                    'processed_at' => now(),
+                ]);
+            }
+        } elseif (in_array($status, ['failed', 'abandoned'], true)) {
+            $this->reconcileVerifiedGatewayState(
+                paymentId: $payment->id,
+                paid: false,
+                state: $status,
+                paidAt: null,
+                transactionId: $transactionId,
+                transactionStatus: $status,
+                rawPayload: $payload,
+            );
+        }
+
+        return PaymentWebhookEvent::query()->create([
+            'gateway' => 'paystack',
+            'idempotency_key' => $idempotencyKey,
+            'request_fingerprint' => $fingerprint,
+            'gateway_bill_id' => $reference,
+            'gateway_transaction_id' => $transactionId,
+            'payment_id' => $payment->id,
+            'order_id' => $payment->order_id,
+            'event_type' => $eventType,
+            'signature_valid' => true,
+            'reported_amount' => $reportedAmount,
+            'reported_paid' => $eventType === 'charge.success',
+            'reported_state' => $status ?: null,
+            'reported_currency' => $reportedCurrency,
+            'headers' => $headers,
+            'payload' => $payload,
+            'processing_status' => WebhookProcessingStatus::Processed,
+            'source_ip' => $sourceIp,
+            'received_at' => now(),
+            'processed_at' => now(),
+        ]);
+    }
+
+    public function verifyPaystackPayment(Payment $payment, ?User $actor = null): Payment
+    {
+        if ($payment->gateway !== 'paystack' || blank($payment->gateway_bill_id)) {
+            throw new DomainException('This payment does not have a Paystack reference to verify.');
+        }
+
+        $data = $this->paystack->verifyTransaction($payment->gateway_bill_id);
+        $amount = isset($data['amount']) ? (int) $data['amount'] : -1;
+        $expectedAmount = PaystackGatewayService::toMinorUnits((string) $payment->amount, (string) $payment->currency);
+        $currency = strtoupper((string) ($data['currency'] ?? ''));
+        $payment->loadMissing('order');
+        $metadata = is_array($data['metadata'] ?? null) ? $data['metadata'] : [];
+        $metadataOrder = (string) ($metadata['etms_order_number'] ?? '');
+
+        if ((string) ($data['reference'] ?? '') !== $payment->gateway_bill_id
+            || $amount !== $expectedAmount
+            || $currency !== strtoupper((string) $payment->currency)
+            || ($metadataOrder !== '' && $metadataOrder !== $payment->order->order_number)) {
+            throw new DomainException('Paystack verification did not match the expected order, payment amount, currency, or reference.');
+        }
+
+        $status = strtolower((string) ($data['status'] ?? ''));
+        $this->reconcileVerifiedGatewayState(
+            paymentId: $payment->id,
+            paid: $status === 'success',
+            state: $status === 'success' ? 'paid' : $status,
+            paidAt: ! empty($data['paid_at']) ? Carbon::parse((string) $data['paid_at']) : null,
+            transactionId: isset($data['id']) ? (string) $data['id'] : $payment->gateway_transaction_id,
+            transactionStatus: $status,
+            rawPayload: $data,
+            actor: $actor,
+        );
+
+        return $payment->fresh(['order', 'refunds']);
     }
 
     /**

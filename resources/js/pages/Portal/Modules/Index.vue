@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight } from 'lucide-vue-next';
+import { ArrowRight, BookOpen, FileText, PlayCircle } from 'lucide-vue-next';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { useRoutes } from '@/composables/useRoutes';
 import PortalLayout from '@/layouts/PortalLayout.vue';
 import { pluralize } from '@/lib/utils';
@@ -23,116 +14,108 @@ const { routes } = useRoutes();
 </script>
 
 <template>
-    <Head title="My Learning" />
+    <Head title="My Learning Modules" />
 
-    <PortalLayout breadcrumb="My Learning">
-        <div class="mx-auto max-w-[1440px] space-y-6">
+    <PortalLayout breadcrumb="My Learning Modules">
+        <div class="mx-auto max-w-6xl space-y-6">
             <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 class="text-[24px] font-extrabold leading-tight tracking-tight text-[#282338] sm:text-[26px]">
-                        My Learning
+                    <h1 class="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+                        My Learning Modules
                     </h1>
-                    <p class="mt-1 text-[13.5px] text-[#625D6D]">
-                        Access your purchased self-paced modules, downloadable technical documents, video lessons, and session recordings.
+                    <p class="mt-1 text-sm text-neutral-600">
+                        Access your purchased standalone learning modules, downloadable documents, and self-paced video lessons.
                     </p>
                 </div>
 
-                <div v-if="activeEntitlements.length > 0" class="flex flex-wrap items-center gap-2.5">
-                    <Button as-child variant="outline" size="sm">
-                        <Link :href="routes.portalRecordings">
-                            Session Recordings
-                        </Link>
-                    </Button>
-                    <Button as-child size="sm">
-                        <Link :href="routes.catalogue">
-                            Browse Training
-                        </Link>
-                    </Button>
-                </div>
+                <Button
+                    v-if="activeEntitlements.length > 0"
+                    as-child
+                    variant="outline"
+                    class="h-9 shrink-0 rounded-[6px] border-neutral-300 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                >
+                    <Link :href="routes.catalogue">
+                        Browse Standalone Modules
+                    </Link>
+                </Button>
             </header>
 
-            <Card
+            <div
                 v-if="activeEntitlements.length === 0 && sessionDocuments.length === 0"
-                class="flex flex-col items-center justify-center px-6 py-12 text-center"
+                class="flex flex-col items-center justify-center rounded-lg border border-neutral-200 bg-white px-6 py-14 text-center"
             >
-                <p class="text-[16px] font-bold text-[#282338]">
-                    No active training modules yet
+                <BookOpen class="h-8 w-8 text-neutral-400" aria-hidden="true" />
+                <p class="mt-3 text-base font-semibold text-neutral-900">
+                    No standalone learning modules purchased yet
                 </p>
-                <p class="mt-1.5 max-w-lg text-[13.5px] text-[#625D6D]">
-                    Purchase any self-paced module from the training catalogue to unlock online learning materials and video lessons.
+                <p class="mt-1 max-w-md text-sm text-neutral-600">
+                    Purchase any standalone learning module to unlock self-paced technical documents and video lessons.
                 </p>
+                <Button
+                    as-child
+                    class="mt-6 h-10 rounded-[6px] bg-[#0F4C81] px-5 text-sm font-medium text-white hover:bg-[#0F4C81]/90"
+                >
+                    <Link :href="routes.catalogue">
+                        Browse Standalone Modules
+                    </Link>
+                </Button>
+            </div>
 
-                <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                    <Button as-child>
-                        <Link :href="routes.catalogue">
-                            Browse Training Catalogue
-                        </Link>
-                    </Button>
-                    <Button as-child variant="outline">
-                        <Link :href="routes.portalRecordings">
-                            Check Session Recordings
-                        </Link>
-                    </Button>
+            <div
+                v-if="sessionDocuments.length > 0"
+                class="rounded-lg border border-neutral-200 bg-white"
+            >
+                <div class="border-b border-neutral-200 px-6 py-4">
+                    <h2 class="text-sm font-semibold text-neutral-900">Purchased Session Documents</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500">
+                        Historical documents purchased separately from physical session bookings
+                    </p>
                 </div>
-            </Card>
-
-            <Card v-if="sessionDocuments.length > 0">
-                <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                    <CardTitle>Purchased Session Documents</CardTitle>
-                    <CardDescription>
-                        Documents purchased separately from physical session bookings
-                    </CardDescription>
-                </CardHeader>
-                <CardContent class="divide-y divide-[#EEEAF2] pt-4">
+                <div class="divide-y divide-neutral-100 px-6">
                     <div
                         v-for="document in sessionDocuments"
                         :key="document.id"
-                        class="flex flex-wrap items-center justify-between gap-4 py-3.5 first:pt-0 last:pb-0"
+                        class="flex flex-wrap items-center justify-between gap-4 py-3.5"
                     >
                         <div>
-                            <p class="text-[14.5px] font-bold text-[#282338]">
-                                {{ document.documentTitle }}
-                            </p>
-                            <p class="mt-0.5 text-[13px] text-[#625D6D]">
+                            <p class="text-sm font-semibold text-neutral-900">{{ document.documentTitle }}</p>
+                            <p class="mt-0.5 text-xs text-neutral-500">
                                 {{ document.sessionTitle }} &middot; Granted {{ document.grantedDateLabel }}
                             </p>
                         </div>
-                        <Button v-if="document.downloadUrl" as-child size="sm">
-                            <a :href="document.downloadUrl">Download Document</a>
+                        <Button
+                            v-if="document.downloadUrl"
+                            as-child
+                            size="sm"
+                            class="rounded-[6px] bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90"
+                        >
+                            <a :href="document.downloadUrl">Download</a>
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             <section v-if="activeEntitlements.length > 0" aria-label="Active Module Workspaces">
                 <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    <Card
+                    <article
                         v-for="entitlement in activeEntitlements"
                         :key="entitlement.id"
-                        class="flex h-full flex-col justify-between"
+                        class="flex h-full flex-col justify-between rounded-lg border border-neutral-200 bg-white p-5 transition-colors duration-150 hover:border-neutral-300"
                     >
-                        <CardContent class="flex-1 p-5">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <Badge variant="outline" class="tabular-nums">
+                        <div>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-mono text-xs font-semibold text-[#0F4C81] tabular-nums">
                                     {{ entitlement.module.code }}
-                                </Badge>
-                                <PortalStatusBadge
-                                    status="active"
-                                    :label="entitlement.accessLabel"
-                                />
+                                </span>
+                                <span class="rounded-[6px] border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    {{ entitlement.accessLabel }}
+                                </span>
                             </div>
 
-                            <p
-                                v-if="entitlement.module.categoryName"
-                                class="mt-3 text-[12.5px] font-bold text-[#5942B5]"
-                            >
-                                {{ entitlement.module.categoryName }}
-                            </p>
-
-                            <h2 class="mt-1 text-[16px] font-bold leading-snug text-[#282338]">
+                            <h2 class="mt-3 text-base font-semibold leading-snug text-neutral-900">
                                 <Link
                                     :href="entitlement.module.workspaceUrl"
-                                    class="hover:text-[#5942B5] hover:underline underline-offset-4"
+                                    class="transition-colors duration-150 hover:text-[#0F4C81]"
                                 >
                                     {{ entitlement.module.title }}
                                 </Link>
@@ -140,98 +123,90 @@ const { routes } = useRoutes();
 
                             <p
                                 v-if="entitlement.module.summary"
-                                class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[#403B4B]"
+                                class="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-600"
                             >
                                 {{ entitlement.module.summary }}
                             </p>
 
-                            <dl class="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-[#E5E1EB] bg-[#FAF9FC] p-3">
-                                <div>
-                                    <dt class="text-[12px] font-semibold text-[#625D6D]">Materials</dt>
-                                    <dd class="mt-0.5 text-[14px] font-bold text-[#282338] tabular-nums">
+                            <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-600 tabular-nums">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <FileText class="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
+                                    <span>
                                         {{ entitlement.module.materialsCount }}
-                                        {{ pluralize(entitlement.module.materialsCount, 'file') }}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="text-[12px] font-semibold text-[#625D6D]">Video Lessons</dt>
-                                    <dd class="mt-0.5 text-[14px] font-bold text-[#282338] tabular-nums">
+                                        {{ pluralize(entitlement.module.materialsCount, 'material') }}
+                                    </span>
+                                </span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <PlayCircle class="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
+                                    <span>
                                         {{ entitlement.module.videosCount }}
                                         {{ pluralize(entitlement.module.videosCount, 'lesson') }}
-                                    </dd>
-                                </div>
-                            </dl>
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
 
-                            <p class="mt-3 text-[12px] text-[#625D6D] tabular-nums">
-                                Granted {{ entitlement.grantedDateLabel }} &middot; {{ entitlement.grantSourceLabel }}
-                            </p>
-                        </CardContent>
-
-                        <CardFooter class="border-t border-[#EEEAF2] px-5 py-3.5">
+                        <div class="mt-5 border-t border-neutral-100 pt-4">
+                            <div class="mb-3 flex items-center justify-between text-xs text-neutral-500 tabular-nums">
+                                <span>Granted {{ entitlement.grantedDateLabel }}</span>
+                                <span>{{ entitlement.grantSourceLabel }}</span>
+                            </div>
                             <Button
                                 as-child
-                                class="w-full"
+                                class="h-9 w-full rounded-[6px] bg-[#0F4C81] text-sm font-medium text-white hover:bg-[#0F4C81]/90"
                             >
                                 <Link :href="entitlement.module.workspaceUrl">
-                                    <span>Open Learning Workspace</span>
+                                    <span>Open Workspace</span>
                                     <ArrowRight class="h-4 w-4" aria-hidden="true" />
                                 </Link>
                             </Button>
-                        </CardFooter>
-                    </Card>
+                        </div>
+                    </article>
                 </div>
             </section>
 
-            <Card v-if="revokedEntitlements.length > 0">
-                <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                    <CardTitle>Inactive &amp; Revoked Modules</CardTitle>
-                    <CardDescription>
+            <div
+                v-if="revokedEntitlements.length > 0"
+                class="rounded-lg border border-neutral-200 bg-white"
+            >
+                <div class="border-b border-neutral-200 px-6 py-4">
+                    <h2 class="text-sm font-semibold text-neutral-900">Inactive &amp; Revoked Modules</h2>
+                    <p class="mt-0.5 text-xs text-neutral-500">
                         Modules whose access was ended following a refund or administrative update
-                    </CardDescription>
-                </CardHeader>
-                <CardContent class="divide-y divide-[#EEEAF2] pt-4">
+                    </p>
+                </div>
+                <div class="divide-y divide-neutral-100 px-6">
                     <div
                         v-for="revoked in revokedEntitlements"
                         :key="revoked.id"
-                        class="flex flex-wrap items-center justify-between gap-4 py-3.5 first:pt-0 last:pb-0"
+                        class="flex flex-wrap items-center justify-between gap-4 py-3.5"
                     >
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span
                                     v-if="revoked.module"
-                                    class="text-[12.5px] font-bold text-[#625D6D] tabular-nums"
+                                    class="font-mono text-xs font-medium text-neutral-500 tabular-nums"
                                 >
                                     {{ revoked.module.code }}
                                 </span>
                                 <PortalStatusBadge status="revoked" label="Revoked" />
                             </div>
-                            <p
-                                v-if="revoked.module"
-                                class="mt-1 text-[14.5px] font-bold text-[#282338]"
-                            >
+                            <p v-if="revoked.module" class="mt-1 text-sm font-semibold text-neutral-900">
                                 {{ revoked.module.title }}
                             </p>
-                            <p
-                                v-if="revoked.revocationReason"
-                                class="mt-0.5 text-[13px] text-[#403B4B]"
-                            >
+                            <p v-if="revoked.revocationReason" class="mt-0.5 text-xs text-neutral-600">
                                 Reason: {{ revoked.revocationReason }}
                             </p>
                         </div>
 
-                        <Button
-                            v-if="revoked.module"
-                            as-child
-                            variant="outline"
-                            size="sm"
-                        >
+                        <Button v-if="revoked.module" as-child variant="outline" size="sm" class="rounded-[6px]">
                             <Link :href="revoked.module.catalogueUrl">
-                                View Programme
+                                View Module
                             </Link>
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </div>
     </PortalLayout>
 </template>

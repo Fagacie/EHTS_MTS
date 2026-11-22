@@ -82,7 +82,7 @@ function getSeatAvailabilityPercent(session: UpcomingSessionItem): number {
                 <TableHeader>
                     <TableRow class="hover:bg-transparent">
                         <TableHead class="w-48 pl-6">Date</TableHead>
-                        <TableHead>Training Programme</TableHead>
+                        <TableHead>Physical Session</TableHead>
                         <TableHead class="w-56">Location</TableHead>
                         <TableHead class="w-40 tabular-nums">Seats</TableHead>
                         <TableHead class="w-28 text-right tabular-nums">Fee</TableHead>

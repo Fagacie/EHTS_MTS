@@ -3,11 +3,13 @@ import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     BarChart3,
+    BookOpen,
     CalendarDays,
     ChevronLeft,
     ChevronRight,
     CreditCard,
     FileCheck2,
+    KeyRound,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -40,7 +42,9 @@ const unreadCount = computed(() => user.value?.unreadNotificationsCount ?? 0);
 
 const navItems = [
     { label: 'Dashboard', href: '/admin-vue', icon: LayoutDashboard, isInertia: true },
-    { label: 'Training Sessions', href: '/admin-vue/sessions', icon: CalendarDays, isInertia: true },
+    { label: 'Physical Sessions', href: '/admin-vue/sessions', icon: CalendarDays, isInertia: true },
+    { label: 'Standalone Modules', href: '/admin-vue/modules', icon: BookOpen, isInertia: true },
+    { label: 'Module Access', href: '/admin-vue/module-entitlements', icon: KeyRound, isInertia: true },
     { label: 'Instructors', href: '/admin-vue/instructor-profiles', icon: Users, isInertia: true },
     { label: 'Payments & Orders', href: '/admin-vue/payments', icon: CreditCard, isInertia: true },
     { label: 'Refunds', href: '/admin-vue/refunds', icon: CreditCard, isInertia: true },

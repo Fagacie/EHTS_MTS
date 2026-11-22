@@ -7,9 +7,11 @@ use App\Enums\AttendanceStatus;
 use App\Enums\BookingStatus;
 use App\Enums\EncodingStatus;
 use App\Enums\RecordingStatus;
+use App\Enums\SessionMaterialStatus;
 use App\Models\Attendance;
 use App\Models\Booking;
 use App\Models\InstructorProfile;
+use App\Models\SessionMaterial;
 use App\Models\SessionRecording;
 use App\Models\TrainingSession;
 use App\Models\User;
@@ -58,6 +60,7 @@ class InstructorPresenter
             ->count());
 
         $recordingsCount = (int) ($session->recordings_count ?? $session->recordings()->count());
+        $materialsCount = (int) ($session->materials_count ?? $session->materials()->count());
 
         return [
             'id' => $session->id,
@@ -79,6 +82,7 @@ class InstructorPresenter
             'confirmedParticipantsCount' => $confirmedCount,
             'capacity' => (int) $session->capacity,
             'recordingsCount' => $recordingsCount,
+            'materialsCount' => $materialsCount,
             'recordingAccessPolicy' => $session->recording_access_policy->value,
             'recordingAccessPolicyLabel' => $session->recording_access_policy->label(),
             'completionNotes' => $session->completion_notes,
@@ -154,7 +158,50 @@ class InstructorPresenter
             'encodingStatusLabel' => $recording->encoding_status->label(),
             'status' => $recording->status->value,
             'statusLabel' => $recording->status->label(),
+            'reviewNotes' => $recording->review_notes,
             'submittedAtLabel' => self::formatDateTime($recording->submitted_at),
+            'canDelete' => in_array($recording->status, [
+                RecordingStatus::Draft,
+                RecordingStatus::PendingReview,
+                RecordingStatus::Rejected,
+            ], true),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function materialItem(SessionMaterial $material, TrainingSession $session): array
+    {
+        $statusValue = $material->status?->value ?? SessionMaterialStatus::PendingReview->value;
+        $statusLabel = match ($statusValue) {
+            SessionMaterialStatus::Published->value => 'Published',
+            SessionMaterialStatus::Rejected->value => 'Rejected',
+            SessionMaterialStatus::Archived->value => 'Archived',
+            default => 'Pending Review',
+        };
+
+        return [
+            'id' => $material->id,
+            'title' => $material->title,
+            'description' => $material->description,
+            'typeValue' => $material->material_type?->value ?? 'document',
+            'typeLabel' => $material->material_type?->label() ?? 'Document',
+            'originalFilename' => $material->original_filename,
+            'fileSizeLabel' => $material->formattedFileSize(),
+            'status' => $statusValue,
+            'statusLabel' => $statusLabel,
+            'reviewNotes' => $material->review_notes,
+            'createdAtLabel' => self::formatDateTime($material->created_at),
+            'downloadUrl' => $material->temporaryDownloadUrl(15),
+            'canDelete' => in_array($material->status, [
+                SessionMaterialStatus::PendingReview,
+                SessionMaterialStatus::Rejected,
+            ], true),
+            'deleteUrl' => route('instructor.sessions.materials.destroy', [
+                'session' => $session,
+                'material' => $material,
+            ]),
         ];
     }
 

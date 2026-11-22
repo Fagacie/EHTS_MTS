@@ -18,7 +18,7 @@ const { routes } = useRoutes();
 
 const filterOptions = [
     { label: 'All Sessions', value: '' },
-    { label: 'Scheduled', value: 'scheduled' },
+    { label: 'Published', value: 'published' },
     { label: 'In Progress', value: 'in_progress' },
     { label: 'Completed', value: 'completed' },
 ];

@@ -1,17 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-vue-next';
+import { AlertCircle, ArrowRight, CheckCircle2, Receipt } from 'lucide-vue-next';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { useRoutes } from '@/composables/useRoutes';
-import PortalLayout from '@/layouts/PortalLayout.vue';
+import FocusedLayout from '@/layouts/FocusedLayout.vue';
 import type { CheckoutReturnProps } from '@/types/etms';
 
 defineProps<CheckoutReturnProps>();
@@ -20,153 +13,165 @@ const { routes } = useRoutes();
 </script>
 
 <template>
-    <Head :title="`Payment Status — ${order.orderNumber}`" />
+    <Head :title="`Receipt — ${order.orderNumber}`" />
 
-    <PortalLayout :breadcrumb="order.orderNumber">
-        <div class="mx-auto max-w-[1440px] space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <Link
-                    :href="routes.portalOrders"
-                    class="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[#5942B5] transition-colors hover:text-[#7057D9] hover:underline underline-offset-4"
+    <FocusedLayout>
+        <div class="mx-auto max-w-xl">
+            <div class="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+                <div
+                    v-if="order.isPaid"
+                    class="border-b border-neutral-200 bg-emerald-50/60 px-6 py-6 text-center"
                 >
-                    <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-                    <span>Back to Orders &amp; Payments</span>
-                </Link>
-
-                <PortalStatusBadge
-                    :status="order.statusValue"
-                    :label="order.statusLabel"
-                />
-            </div>
-
-            <header>
-                <h1 class="text-[24px] font-extrabold leading-tight tracking-tight text-[#282338] tabular-nums sm:text-[26px]">
-                    Order {{ order.orderNumber }}
-                </h1>
-                <p class="mt-1 text-[13.5px] text-[#625D6D]">
-                    Payment status update for your {{ order.orderTypeLabel }}.
-                </p>
-            </header>
-
-            <Card
-                v-if="order.isPaid"
-                role="status"
-                class="flex flex-col gap-4 border-[#B8DFC9] bg-[#E8F4ED] p-4 shadow-none sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <CheckCircle2 class="mt-0.5 h-5 w-5 shrink-0 text-[#28734F]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">Payment Confirmed</p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            Thank you! Your payment has been verified and confirmed. Your booking or learning module access is now active.
-                        </p>
+                    <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 class="h-6 w-6" aria-hidden="true" />
                     </div>
+                    <h1 class="mt-3 text-xl font-semibold tracking-tight text-neutral-900">
+                        Payment Confirmed
+                    </h1>
+                    <p class="mt-1 text-sm text-neutral-600">
+                        {{
+                            order.isModulePurchase
+                                ? 'Your standalone learning module access is now active.'
+                                : 'Your physical training session booking is confirmed.'
+                        }}
+                    </p>
+                    <p class="mt-4 text-3xl font-bold tracking-tight text-neutral-900 tabular-nums">
+                        {{ order.totalLabel }}
+                    </p>
                 </div>
 
-                <Button as-child size="sm" class="shrink-0">
-                    <Link :href="order.isModulePurchase ? routes.portalModules : routes.portalBookings">
-                        {{ order.isModulePurchase ? 'Go to My Learning' : 'View My Bookings' }}
-                    </Link>
-                </Button>
-            </Card>
-
-            <Card
-                v-else-if="order.isPendingPayment"
-                role="status"
-                class="flex flex-col gap-4 border-[#E8CFA1] bg-[#FBF2E3] p-4 shadow-none sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#8B5A17]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">
-                            Awaiting Server-Side Payment Confirmation
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            {{
-                                redirectReportedPaid
-                                    ? 'Your payment gateway redirect reported a completed transaction. We are awaiting verified webhook confirmation before activating your seat or module entitlement.'
-                                    : 'This order is still waiting for verified payment confirmation from the payment gateway.'
-                            }}
-                        </p>
+                <div
+                    v-else-if="order.isPendingPayment"
+                    class="border-b border-neutral-200 bg-amber-50/60 px-6 py-6 text-center"
+                >
+                    <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                        <AlertCircle class="h-6 w-6" aria-hidden="true" />
                     </div>
+                    <h1 class="mt-3 text-xl font-semibold tracking-tight text-neutral-900">
+                        Awaiting Payment Confirmation
+                    </h1>
+                    <p class="mt-1 text-sm text-neutral-600">
+                        {{
+                            redirectReportedPaid
+                                ? 'We are awaiting verified gateway confirmation before activating your access.'
+                                : 'This order is waiting for verified payment confirmation.'
+                        }}
+                    </p>
                 </div>
 
-                <Button as-child variant="outline" size="sm" class="shrink-0">
-                    <Link :href="refreshUrl">
-                        Refresh Status
-                    </Link>
-                </Button>
-            </Card>
-
-            <Card
-                v-else
-                role="status"
-                class="flex flex-col gap-4 border-[#ECC4CA] bg-[#FBECEE] p-4 shadow-none sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#A33C48]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">
-                            Payment {{ order.statusLabel }}
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            This transaction was not completed ({{ order.statusLabel }}). Please inspect your order details or browse available programmes to register again.
-                        </p>
+                <div
+                    v-else
+                    class="border-b border-neutral-200 bg-red-50/60 px-6 py-6 text-center"
+                >
+                    <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-100 text-red-700">
+                        <AlertCircle class="h-6 w-6" aria-hidden="true" />
                     </div>
+                    <h1 class="mt-3 text-xl font-semibold tracking-tight text-neutral-900">
+                        Payment {{ order.statusLabel }}
+                    </h1>
+                    <p class="mt-1 text-sm text-neutral-600">
+                        This transaction was not completed ({{ order.statusLabel }}).
+                    </p>
                 </div>
 
-                <Button as-child size="sm" class="shrink-0">
-                    <Link :href="routes.catalogue">
-                        Browse Training
-                    </Link>
-                </Button>
-            </Card>
+                <div class="px-6 py-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                            <Receipt class="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>{{ order.isPaid ? 'Official Receipt' : 'Transaction Summary' }}</span>
+                        </span>
+                        <PortalStatusBadge
+                            :status="order.statusValue"
+                            :label="order.statusLabel"
+                        />
+                    </div>
 
-            <Card>
-                <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                    <CardTitle>Transaction Overview</CardTitle>
-                </CardHeader>
-                <CardContent class="pt-4">
-                    <dl class="grid gap-5 text-[13.5px] sm:grid-cols-2 lg:grid-cols-4">
-                        <div>
-                            <dt class="text-[12.5px] font-semibold text-[#625D6D]">Order Number</dt>
-                            <dd class="mt-1 font-bold text-[#282338] tabular-nums">
+                    <dl class="divide-y divide-neutral-100 text-sm">
+                        <div class="flex items-center justify-between gap-4 py-3">
+                            <dt class="text-neutral-500">Order Number</dt>
+                            <dd class="font-mono font-medium text-neutral-900 tabular-nums">
                                 {{ order.orderNumber }}
                             </dd>
                         </div>
-                        <div>
-                            <dt class="text-[12.5px] font-semibold text-[#625D6D]">Order Type</dt>
-                            <dd class="mt-1 font-semibold text-[#292536]">
+
+                        <div class="flex items-center justify-between gap-4 py-3">
+                            <dt class="text-neutral-500">Order Type</dt>
+                            <dd class="font-medium text-neutral-900">
                                 {{ order.orderTypeLabel }}
                             </dd>
                         </div>
-                        <div>
-                            <dt class="text-[12.5px] font-semibold text-[#625D6D]">Total Amount</dt>
-                            <dd class="mt-1 font-bold text-[#282338] tabular-nums">
+
+                        <div v-if="payment?.paymentReference" class="flex items-center justify-between gap-4 py-3">
+                            <dt class="text-neutral-500">Payment Reference</dt>
+                            <dd class="font-mono text-neutral-800 tabular-nums">
+                                {{ payment.paymentReference }}
+                            </dd>
+                        </div>
+
+                        <div v-if="payment?.paidAtLabel" class="flex items-center justify-between gap-4 py-3">
+                            <dt class="text-neutral-500">Payment Date</dt>
+                            <dd class="font-medium text-neutral-900 tabular-nums">
+                                {{ payment.paidAtLabel }}
+                            </dd>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-4 py-3">
+                            <dt class="font-semibold text-neutral-900">Total Amount</dt>
+                            <dd class="font-bold text-neutral-900 tabular-nums">
                                 {{ order.totalLabel }}
                             </dd>
                         </div>
-                        <div>
-                            <dt class="text-[12.5px] font-semibold text-[#625D6D]">Latest Payment Reference</dt>
-                            <dd class="mt-1 text-[#292536] tabular-nums">
-                                {{ payment?.paymentReference ?? '—' }}
-                            </dd>
-                        </div>
                     </dl>
-                </CardContent>
-                <CardFooter class="flex flex-wrap items-center justify-end gap-3 border-t border-[#EEEAF2] px-6 py-4">
-                    <Button as-child variant="outline">
+                </div>
+
+                <div class="flex flex-col-reverse gap-2.5 border-t border-neutral-200 bg-neutral-50/70 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Button as-child variant="outline" class="h-10 rounded-[6px]">
                         <Link :href="order.detailUrl">
                             View Order Details
                         </Link>
                     </Button>
-                    <Button as-child>
-                        <Link :href="routes.portalDashboard">
-                            Return to Dashboard
+
+                    <Button
+                        v-if="order.isPaid"
+                        as-child
+                        class="h-10 rounded-[6px] bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90"
+                    >
+                        <Link :href="order.isModulePurchase ? routes.portalModules : routes.portalBookings">
+                            <span>{{ order.isModulePurchase ? 'Go to My Modules' : 'View My Bookings' }}</span>
+                            <ArrowRight class="h-4 w-4" aria-hidden="true" />
                         </Link>
                     </Button>
-                </CardFooter>
-            </Card>
+
+                    <Button
+                        v-else-if="order.isPendingPayment"
+                        as-child
+                        class="h-10 rounded-[6px] bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90"
+                    >
+                        <Link :href="refreshUrl">
+                            Refresh Status
+                        </Link>
+                    </Button>
+
+                    <Button
+                        v-else
+                        as-child
+                        class="h-10 rounded-[6px] bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90"
+                    >
+                        <Link :href="routes.sessions">
+                            Browse Training
+                        </Link>
+                    </Button>
+                </div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <Link
+                    :href="routes.portalDashboard"
+                    class="text-sm font-medium text-neutral-500 transition-colors duration-150 hover:text-neutral-900"
+                >
+                    Return to Trainee Dashboard
+                </Link>
+            </div>
         </div>
-    </PortalLayout>
+    </FocusedLayout>
 </template>

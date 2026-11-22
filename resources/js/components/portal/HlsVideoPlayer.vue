@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const videoRef = ref<HTMLVideoElement | null>(null);
 const playbackError = ref<string | null>(null);
+const isLoading = ref(true);
 
 let hlsInstance: HlsType | null = null;
 let loadGeneration = 0;
@@ -30,6 +31,7 @@ function destroyPlayer(): void {
 async function initPlayer(): Promise<void> {
     const generation = ++loadGeneration;
     playbackError.value = null;
+    isLoading.value = true;
 
     destroyPlayer();
 
@@ -105,7 +107,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="space-y-3">
-        <div class="aspect-video w-full overflow-hidden rounded-xl border border-[#E5E1EB] bg-[#282338]">
+        <div class="relative aspect-video w-full overflow-hidden rounded-xl border border-[#E5E1EB] bg-[#F1EEF5]">
             <video
                 ref="videoRef"
                 controls
@@ -116,9 +118,23 @@ onBeforeUnmount(() => {
                 data-etms-hls-player
                 :data-src="src"
                 class="h-full w-full"
+                @loadeddata="isLoading=false"
+                @canplay="isLoading=false"
+                @waiting="isLoading=true"
+                @playing="isLoading=false"
+                @error="isLoading=false"
             >
                 Your browser does not support HTML5 video playback.
             </video>
+            <div
+                v-if="isLoading && !playbackError"
+                class="pointer-events-none absolute inset-0 grid place-items-center bg-[#F1EEF5]/85"
+            >
+                <div class="text-center">
+                    <div class="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-[#D8D2E3] border-t-[#5942B5]" aria-hidden="true" />
+                    <p class="mt-2 text-[12.5px] font-semibold text-[#625D6D]">Loading video lesson...</p>
+                </div>
+            </div>
         </div>
 
         <div

@@ -65,7 +65,7 @@ A web-based platform for Ecohydrotech Solution to manage physical training sessi
 - Administrator accounts require verified email and TOTP Multi-Factor Authentication before accessing `/admin-vue`.
 - A training module may have multiple physical sessions; physical session purchases and independent module purchases are separate.
 - Purchased modules provide lifetime access; physical certificates require verified attendance and administrator approval.
-- Payment confirmation must come from a verified server-side gateway callback (Billplz).
+- Payment confirmation must come from a verified server-side Paystack webhook or server-side transaction verification.
 
 ## Project documentation
 

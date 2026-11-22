@@ -25,7 +25,7 @@ const { routes } = useRoutes();
                         id="home-featured-title"
                         class="text-3xl font-bold text-[#272d38] sm:text-4xl"
                     >
-                        Featured Programmes
+                        Standalone Learning Modules
                     </h2>
                 </div>
 
@@ -33,7 +33,7 @@ const { routes } = useRoutes();
                     :href="routes.catalogue"
                     class="group inline-flex items-center gap-1.5 rounded-md text-[15px] font-bold text-[#272d38] transition-colors duration-150 hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
                 >
-                    <span>Explore full catalogue</span>
+                    <span>Explore standalone modules</span>
                     <ArrowRight
                         class="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5"
                         aria-hidden="true"
@@ -56,7 +56,7 @@ const { routes } = useRoutes();
                 v-else
                 class="mt-9 rounded-xl border border-[#272d38]/12 bg-white px-6 py-10 text-center text-[16px] text-[#272d38]/70"
             >
-                Published training programmes will appear here once released in the catalogue.
+                Published standalone learning modules will appear here once released.
             </div>
         </div>
     </section>

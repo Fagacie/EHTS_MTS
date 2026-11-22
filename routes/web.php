@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminModuleController;
 use App\Http\Controllers\Admin\AdminTrainingSessionController;
 use App\Http\Controllers\Admin\AdminBookingController;
 use App\Http\Controllers\Admin\AdminAttendanceController;
@@ -29,11 +30,11 @@ use App\Http\Controllers\Portal\PortalSearchController;
 use App\Http\Controllers\Portal\ProfileController;
 use App\Http\Controllers\Portal\SecurityController;
 use App\Http\Controllers\Portal\SessionCheckoutController;
-use App\Http\Controllers\Portal\SessionDocumentCheckoutController;
 use App\Http\Controllers\PublicCatalogueController;
 use App\Http\Controllers\PublicInstructorController;
 use App\Http\Controllers\PublicSessionController;
 use App\Http\Controllers\Webhooks\BillplzWebhookController;
+use App\Http\Controllers\Webhooks\PaystackWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicCatalogueController::class, 'home'])->name('home');
@@ -50,6 +51,10 @@ Route::get('/instructors/{instructor}', [PublicInstructorController::class, 'sho
 Route::post('/webhooks/billplz', BillplzWebhookController::class)
     ->middleware('throttle:webhooks')
     ->name('webhooks.billplz');
+
+Route::post('/webhooks/paystack', PaystackWebhookController::class)
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.paystack');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
@@ -98,8 +103,6 @@ Route::middleware(['auth', 'active.account'])->group(function (): void {
             Route::post('/checkout/session/{session:slug}', [SessionCheckoutController::class, 'store'])->name('checkout.session.store');
             Route::get('/checkout/module/{module:slug}', [ModuleCheckoutController::class, 'show'])->name('checkout.module.show');
             Route::post('/checkout/module/{module:slug}', [ModuleCheckoutController::class, 'store'])->name('checkout.module.store');
-            Route::get('/checkout/session-document/{session:slug}', [SessionDocumentCheckoutController::class, 'show'])->name('checkout.session-document.show');
-            Route::post('/checkout/session-document/{session:slug}', [SessionDocumentCheckoutController::class, 'store'])->name('checkout.session-document.store');
             Route::get('/checkout/return', [OrderController::class, 'returnPage'])->name('checkout.return');
         });
     });
@@ -155,6 +158,7 @@ Route::prefix('instructor')
         Route::get('/sessions/{session:session_code}/recordings', [InstructorSessionController::class, 'recordings'])->name('sessions.recordings');
         Route::post('/sessions/{session:session_code}/recordings', [InstructorSessionController::class, 'storeRecording'])->name('sessions.recordings.store');
         Route::post('/sessions/{session:session_code}/materials', [InstructorSessionController::class, 'storeMaterial'])->name('sessions.materials.store');
+        Route::delete('/sessions/{session:session_code}/materials/{material}', [InstructorSessionController::class, 'destroyMaterial'])->name('sessions.materials.destroy');
         Route::get('/profile', [InstructorProfileController::class, 'edit'])->name('profile.edit');
         Route::put('/profile', [InstructorProfileController::class, 'update'])->name('profile.update');
         Route::get('/notifications', [NotificationCentreController::class, 'instructorIndex'])->name('notifications.index');
@@ -179,7 +183,25 @@ Route::middleware(['auth', 'active.account', 'verified', 'role:administrator'])
         Route::delete('/admin-vue/sessions/{trainingSession}', [AdminTrainingSessionController::class, 'destroy'])->name('admin-vue.sessions.destroy');
         Route::post('/admin-vue/sessions/{trainingSession}/materials', [AdminTrainingSessionController::class, 'storeMaterial'])->name('admin-vue.sessions.materials.store');
         Route::post('/admin-vue/sessions/{trainingSession}/materials/{material}', [AdminTrainingSessionController::class, 'updateMaterial'])->name('admin-vue.sessions.materials.update');
+        Route::post('/admin-vue/sessions/{trainingSession}/materials/{material}/review', [AdminTrainingSessionController::class, 'reviewMaterial'])->name('admin-vue.sessions.materials.review');
         Route::delete('/admin-vue/sessions/{trainingSession}/materials/{material}', [AdminTrainingSessionController::class, 'destroyMaterial'])->name('admin-vue.sessions.materials.destroy');
+
+        Route::get('/admin-vue/modules', [AdminModuleController::class, 'index'])->name('admin-vue.modules.index');
+        Route::get('/admin-vue/modules/create', [AdminModuleController::class, 'create'])->name('admin-vue.modules.create');
+        Route::post('/admin-vue/modules', [AdminModuleController::class, 'store'])->name('admin-vue.modules.store');
+        Route::get('/admin-vue/modules/{module}/edit', [AdminModuleController::class, 'edit'])->name('admin-vue.modules.edit');
+        Route::put('/admin-vue/modules/{module}', [AdminModuleController::class, 'update'])->name('admin-vue.modules.update');
+        Route::delete('/admin-vue/modules/{module}', [AdminModuleController::class, 'destroy'])->name('admin-vue.modules.destroy');
+        Route::post('/admin-vue/modules/{module}/status', [AdminModuleController::class, 'changeStatus'])->name('admin-vue.modules.status');
+        Route::post('/admin-vue/modules/{module}/materials', [AdminModuleController::class, 'storeMaterial'])->name('admin-vue.modules.materials.store');
+        Route::post('/admin-vue/modules/{module}/materials/{material}', [AdminModuleController::class, 'updateMaterial'])->name('admin-vue.modules.materials.update');
+        Route::delete('/admin-vue/modules/{module}/materials/{material}', [AdminModuleController::class, 'destroyMaterial'])->name('admin-vue.modules.materials.destroy');
+        Route::post('/admin-vue/modules/{module}/videos', [AdminModuleController::class, 'storeVideo'])->name('admin-vue.modules.videos.store');
+        Route::delete('/admin-vue/modules/{module}/videos/{video}', [AdminModuleController::class, 'destroyVideo'])->name('admin-vue.modules.videos.destroy');
+
+        Route::get('/admin-vue/module-entitlements', [AdminCommerceGovernanceController::class, 'entitlements'])->name('admin-vue.module-entitlements.index');
+        Route::post('/admin-vue/module-entitlements', [AdminCommerceGovernanceController::class, 'grantEntitlement'])->name('admin-vue.module-entitlements.grant');
+        Route::post('/admin-vue/module-entitlements/{entitlement}/revoke', [AdminCommerceGovernanceController::class, 'revokeEntitlement'])->name('admin-vue.module-entitlements.revoke');
     });
 
 Route::middleware(['auth', 'active.account', 'verified', 'role:administrator'])

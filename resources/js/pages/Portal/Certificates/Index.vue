@@ -67,7 +67,7 @@ const filteredIssued = computed(() => {
                 <template #action>
                     <div class="flex flex-wrap items-center justify-center gap-2.5">
                         <AppButton :href="routes.portalBookings" variant="outline" size="sm" pill>
-                            View Live Sessions
+                            View Training Sessions
                         </AppButton>
                         <AppButton :href="routes.catalogue" variant="warm" size="sm" pill>
                             Explore Modules

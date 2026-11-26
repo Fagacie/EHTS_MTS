@@ -213,14 +213,14 @@ function decodeLabel(label: string): string {
 </script>
 
 <template>
-    <Head title="Live Sessions" />
+    <Head title="Training Sessions" />
 
-    <AdminLayout breadcrumb="Live Sessions">
+    <AdminLayout breadcrumb="Training Sessions">
         <div class="space-y-6">
             <!-- Header -->
             <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 class="type-page-title">Live sessions</h1>
+                    <h1 class="type-page-title">Training sessions</h1>
                     <p class="mt-1 text-sm text-muted">
                         Schedule, publish, and manage instructor-led training sessions.
                     </p>

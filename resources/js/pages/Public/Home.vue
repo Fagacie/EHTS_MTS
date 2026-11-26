@@ -75,7 +75,7 @@ function instructorInitials(name: string): string {
 
                             <div class="mt-8 flex flex-wrap items-center gap-3">
                                 <AppButton :href="routes.sessions" variant="warm" size="lg" pill>
-                                    <span>View Live Sessions</span>
+                                    <span>View Training Sessions</span>
                                     <ArrowRight class="size-4" aria-hidden="true" />
                                 </AppButton>
                                 <AppButton
@@ -115,11 +115,11 @@ function instructorInitials(name: string): string {
                 />
             </section>
 
-            <!-- Upcoming Live Sessions Schedule (Most Actionable First) -->
+            <!-- Upcoming Training Sessions Schedule (Most Actionable First) -->
             <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                     <div>
-                        <h2 class="type-page-title">Upcoming live sessions</h2>
+                        <h2 class="type-page-title">Upcoming training sessions</h2>
                         <p class="mt-1.5 text-sm text-muted">
                             Real-time seat counts with {{ stats.reservationHoldMinutes }}-minute checkout holds.
                         </p>

@@ -140,7 +140,7 @@ const statusTone = computed<StatusTone>(() => {
                         Getting Started
                     </span>
                     <h2 class="mt-4 text-lg font-bold tracking-tight text-navy-950">
-                        No upcoming live session booked yet
+                        No upcoming training session booked yet
                     </h2>
                     <p class="mt-2 text-sm leading-relaxed text-muted">
                         Reserve a seat in an upcoming field workshop or open your self-paced training modules.
@@ -149,7 +149,7 @@ const statusTone = computed<StatusTone>(() => {
 
                 <div class="mt-6 flex flex-wrap items-center gap-2.5">
                     <AppButton :href="browseUrl" variant="warm" size="sm" pill>
-                        <span>Browse Live Sessions</span>
+                        <span>Browse Training Sessions</span>
                         <ArrowRight class="size-3.5" aria-hidden="true" />
                     </AppButton>
                     <AppButton :href="modulesUrl" variant="outline" size="sm" pill>

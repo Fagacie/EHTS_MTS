@@ -217,7 +217,7 @@ function saveMaterialEdit(): void {
                     class="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-navy-950"
                 >
                     <ArrowLeft class="size-3.5" aria-hidden="true" />
-                    <span>Live Sessions</span>
+                    <span>Training Sessions</span>
                 </Link>
 
                 <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

@@ -47,7 +47,7 @@ const mobileOpen = ref(false);
 const navItems = computed(() => [
     { label: 'Home', href: routes.value.home, icon: Compass, match: (p: string) => p === '/' },
     { label: 'Modules', href: routes.value.catalogue, icon: BookOpen, match: (p: string) => p.startsWith('/training') },
-    { label: 'Live Sessions', href: routes.value.sessions, icon: CalendarDays, match: (p: string) => p.startsWith('/sessions') },
+    { label: 'Training Sessions', href: routes.value.sessions, icon: CalendarDays, match: (p: string) => p.startsWith('/sessions') },
     { label: 'Instructors', href: routes.value.instructors, icon: Users, match: (p: string) => p.startsWith('/instructors') },
 ]);
 
@@ -433,7 +433,7 @@ function scrollToTop(): void {
                         <ul class="mt-3.5 space-y-2.5 text-sm">
                             <li>
                                 <Link :href="routes.sessions" class="text-white/80 transition-colors hover:text-white">
-                                    Live Sessions
+                                    Training Sessions
                                 </Link>
                             </li>
                             <li>

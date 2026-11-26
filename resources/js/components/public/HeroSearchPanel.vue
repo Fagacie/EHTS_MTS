@@ -60,7 +60,7 @@ function submitSearch(): void {
                         @click="activeTab = 'sessions'"
                     >
                         <CalendarDays class="size-4 text-accent-600" aria-hidden="true" />
-                        <span>Live Sessions</span>
+                        <span>Training Sessions</span>
                     </button>
                     <button
                         type="button"

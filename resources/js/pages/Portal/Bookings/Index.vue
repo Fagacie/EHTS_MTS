@@ -56,14 +56,14 @@ function statusTone(statusValue: string): StatusTone {
 </script>
 
 <template>
-    <Head title="Live Sessions" />
+    <Head title="Training Sessions" />
 
-    <PortalLayout breadcrumb="Live Sessions">
+    <PortalLayout breadcrumb="Training Sessions">
         <div class="mx-auto max-w-[1440px] space-y-6">
             <!-- Header -->
             <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 class="type-page-title">Live sessions</h1>
+                    <h1 class="type-page-title">Training sessions</h1>
                     <p class="mt-1 text-sm text-muted">
                         Track upcoming session reservations, payment holds, and attendance records.
                     </p>
@@ -145,7 +145,7 @@ function statusTone(statusValue: string): StatusTone {
             <EmptyState
                 v-if="filteredBookings.length === 0"
                 :icon="CalendarCheck"
-                title="No live session bookings found"
+                title="No training session bookings found"
                 :description="
                     statusFilter !== '' || searchQuery !== ''
                         ? 'Try clearing your status filter or search term.'
@@ -165,7 +165,7 @@ function statusTone(statusValue: string): StatusTone {
                             Reset filters
                         </AppButton>
                         <AppButton :href="routes.sessions" variant="warm" size="sm" pill>
-                            Browse Live Sessions
+                            Browse Training Sessions
                         </AppButton>
                     </div>
                 </template>

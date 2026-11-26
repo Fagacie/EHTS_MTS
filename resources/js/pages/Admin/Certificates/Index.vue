@@ -344,7 +344,7 @@ function decodeLabel(label: string): string {
                     <template #cell-training="{ row }">
                         <p class="font-medium text-ink">{{ row.title }}</p>
                         <p class="mt-0.5 text-xs text-muted">
-                            {{ row.recordType === 'session' ? 'Live Session' : 'Standalone Module' }}
+                            {{ row.recordType === 'session' ? 'Training Session' : 'Standalone Module' }}
                             <template v-if="row.completionDate">
                                 &middot; Completed {{ formatDate(row.completionDate) }}
                             </template>
@@ -465,7 +465,7 @@ function decodeLabel(label: string): string {
                                     "
                                     @click="setRecordType('session')"
                                 >
-                                    Live Session
+                                    Training Session
                                 </button>
                                 <button
                                     type="button"

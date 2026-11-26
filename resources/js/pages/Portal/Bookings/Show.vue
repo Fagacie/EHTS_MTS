@@ -81,7 +81,7 @@ function triggerOnlinePayment(): void {
                     class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-navy-950"
                 >
                     <ArrowLeft class="size-4" aria-hidden="true" />
-                    <span>Live Sessions</span>
+                    <span>Training Sessions</span>
                 </Link>
 
                 <StatusBadge tone="warning" dot>
@@ -154,7 +154,7 @@ function triggerOnlinePayment(): void {
                     class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-navy-950"
                 >
                     <ArrowLeft class="size-3.5" aria-hidden="true" />
-                    <span>Back to Live Sessions</span>
+                    <span>Back to Training Sessions</span>
                 </Link>
             </div>
 

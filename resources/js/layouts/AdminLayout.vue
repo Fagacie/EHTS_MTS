@@ -82,7 +82,7 @@ const navGroups: NavGroup[] = [
     {
         label: 'Training',
         items: [
-            { label: 'Live Sessions', href: '/admin-vue/sessions', icon: CalendarDays, isInertia: true },
+            { label: 'Training Sessions', href: '/admin-vue/sessions', icon: CalendarDays, isInertia: true },
             { label: 'Modules', href: '/admin-vue/modules', icon: BookOpen, isInertia: true },
             { label: 'Module Access', href: '/admin-vue/module-entitlements', icon: KeyRound, isInertia: true },
             { label: 'Instructors', href: '/admin-vue/instructor-profiles', icon: Users, isInertia: true },

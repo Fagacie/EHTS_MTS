@@ -40,7 +40,7 @@ function initials(name: string): string {
                 <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-muted">
                     <Link :href="routes.sessions" class="inline-flex items-center gap-1 transition-colors hover:text-navy-950">
                         <ArrowLeft class="size-3.5" aria-hidden="true" />
-                        <span>Live Sessions</span>
+                        <span>Training Sessions</span>
                     </Link>
                     <span>/</span>
                     <span class="tabular-nums-mono text-navy-900">{{ session.sessionCode }}</span>

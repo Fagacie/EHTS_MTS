@@ -135,7 +135,7 @@ const navItems = computed<NavEntry[]>(() => [
         active: currentPath.value === '/portal',
     },
     {
-        label: 'Live Sessions',
+        label: 'Training Sessions',
         href: routes.value.portalBookings,
         icon: CalendarCheck,
         active: isActive('/portal/bookings'),

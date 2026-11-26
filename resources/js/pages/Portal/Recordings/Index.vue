@@ -127,11 +127,11 @@ const filterTabs: { key: MediaFilter; label: string }[] = [
                 v-if="bookingItems.length === 0"
                 :icon="Video"
                 title="No registered sessions yet"
-                description="Once you register for a live session, its recordings and downloadable resources will appear here."
+                description="Once you register for a training session, its recordings and downloadable resources will appear here."
             >
                 <template #action>
                     <AppButton :href="routes.sessions" variant="warm" size="sm" pill>
-                        Browse Live Sessions
+                        Browse Training Sessions
                     </AppButton>
                 </template>
             </EmptyState>

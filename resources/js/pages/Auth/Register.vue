@@ -43,7 +43,7 @@ function submitRegistration(): void {
 
     <AuthLayout
         heading="Create your account"
-        subheading="Register to book live sessions, access modules, and download certificates."
+        subheading="Register to book training sessions, access modules, and download certificates."
         :wide="true"
     >
         <form class="space-y-5" @submit.prevent="submitRegistration">

@@ -105,7 +105,7 @@ const hasActiveFilters = () => Boolean(q.value.trim() || category.value || avail
                     @submit.prevent="applyFilters"
                 >
                     <div class="md:col-span-5">
-                        <label for="sessions-q" class="sr-only">Search live sessions</label>
+                        <label for="sessions-q" class="sr-only">Search training sessions</label>
                         <div class="relative">
                             <Search
                                 class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
@@ -274,7 +274,7 @@ const hasActiveFilters = () => Boolean(q.value.trim() || category.value || avail
             <EmptyState
                 v-else
                 :icon="CalendarDays"
-                title="No live sessions match your filter"
+                title="No training sessions match your filter"
                 description="Try broadening your availability window, clearing keywords, or browsing self-paced modules."
             >
                 <template #action>

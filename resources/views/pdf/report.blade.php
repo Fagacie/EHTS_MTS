@@ -385,7 +385,7 @@
                                 <div class="panel-header">Revenue &amp; Refunds Ledger</div>
                                 <table class="ledger-table" cellspacing="0" cellpadding="0">
                                     <tr>
-                                        <td class="key">Live Session Bookings</td>
+                                        <td class="key">Training Session Bookings</td>
                                         <td class="val">MYR {{ number_format($report['revenue']['session_myr'], 2) }}</td>
                                     </tr>
                                     <tr>
@@ -669,7 +669,7 @@
         <!-- 5. Module Sales & Performance -->
         @if ($show('modules'))
             <p class="section-heading">Module Sales &amp; Performance</p>
-            <p class="section-sub">Ranked by confirmed live session bookings and standalone module purchases.</p>
+            <p class="section-sub">Ranked by confirmed training session bookings and standalone module purchases.</p>
 
             <table class="data-table" cellspacing="0" cellpadding="0">
                 <thead>

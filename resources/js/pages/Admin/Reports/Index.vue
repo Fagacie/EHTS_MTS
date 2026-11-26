@@ -612,7 +612,7 @@ function statusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral
                         </div>
                         <dl class="divide-y divide-line/70 text-sm">
                             <div class="flex items-center justify-between py-2.5">
-                                <dt class="text-muted">Live session bookings</dt>
+                                <dt class="text-muted">Training session bookings</dt>
                                 <dd class="tabular font-medium text-ink">{{ formatMyr(report.revenue.session_myr) }}</dd>
                             </div>
                             <div class="flex items-center justify-between py-2.5">

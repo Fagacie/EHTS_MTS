@@ -238,7 +238,7 @@ defineProps<CatalogueShowProps>();
 
                             <template v-else>
                                 <AppButton :href="routes.sessions" variant="primary" size="lg" class="w-full">
-                                    <span>View Live Sessions</span>
+                                    <span>View Training Sessions</span>
                                     <ArrowRight class="size-4" aria-hidden="true" />
                                 </AppButton>
                             </template>

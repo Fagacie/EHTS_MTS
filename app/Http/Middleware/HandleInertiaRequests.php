@@ -41,7 +41,7 @@ class HandleInertiaRequests extends Middleware
                 'displayTimezone' => (string) config('etms.display_timezone', 'Asia/Kuala_Lumpur'),
                 'currency' => (string) config('etms.currency', 'MYR'),
                 'year' => (int) now()->year,
-                'logoUrl' => asset('images/ecohydrotech-logo.svg'),
+                'logoUrl' => asset('images/ecohydrotech-logo.png'),
             ],
             'auth' => fn (): array => [
                 'user' => $this->resolveAuthUser($request),

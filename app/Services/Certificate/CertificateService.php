@@ -34,7 +34,7 @@ class CertificateService
 
     public const DEFAULT_SIGNATORY_TITLE = 'Managing Director, Ecohydrotech Solution';
 
-    public const DEFAULT_LOGO_PATH = 'images/ecohydrotech-logo.svg';
+    public const DEFAULT_LOGO_PATH = 'images/ecohydrotech-logo.png';
 
     /**
      * Retrieve global certificate configuration values from `system_settings`.
@@ -146,14 +146,24 @@ class CertificateService
         }
         if (is_file($publicFullPath)) {
             $ext = strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION));
-            if ($ext === 'svg') {
-                return 'data:image/svg+xml;base64,'.base64_encode((string) file_get_contents($publicFullPath));
+            $mime = match ($ext) {
+                'svg' => 'image/svg+xml',
+                'png' => 'image/png',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'webp' => 'image/webp',
+                default => null,
+            };
+            if ($mime !== null) {
+                return "data:{$mime};base64,".base64_encode((string) file_get_contents($publicFullPath));
             }
         }
 
-        $fallbackSvg = public_path(self::DEFAULT_LOGO_PATH);
-        if (is_file($fallbackSvg)) {
-            return 'data:image/svg+xml;base64,'.base64_encode((string) file_get_contents($fallbackSvg));
+        $fallbackLogo = public_path(self::DEFAULT_LOGO_PATH);
+        if (is_file($fallbackLogo)) {
+            $ext = strtolower(pathinfo($fallbackLogo, PATHINFO_EXTENSION));
+            $mime = $ext === 'svg' ? 'image/svg+xml' : 'image/png';
+
+            return "data:{$mime};base64,".base64_encode((string) file_get_contents($fallbackLogo));
         }
 
         return null;

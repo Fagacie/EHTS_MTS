@@ -125,25 +125,14 @@ type Tab = (typeof tabs)[number];
 const activeTab = ref<Tab>('Overview');
 const participantFilters = reactive({ ...props.participantFilters });
 
-const contentUpload = reactive({
-    title: '',
-    description: '',
-    materialType: 'pdf',
-    status: 'published',
-    isDownloadable: true,
-    file: null as File | null,
-});
 const recordingUpload = reactive({
     title: '',
     description: '',
     status: 'pending_review',
     file: null as File | null,
 });
-const contentBusy = ref(false);
-const contentError = ref('');
 const recordingBusy = ref(false);
 const recordingError = ref('');
-const contentFileKey = ref(0);
 const recordingFileKey = ref(0);
 
 function date(value: string | null): string {
@@ -163,59 +152,16 @@ function filterParticipants() {
     );
 }
 
-function onFile(event: Event, target: typeof contentUpload | typeof recordingUpload): void {
+function onFile(event: Event, target: typeof recordingUpload): void {
     target.file = (event.target as HTMLInputElement).files?.[0] ?? null;
     if (target.file) {
-        const maxBytes = target === recordingUpload ? 2097152 * 1024 : 102400 * 1024;
+        const maxBytes = 2097152 * 1024;
         if (target.file.size > maxBytes) {
             target.file = null;
-            contentError.value = target === contentUpload ? 'The document is larger than 100 MB.' : '';
-            recordingError.value = target === recordingUpload ? 'The recording is larger than 2 GB.' : '';
+            recordingError.value = 'The recording is larger than 2 GB.';
             (event.target as HTMLInputElement).value = '';
         }
     }
-}
-
-function uploadContent(): void {
-    if (!contentUpload.title.trim()) {
-        contentError.value = 'Enter a document title.';
-        return;
-    }
-    if (!contentUpload.file) {
-        contentError.value = 'Choose a teaching material file.';
-        return;
-    }
-    contentBusy.value = true;
-    contentError.value = '';
-    router.post(
-        `/admin-vue/sessions/${props.session.id}/materials`,
-        {
-            title: contentUpload.title,
-            description: contentUpload.description,
-            status: contentUpload.status,
-            is_downloadable: contentUpload.isDownloadable,
-            material_type: contentUpload.materialType,
-            file: contentUpload.file,
-        },
-        {
-            forceFormData: true,
-            preserveScroll: true,
-            onError: (errors) => {
-                contentError.value = Object.values(errors)[0] ?? 'Unable to upload the document.';
-            },
-            onFinish: () => {
-                contentBusy.value = false;
-            },
-            onSuccess: () => {
-                contentUpload.title = '';
-                contentUpload.description = '';
-                contentUpload.file = null;
-                contentUpload.materialType = 'pdf';
-                contentError.value = '';
-                contentFileKey.value++;
-            },
-        },
-    );
 }
 
 function uploadRecording(): void {
@@ -548,77 +494,7 @@ function deleteSession(): void {
         </Card>
 
         <Card v-if="activeTab === 'Session Materials & Recordings'">
-            <CardContent class="grid gap-6 p-5 lg:grid-cols-2">
-                <section class="rounded-lg border border-slate-200 p-5">
-                    <div>
-                        <h2 class="text-base font-semibold text-slate-900">Upload session teaching material</h2>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Upload manuals, slides, worksheets, or reference documents for confirmed attendees of this session.
-                        </p>
-                    </div>
-                    <div class="mt-4 grid gap-3">
-                        <label class="text-sm text-slate-700">
-                            Document title
-                            <input
-                                v-model="contentUpload.title"
-                                class="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
-                                placeholder="Document title"
-                            />
-                        </label>
-                        <label class="text-sm text-slate-700">
-                            Document type
-                            <select v-model="contentUpload.materialType" class="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm">
-                                <option value="pdf">PDF document</option>
-                                <option value="presentation">Presentation</option>
-                                <option value="document">Reference document</option>
-                                <option value="worksheet">Technical worksheet</option>
-                                <option value="image">Diagram or image</option>
-                                <option value="other">Supporting file</option>
-                            </select>
-                        </label>
-                        <label class="text-sm text-slate-700">
-                            Publication status
-                            <select v-model="contentUpload.status" class="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-sm">
-                                <option value="published">Published</option>
-                                <option value="pending_review">Pending review</option>
-                                <option value="archived">Archived</option>
-                            </select>
-                        </label>
-                        <label class="text-sm text-slate-700">
-                            File
-                            <input
-                                :key="contentFileKey"
-                                name="file"
-                                type="file"
-                                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.zip,.png,.jpg,.jpeg"
-                                class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                                @change="onFile($event, contentUpload)"
-                            />
-                        </label>
-                        <label class="text-sm text-slate-700">
-                            Description
-                            <textarea
-                                v-model="contentUpload.description"
-                                class="mt-1 min-h-20 w-full rounded-md border border-slate-300 p-3 text-sm"
-                                placeholder="Optional document description"
-                            />
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-slate-700">
-                            <input v-model="contentUpload.isDownloadable" type="checkbox" />
-                            Downloadable by confirmed session attendees
-                        </label>
-                        <p v-if="contentError" class="text-sm text-red-700">{{ contentError }}</p>
-                        <button
-                            type="button"
-                            :disabled="contentBusy || !contentUpload.file || !contentUpload.title.trim()"
-                            class="h-10 rounded-md bg-[#0F4C81] px-4 text-sm font-medium text-white disabled:opacity-50"
-                            @click="uploadContent"
-                        >
-                            {{ contentBusy ? 'Uploading…' : 'Upload document' }}
-                        </button>
-                    </div>
-                </section>
-
+            <CardContent class="grid gap-6 p-5">
                 <section class="rounded-lg border border-slate-200 p-5">
                     <div>
                         <h2 class="text-base font-semibold text-slate-900">Upload session recording</h2>
@@ -666,8 +542,11 @@ function deleteSession(): void {
                     </div>
                 </section>
 
-                <section class="lg:col-span-2">
-                    <h3 class="text-sm font-semibold text-slate-900">Session teaching materials ({{ materials.length }})</h3>
+                <section>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-slate-900">Session teaching materials ({{ materials.length }})</h3>
+                        <p class="text-xs text-slate-500">Uploaded by assigned instructors for administrator review and publication.</p>
+                    </div>
                     <div v-if="materials.length" class="mt-3 divide-y rounded-lg border border-slate-200">
                         <div
                             v-for="material in materials"

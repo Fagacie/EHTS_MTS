@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
-import { cn } from '@/lib/utils';
 import type { PaginationMeta } from '@/types/etms';
 
 defineProps<{
@@ -14,15 +13,15 @@ defineProps<{
     <nav
         v-if="pagination.lastPage > 1"
         aria-label="Pagination"
-        class="mt-10 flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between"
+        class="mt-10 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between"
     >
-        <p class="text-[13.5px] text-muted-foreground tabular-nums">
+        <p class="tabular text-sm text-muted">
             Showing
-            <span class="font-bold text-foreground">{{ pagination.from ?? 0 }}</span>
+            <span class="font-semibold text-navy-950">{{ pagination.from ?? 0 }}</span>
             to
-            <span class="font-bold text-foreground">{{ pagination.to ?? 0 }}</span>
+            <span class="font-semibold text-navy-950">{{ pagination.to ?? 0 }}</span>
             of
-            <span class="font-bold text-foreground">{{ pagination.total }}</span>
+            <span class="font-semibold text-navy-950">{{ pagination.total }}</span>
             {{ itemLabel ?? 'results' }}
         </p>
 
@@ -31,23 +30,23 @@ defineProps<{
                 v-if="pagination.prevPageUrl"
                 :href="pagination.prevPageUrl"
                 preserve-scroll
-                class="inline-flex h-9 items-center gap-1 rounded-lg border border-border bg-card px-3 text-[13px] font-semibold text-foreground transition-colors duration-150 hover:border-ring/50 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-white px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:border-line-strong hover:bg-sand-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
             >
-                <ChevronLeft class="h-4 w-4" aria-hidden="true" />
+                <ChevronLeft class="size-4" aria-hidden="true" />
                 <span>Previous</span>
             </Link>
             <span
                 v-else
-                class="inline-flex h-9 items-center gap-1 rounded-lg border border-border bg-card px-3 text-[13px] text-muted-foreground/60"
+                class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-sand-50 px-3 text-xs font-medium text-muted/60"
             >
-                <ChevronLeft class="h-4 w-4" aria-hidden="true" />
+                <ChevronLeft class="size-4" aria-hidden="true" />
                 <span>Previous</span>
             </span>
 
             <template v-for="(link, index) in pagination.links" :key="`${index}-${link.label}`">
                 <span
                     v-if="!link.url"
-                    class="inline-flex h-9 min-w-9 items-center justify-center px-2 text-[13px] text-muted-foreground"
+                    class="inline-flex h-9 min-w-9 items-center justify-center px-2 text-xs text-muted"
                 >
                     {{ link.label }}
                 </span>
@@ -56,13 +55,11 @@ defineProps<{
                     :href="link.url"
                     preserve-scroll
                     :aria-current="link.active ? 'page' : undefined"
+                    class="tabular inline-flex h-9 min-w-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
                     :class="
-                        cn(
-                            'inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-3 text-[13px] font-semibold tabular-nums transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35',
-                            link.active
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-card text-foreground hover:border-ring/50 hover:bg-secondary/60',
-                        )
+                        link.active
+                            ? 'border-navy-950 bg-navy-950 text-white'
+                            : 'border-line bg-white text-ink hover:border-line-strong hover:bg-sand-50'
                     "
                 >
                     {{ link.label }}
@@ -73,17 +70,17 @@ defineProps<{
                 v-if="pagination.nextPageUrl"
                 :href="pagination.nextPageUrl"
                 preserve-scroll
-                class="inline-flex h-9 items-center gap-1 rounded-lg border border-border bg-card px-3 text-[13px] font-semibold text-foreground transition-colors duration-150 hover:border-ring/50 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-white px-3 text-xs font-semibold text-ink transition-colors duration-150 hover:border-line-strong hover:bg-sand-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
             >
                 <span>Next</span>
-                <ChevronRight class="h-4 w-4" aria-hidden="true" />
+                <ChevronRight class="size-4" aria-hidden="true" />
             </Link>
             <span
                 v-else
-                class="inline-flex h-9 items-center gap-1 rounded-lg border border-border bg-card px-3 text-[13px] text-muted-foreground/60"
+                class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-sand-50 px-3 text-xs font-medium text-muted/60"
             >
                 <span>Next</span>
-                <ChevronRight class="h-4 w-4" aria-hidden="true" />
+                <ChevronRight class="size-4" aria-hidden="true" />
             </span>
         </div>
     </nav>

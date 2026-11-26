@@ -8,7 +8,7 @@
     @vite(['resources/css/app.css', 'resources/js/inertia.ts'])
     @inertiaHead
 </head>
-<body class="min-h-screen bg-white font-classic text-[#272d38]">
+<body class="min-h-screen bg-white font-sans text-ink antialiased">
     @inertia
 </body>
 </html>

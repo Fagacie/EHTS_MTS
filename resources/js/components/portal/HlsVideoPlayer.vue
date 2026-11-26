@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="space-y-3">
-        <div class="relative aspect-video w-full overflow-hidden rounded-xl border border-[#E5E1EB] bg-[#F1EEF5]">
+        <div class="relative aspect-video w-full overflow-hidden bg-navy-950">
             <video
                 ref="videoRef"
                 controls
@@ -118,21 +118,24 @@ onBeforeUnmount(() => {
                 data-etms-hls-player
                 :data-src="src"
                 class="h-full w-full"
-                @loadeddata="isLoading=false"
-                @canplay="isLoading=false"
-                @waiting="isLoading=true"
-                @playing="isLoading=false"
-                @error="isLoading=false"
+                @loadeddata="isLoading = false"
+                @canplay="isLoading = false"
+                @waiting="isLoading = true"
+                @playing="isLoading = false"
+                @error="isLoading = false"
             >
                 Your browser does not support HTML5 video playback.
             </video>
             <div
                 v-if="isLoading && !playbackError"
-                class="pointer-events-none absolute inset-0 grid place-items-center bg-[#F1EEF5]/85"
+                class="pointer-events-none absolute inset-0 grid place-items-center bg-navy-950/85"
             >
                 <div class="text-center">
-                    <div class="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-[#D8D2E3] border-t-[#5942B5]" aria-hidden="true" />
-                    <p class="mt-2 text-[12.5px] font-semibold text-[#625D6D]">Loading video lesson...</p>
+                    <div
+                        class="mx-auto size-7 animate-spin rounded-full border-2 border-white/20 border-t-accent-600"
+                        aria-hidden="true"
+                    />
+                    <p class="mt-2.5 text-xs font-medium text-white/75">Loading video lesson...</p>
                 </div>
             </div>
         </div>
@@ -140,9 +143,9 @@ onBeforeUnmount(() => {
         <div
             v-if="playbackError"
             role="alert"
-            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#ECC4CA] bg-[#FBECEE] px-4 py-3"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-danger-50 px-4 py-3 ring-1 ring-inset ring-danger-600/20"
         >
-            <p class="text-[13.5px] font-medium text-[#A33C48]">
+            <p class="text-sm font-medium text-danger-700">
                 {{ playbackError }}
             </p>
             <Button type="button" variant="outline" size="sm" @click="initPlayer">

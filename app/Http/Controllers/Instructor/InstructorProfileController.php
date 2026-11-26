@@ -22,7 +22,8 @@ class InstructorProfileController extends Controller
             [
                 'display_name' => $user->name,
                 'photo_storage_disk' => 'public',
-                'is_public' => false,
+                'is_public' => true,
+                'published_at' => now(),
             ],
         );
 

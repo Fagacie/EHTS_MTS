@@ -271,15 +271,9 @@ class LearningPortalController extends Controller
             if (! $session) {
                 $denialReason = 'Training session is no longer available.';
             } elseif ($session->recording_access_policy !== RecordingAccessPolicy::AttendeesOnly) {
-                $denialReason = 'Post-session recording access is disabled for this training session (recording_access_policy = none).';
+                $denialReason = 'Recording access is not enabled for this training session.';
             } elseif ($booking->status !== BookingStatus::Confirmed) {
                 $denialReason = "Booking status is {$booking->status->label()} (requires Confirmed booking).";
-            } elseif (! $attendance) {
-                $denialReason = 'Attendance has not been recorded yet.';
-            } elseif ($attendance->attendance_status !== AttendanceStatus::Present) {
-                $denialReason = "Attendance status is {$attendance->attendance_status->label()} — session recordings are restricted to participants marked Present (D-017).";
-            } elseif ($attendance->review_status !== AttendanceReviewStatus::Verified) {
-                $denialReason = "Attendance review status is {$attendance->review_status->label()} — administrator verification is required before recording playback unlocks (D-017).";
             } else {
                 $isEligible = true;
             }

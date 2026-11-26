@@ -84,7 +84,7 @@ class PublicCatalogueController extends Controller
                 'classroomPhotoWebpUrl' => file_exists(public_path('images/home/classroom-session.webp'))
                     ? asset('images/home/classroom-session.webp')
                     : null,
-                'logoSvgUrl' => asset('images/ecohydrotech-logo.svg'),
+                'logoSvgUrl' => asset('images/ecohydrotech-logo.png'),
             ],
         ]);
     }

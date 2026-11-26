@@ -75,21 +75,10 @@ class SessionRecordingPolicy
             return false;
         }
 
-        $hasConfirmedBooking = Booking::query()
+        return Booking::query()
             ->where('user_id', $user->id)
             ->where('training_session_id', $session->id)
             ->where('status', BookingStatus::Confirmed->value)
-            ->exists();
-
-        if (! $hasConfirmedBooking) {
-            return false;
-        }
-
-        return Attendance::query()
-            ->where('user_id', $user->id)
-            ->where('training_session_id', $session->id)
-            ->where('attendance_status', AttendanceStatus::Present->value)
-            ->where('review_status', AttendanceReviewStatus::Verified->value)
             ->exists();
     }
 }

@@ -207,15 +207,22 @@ class PortalPresenter
 
         $instructors = $session
             ? $session->instructors->map(static function ($instructor): array {
-                $name = $instructor->instructorProfile?->resolvedDisplayName() ?: $instructor->name;
+                $profile = $instructor->instructorProfile;
+                $name = $profile?->resolvedDisplayName() ?: $instructor->name;
                 $initials = collect(preg_split('/\s+/', trim((string) $name)) ?: [])
                     ->filter()
                     ->take(2)
                     ->map(static fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)))
                     ->implode('');
+                $canLinkProfile = $profile && $profile->is_public && $instructor->isActive();
+
                 return [
                     'name' => $name,
-                    'title' => $instructor->instructorProfile?->professional_title,
+                    'title' => $profile?->professional_title,
+                    'qualifications' => $profile?->qualifications,
+                    'roleLabel' => $instructor->pivot?->role_label ?: 'Instructor',
+                    'photoUrl' => $profile?->photoUrl() ?: $instructor->photoUrl(),
+                    'profileUrl' => $canLinkProfile ? route('instructors.show', $profile) : null,
                     'initials' => $initials ?: 'IN',
                 ];
             })->values()->all()
@@ -492,6 +499,7 @@ class PortalPresenter
                 'title' => $module->title,
                 'slug' => $module->slug,
                 'categoryName' => $module->category?->name,
+                'coverImageUrl' => $module->coverImageUrl(),
                 'summary' => $summary !== '' ? $summary : null,
                 'materialsCount' => $module->publishedMaterials->count(),
                 'videosCount' => $module->publishedVideos->count(),
@@ -800,6 +808,7 @@ class PortalPresenter
                 'title' => $module->title,
                 'slug' => $module->slug,
                 'categoryName' => $module->category?->name,
+                'coverImageUrl' => $module->coverImageUrl(),
                 'description' => trim(strip_tags((string) $module->description)),
                 'learningObjectives' => $objectives,
             ],

@@ -217,7 +217,13 @@ class AdminOperationsController extends Controller
             return;
         }
 
-        $profile = $user->instructorProfile()->updateOrCreate(
+        $isPublic = array_key_exists('instructor_is_public', $data)
+            ? (bool) $data['instructor_is_public']
+            : true;
+
+        $existingProfile = $user->instructorProfile;
+
+        $user->instructorProfile()->updateOrCreate(
             ['user_id' => $user->id],
             [
                 'display_name' => $data['name'],
@@ -226,8 +232,8 @@ class AdminOperationsController extends Controller
                 'short_bio' => $data['instructor_short_bio'] ?? null,
                 'biography' => $data['instructor_biography'] ?? null,
                 'specialisations' => $data['instructor_specialisations'] ?? [],
-                'is_public' => (bool) ($data['instructor_is_public'] ?? false),
-                'published_at' => ($data['instructor_is_public'] ?? false) ? now() : null,
+                'is_public' => $isPublic,
+                'published_at' => $isPublic ? ($existingProfile?->published_at ?? now()) : null,
                 'updated_by' => request()->user()?->id,
             ],
         );

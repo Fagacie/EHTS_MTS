@@ -130,6 +130,7 @@ export interface UpcomingSessionItem {
     statusLabel: string;
     statusValue: string;
     priceLabel: string;
+    coverImageUrl?: string | null;
     moduleCode: string | null;
     moduleTitle?: string | null;
     moduleSlug?: string | null;
@@ -519,6 +520,10 @@ export interface PortalBookingsIndexProps extends EtmsSharedProps {
 export interface PortalBookingDetailInstructor {
     name: string;
     title: string | null;
+    qualifications?: string | null;
+    roleLabel?: string | null;
+    photoUrl?: string | null;
+    profileUrl?: string | null;
     initials: string;
 }
 
@@ -745,6 +750,7 @@ export interface PortalModuleEntitlementItem {
         title: string;
         slug: string;
         categoryName: string | null;
+        coverImageUrl?: string | null;
         summary: string | null;
         materialsCount: number;
         videosCount: number;
@@ -972,6 +978,7 @@ export interface PortalModuleWorkspaceProps extends EtmsSharedProps {
         title: string;
         slug: string;
         categoryName: string | null;
+        coverImageUrl?: string | null;
         description: string;
         learningObjectives: string[];
     };

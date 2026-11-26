@@ -1,7 +1,4 @@
-@import "@fontsource/plus-jakarta-sans/latin-400.css";
-@import "@fontsource/plus-jakarta-sans/latin-500.css";
-@import "@fontsource/plus-jakarta-sans/latin-600.css";
-@import "@fontsource/plus-jakarta-sans/latin-700.css";
+@import "@fontsource-variable/inter";
 @import "@fontsource/jetbrains-mono/latin-400.css";
 @import "@fontsource/jetbrains-mono/latin-500.css";
 @import "@fontsource/jetbrains-mono/latin-600.css";
@@ -13,116 +10,85 @@
 @source "../views/**/*.blade.php";
 @source "../js/**/*.{vue,ts,js}";
 
-@keyframes public-enter {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.public-enter {
-  animation: public-enter 500ms ease-out both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .public-enter {
-    animation: none;
-  }
-}
-
-:root {
-  --background: #FFFFFF;
-  --foreground: #272d38;
-  --card: #FFFFFF;
-  --card-foreground: #272d38;
-  --popover: #FFFFFF;
-  --popover-foreground: #272d38;
-  --primary: #272d38;
-  --primary-hover: rgba(39, 45, 56, 0.9);
-  --primary-foreground: #FFFFFF;
-  --secondary: rgba(39, 45, 56, 0.05);
-  --secondary-foreground: #272d38;
-  --muted: rgba(39, 45, 56, 0.04);
-  --muted-foreground: rgba(39, 45, 56, 0.65);
-  --accent: rgba(39, 45, 56, 0.06);
-  --accent-foreground: #272d38;
-  --destructive: #272d38;
-  --destructive-foreground: #FFFFFF;
-  --border: rgba(39, 45, 56, 0.12);
-  --input: rgba(39, 45, 56, 0.18);
-  --ring: #272d38;
-  --radius: 0.75rem;
-  --card-shadow: 0 1px 2px rgba(39, 45, 56, 0.04);
-  --table-header-bg: rgba(39, 45, 56, 0.03);
-  --table-row-hover: rgba(39, 45, 56, 0.025);
-  --table-border: rgba(39, 45, 56, 0.08);
-  --tab-active-bg: #FFFFFF;
-  --tab-active-fg: #272d38;
-}
-
-.portal-violet {
-  --background: #F7F6FA;
-  --foreground: #292536;
-  --card: #FFFFFF;
-  --card-foreground: #292536;
-  --popover: #FFFFFF;
-  --popover-foreground: #292536;
-  --primary: #7057D9;
-  --primary-hover: #5942B5;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F1EDFB;
-  --secondary-foreground: #5942B5;
-  --muted: #F3F1F7;
-  --muted-foreground: #625D6D;
-  --accent: #EAE5F8;
-  --accent-foreground: #5942B5;
-  --destructive: #A33C48;
-  --destructive-foreground: #FFFFFF;
-  --border: #E5E1EB;
-  --input: #E5E1EB;
-  --ring: #7057D9;
-  --radius: 0.75rem;
-  --card-shadow: 0 5px 20px rgba(40, 35, 56, 0.045);
-  --table-header-bg: #FAF9FC;
-  --table-row-hover: #FCFBFE;
-  --table-border: #EEEAF2;
-  --tab-active-bg: #7057D9;
-  --tab-active-fg: #FFFFFF;
-  font-family: var(--font-sans);
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.75rem;
-}
-
 @theme {
-  /* Typography */
-  --font-classic: "Times New Roman", Times, Georgia, serif;
-  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: "Libre Baskerville", Georgia, Cambria, serif;
+  /* Brand anchor — Deep Navy */
+  --color-navy-950: #0d1829;
+  --color-navy-900: #14243a;
+  --color-navy-800: #1e3554;
+  --color-navy-700: #2b476e;
 
-  /* Public, Auth & Instructor Brand Palette (preserved untouched for shared non-portal pages) */
+  /* Primary interactive blue */
+  --color-primary-50: #eef4fe;
+  --color-primary-100: #dbe8fd;
+  --color-primary-200: #bfd6fb;
+  --color-primary-600: #2e5fd0;
+  --color-primary-700: #234bb0;
+
+  /* Secondary teal accent (eyebrows, highlights) */
+  --color-accent-50: #e7f7f6;
+  --color-accent-100: #cceeed;
+  --color-accent-600: #159b9a;
+  --color-accent-700: #107d7c;
+
+  /* Warm terracotta / editorial accent (public CTAs, highlights) */
+  --color-coral-50: #fef3ee;
+  --color-coral-100: #fde3d7;
+  --color-coral-500: #e86a33;
+  --color-coral-600: #d55722;
+  --color-coral-700: #b84617;
+
+  /* Warm editorial stone backgrounds (Portals & Auth) */
+  --color-sand-50: #faf9f6;
+  --color-sand-100: #f3f1ec;
+
+  /* Operational warm amber (KPI highlight cards, badges) */
+  --color-warm-50: #fef9f2;
+  --color-warm-100: #fdf1e1;
+  --color-warm-400: #f5b978;
+  --color-warm-500: #f2a65a;
+  --color-warm-600: #d98736;
+
+  /* Neutral surfaces & text */
+  --color-canvas: #f6f8fb;
+  --color-canvas-warm: #f7f6f2;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f4f9;
+  --color-ink: #152033;
+  --color-muted: #5f6e82;
+  --color-line: #e3e8f0;
+  --color-line-strong: #cdd6e3;
+
+  /* Semantic status colours (never replaced by decorative colours) */
+  --color-success-50: #e9f7f1;
+  --color-success-600: #158058;
+  --color-success-700: #106646;
+  --color-warning-50: #fef5e6;
+  --color-warning-600: #b47112;
+  --color-warning-700: #90590d;
+  --color-danger-50: #fdeeee;
+  --color-danger-600: #c43e3e;
+  --color-danger-700: #a12f2f;
+
+  /* Typography */
+  --font-sans: 'Inter Variable', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Tiered border-radius scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+
+  /* Layered soft elevation shadows (no harsh black drop shadows) */
+  --shadow-card: 0 1px 2px rgba(13, 24, 41, 0.04), 0 4px 12px -4px rgba(13, 24, 41, 0.05);
+  --shadow-card-hover: 0 4px 10px -2px rgba(13, 24, 41, 0.08), 0 12px 24px -8px rgba(13, 24, 41, 0.09);
+  --shadow-elevated: 0 8px 24px -6px rgba(13, 24, 41, 0.1), 0 2px 6px -2px rgba(13, 24, 41, 0.05);
+  --shadow-floating: 0 18px 40px -12px rgba(13, 24, 41, 0.18), 0 4px 12px -4px rgba(13, 24, 41, 0.08);
+  --shadow-popover: 0 12px 28px -6px rgba(13, 24, 41, 0.14), 0 4px 10px -4px rgba(13, 24, 41, 0.06);
+
+  /* Legacy tokens preserved for un-redesigned Auth/Portal/Instructor/Admin shells */
   --color-eht-navy-50: #F0F7FF;
   --color-eht-navy-100: #E0EEFF;
   --color-eht-navy-200: #B9D8FE;
@@ -150,29 +116,23 @@
   --color-status-success-bg: #ECFDF5;
   --color-status-success-text: #065F46;
   --color-status-success-border: #A7F3D0;
-
   --color-status-warning-bg: #FFFBEB;
   --color-status-warning-text: #92400E;
   --color-status-warning-border: #FDE68A;
-
   --color-status-danger-bg: #FFF1F2;
   --color-status-danger-text: #9F1239;
   --color-status-danger-border: #FECDD3;
-
   --color-status-info-bg: #F0F9FF;
   --color-status-info-text: #075985;
   --color-status-info-border: #BAE6FD;
-
   --color-status-neutral-bg: #F1F5F9;
   --color-status-neutral-text: #334155;
   --color-status-neutral-border: #CBD5E1;
 
-  /* Trainee Portal Tokens — Aligned with ETMS Filament Admin (#0F4C81 Primary + Neutral Surfaces) */
   --color-portal-primary: #0F4C81;
   --color-portal-primary-hover: #0C3D68;
   --color-portal-primary-soft: #EFF5FA;
   --color-portal-primary-border: #C8DCEB;
-
   --color-portal-bg: #F9FAFB;
   --color-portal-surface: #FFFFFF;
   --color-portal-surface-muted: #F3F4F6;
@@ -181,6 +141,95 @@
   --color-portal-muted: #6B7280;
 }
 
+/* Legacy shadcn CSS vars preserved for un-redesigned shells */
+:root {
+  --background: #ffffff;
+  --foreground: #152033;
+  --card: #ffffff;
+  --card-foreground: #152033;
+  --popover: #ffffff;
+  --popover-foreground: #152033;
+  --primary: #14243a;
+  --primary-hover: #0d1829;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f1ec;
+  --secondary-foreground: #152033;
+  --muted: #f1f4f9;
+  --muted-foreground: #5f6e82;
+  --accent: #e7f7f6;
+  --accent-foreground: #107d7c;
+  --destructive: #c43e3e;
+  --destructive-foreground: #ffffff;
+  --border: #e3e8f0;
+  --input: #cdd6e3;
+  --ring: #2e5fd0;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* Editorial Typography Utility Classes */
+@layer utilities {
+  .type-display {
+    font-size: clamp(2.125rem, 4.2vw, 3.5rem);
+    line-height: 1.08;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .type-page-title {
+    font-size: clamp(1.5rem, 2.2vw, 1.875rem);
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-navy-900);
+  }
+
+  .type-section-title {
+    font-size: clamp(1.125rem, 1.6vw, 1.375rem);
+    line-height: 1.28;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .type-eyebrow {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-accent-600);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular-nums-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Legacy portal utility classes preserved for un-redesigned shells */
 @layer components {
   .portal-shell {
     background-color: var(--color-portal-bg);
@@ -204,7 +253,7 @@
     width: 100%;
     min-height: 2.625rem;
     border-radius: 0.5rem;
-    border: 1px solid #D1D5DB;
+    border: 1px solid #d1d5db;
     background-color: var(--color-portal-surface);
     padding: 0.5625rem 0.875rem;
     font-size: 0.9375rem;
@@ -217,25 +266,12 @@
     min-height: 5.5rem;
   }
 
-  .portal-input::placeholder,
-  .portal-textarea::placeholder {
-    color: #9CA3AF;
-  }
-
   .portal-input:focus,
   .portal-select:focus,
   .portal-textarea:focus {
     outline: none;
-    border-color: var(--color-portal-primary);
-    box-shadow: 0 0 0 2px rgb(15 76 129 / 0.16);
-  }
-
-  .portal-input:disabled,
-  .portal-select:disabled,
-  .portal-textarea:disabled {
-    background-color: var(--color-portal-surface-muted);
-    color: var(--color-portal-muted);
-    cursor: not-allowed;
+    border-color: var(--color-primary-600);
+    box-shadow: 0 0 0 2px rgb(46 95 208 / 0.16);
   }
 
   .portal-table-wrap {
@@ -252,8 +288,8 @@
   }
 
   .portal-table thead tr {
-    background-color: var(--color-portal-bg);
-    border-bottom: 1px solid var(--color-portal-border);
+    background-color: var(--color-sand-50);
+    border-bottom: 1px solid var(--color-line);
   }
 
   .portal-table thead th {
@@ -261,12 +297,12 @@
     font-size: 0.8125rem;
     line-height: 1.125rem;
     font-weight: 600;
-    color: #374151;
+    color: var(--color-muted);
     white-space: nowrap;
   }
 
   .portal-table tbody tr {
-    border-bottom: 1px solid var(--color-portal-border);
+    border-bottom: 1px solid var(--color-line);
   }
 
   .portal-table tbody tr:last-child {
@@ -275,53 +311,8 @@
 
   .portal-table tbody td {
     padding: 0.9375rem 1rem;
-    color: var(--color-portal-text);
+    color: var(--color-ink);
     vertical-align: middle;
-  }
-
-  .portal-table tbody tr:hover td {
-    background-color: #F9FAFB;
-  }
-
-  @media (min-width: 1024px) {
-    #portal-sidebar[data-collapsed="true"] {
-      width: 4.5rem;
-    }
-
-    #portal-sidebar[data-collapsed="true"] .portal-sidebar-text,
-    #portal-sidebar[data-collapsed="true"] .portal-logo-text,
-    #portal-sidebar[data-collapsed="true"] .portal-sidebar-badge {
-      display: none;
-    }
-
-    #portal-sidebar[data-collapsed="true"] .portal-sidebar-header {
-      justify-content: center;
-      padding-left: 0;
-      padding-right: 0;
-    }
-
-    #portal-sidebar[data-collapsed="true"] .portal-sidebar-nav,
-    #portal-sidebar[data-collapsed="true"] .portal-sidebar-footer {
-      padding-left: 0.75rem;
-      padding-right: 0.75rem;
-    }
-
-    #portal-sidebar[data-collapsed="true"] .portal-nav-item {
-      width: 2.625rem;
-      height: 2.625rem;
-      margin-left: auto;
-      margin-right: auto;
-      justify-content: center;
-      padding-left: 0;
-      padding-right: 0;
-    }
-  }
-}
-
-@layer utilities {
-  .tabular-nums-mono {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -329,17 +320,44 @@
   *,
   ::before,
   ::after {
-    border-color: var(--border);
+    border-color: var(--color-line);
   }
 
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 5rem;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+}
+
+/* Branded A4 Reports Studio Print Support */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  .a4-report-sheet {
+    background: #ffffff !important;
+    color: #0d1829 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+
+  .a4-report-sheet thead {
+    display: table-header-group;
+  }
+
+  .a4-report-sheet tr {
+    break-inside: avoid;
   }
 }
 

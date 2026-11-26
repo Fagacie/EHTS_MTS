@@ -599,6 +599,28 @@ class AdminTrainingSessionController extends Controller
                 'assigned_by' => $actorId,
                 'assigned_at' => now(),
             ]);
+
+            $instructor = User::query()->find($assignment['instructor_id']);
+            if ($instructor) {
+                $profile = \App\Models\InstructorProfile::query()->firstOrCreate(
+                    ['user_id' => $instructor->id],
+                    [
+                        'display_name' => $instructor->name,
+                        'photo_storage_disk' => 'public',
+                        'is_public' => true,
+                        'published_at' => now(),
+                        'updated_by' => $actorId,
+                    ],
+                );
+
+                if (! $profile->is_public && $profile->published_at === null) {
+                    $profile->update([
+                        'is_public' => true,
+                        'published_at' => now(),
+                        'updated_by' => $actorId,
+                    ]);
+                }
+            }
         }
     }
     public function index(Request $request): Response

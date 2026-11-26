@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+import AppButton from '@/components/ds/AppButton.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import type { AuthForgotPasswordProps } from '@/types/etms';
 
@@ -23,14 +20,14 @@ function submitLinkRequest(): void {
 
     <AuthLayout
         heading="Reset your password"
-        subheading="Enter your registered email address to receive a password reset link."
+        subheading="Enter your email address and we'll send you a reset link."
     >
         <form class="space-y-4" @submit.prevent="submitLinkRequest">
             <div>
-                <Label for="email" class="mb-1.5">
-                    Email address <span aria-hidden="true">*</span>
-                </Label>
-                <Input
+                <label for="email" class="mb-1.5 block text-sm font-medium text-navy-950">
+                    Email address
+                </label>
+                <input
                     id="email"
                     v-model="form.email"
                     name="email"
@@ -38,31 +35,37 @@ function submitLinkRequest(): void {
                     required
                     autofocus
                     autocomplete="email"
+                    placeholder="name@company.com"
                     :aria-invalid="form.errors.email ? 'true' : undefined"
+                    class="h-11 w-full rounded-xl border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/70 transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                    :class="form.errors.email ? 'border-danger-600 focus:border-danger-600 focus:ring-danger-600/15' : ''"
                 />
-                <p
-                    v-if="form.errors.email"
-                    class="mt-1.5 text-[14px] font-semibold text-[#272d38]"
-                >
+                <p v-if="form.errors.email" class="mt-1.5 text-xs font-semibold text-danger-600">
                     {{ form.errors.email }}
                 </p>
             </div>
 
-            <Button type="submit" size="lg" class="w-full" :disabled="form.processing">
-                {{ form.processing ? 'Sending...' : 'Email Password Reset Link' }}
-            </Button>
+            <div class="pt-1">
+                <AppButton
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    class="w-full"
+                    :loading="form.processing"
+                >
+                    {{ form.processing ? 'Sending...' : 'Send reset link' }}
+                </AppButton>
+            </div>
         </form>
 
-        <Separator />
-
-        <p class="text-center text-[14px] text-[#272d38]/65">
+        <div class="border-t border-line pt-5 text-center text-sm text-muted">
             Remembered your password?
             <Link
                 :href="loginUrl"
-                class="ml-1 font-semibold text-[#272d38] hover:underline underline-offset-4"
+                class="ml-1 font-semibold text-primary-600 transition-colors hover:text-primary-700"
             >
                 Back to sign in
             </Link>
-        </p>
+        </div>
     </AuthLayout>
 </template>

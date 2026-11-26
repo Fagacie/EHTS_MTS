@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { AlertCircle } from 'lucide-vue-next';
+import AvatarUpload from '@/components/ds/AvatarUpload.vue';
 import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,12 +41,6 @@ const form = useForm({
 });
 
 const photo = ref<File | null>(null);
-const photoPreview = ref<string | null>(props.user.photoUrl);
-
-function handlePhoto(event: Event): void {
-    photo.value = (event.target as HTMLInputElement).files?.[0] ?? null;
-    photoPreview.value = photo.value ? URL.createObjectURL(photo.value) : props.user.photoUrl;
-}
 
 
 function submitProfile(): void {
@@ -138,13 +133,14 @@ function submitProfile(): void {
                             </CardHeader>
                             <CardContent class="pt-4">
                                 <div class="grid gap-4 sm:grid-cols-2">
-                                    <div class="sm:col-span-2 flex items-center gap-4">
-                                        <img v-if="photoPreview" :src="photoPreview" alt="Profile photo" class="h-20 w-20 rounded-full object-cover border border-[#E5E1EB]"/>
-                                        <span v-else class="grid h-20 w-20 place-items-center rounded-full bg-[#F1EDFB] text-xl font-bold text-[#5942B5]">{{props.user.name.slice(0,1).toUpperCase()}}</span>
-                                        <div>
-                                            <Label for="profile-photo" class="mb-1.5">Profile photo</Label>
-                                            <input id="profile-photo" name="photo" type="file" accept="image/*" class="block max-w-xs text-[13px]" @change="handlePhoto"/>
-                                        </div>
+                                    <div class="sm:col-span-2">
+                                        <AvatarUpload
+                                            id="profile-photo"
+                                            v-model="photo"
+                                            :initial-url="props.user.photoUrl"
+                                            label="Profile photo"
+                                            hint="Optional · JPG, PNG, or WebP up to 5 MB"
+                                        />
                                     </div>
                                     <div class="sm:col-span-2">
                                         <Label for="profile-name" class="mb-1.5">

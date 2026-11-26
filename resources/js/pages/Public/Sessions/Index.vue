@@ -1,259 +1,295 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Search, X } from 'lucide-vue-next';
+import { CalendarDays, LayoutGrid, List, MapPin, RotateCcw, Search } from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import DataTable, { type DataTableColumn } from '@/components/ds/DataTable.vue';
+import EmptyState from '@/components/ds/EmptyState.vue';
+import StatusBadge, { type StatusTone } from '@/components/ds/StatusBadge.vue';
 import PublicPagination from '@/components/public/PublicPagination.vue';
-import SessionsDataTable from '@/components/public/SessionsDataTable.vue';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useRoutes } from '@/composables/useRoutes';
+import SessionCard from '@/components/public/SessionCard.vue';
 import PublicLayout from '@/layouts/PublicLayout.vue';
-import { cn, pluralize } from '@/lib/utils';
-import type { SessionsIndexProps } from '@/types/etms';
+import type { SessionsIndexProps, UpcomingSessionItem } from '@/types/etms';
 
 const props = defineProps<SessionsIndexProps>();
 
-const { routes } = useRoutes();
-
-const search = ref(props.filters.q ?? '');
-const availability = ref(props.filters.availability ?? 'all');
-const isFiltering = ref(false);
-
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-let syncingFromProps = false;
+const q = ref(props.filters.q);
+const category = ref(props.filters.category);
+const availability = ref(props.filters.availability || 'all');
+const viewMode = ref<'cards' | 'table'>('cards');
 
 watch(
     () => props.filters,
     (next) => {
-        syncingFromProps = true;
-        search.value = next.q ?? '';
-        availability.value = next.availability ?? 'all';
-        syncingFromProps = false;
+        q.value = next.q;
+        category.value = next.category;
+        availability.value = next.availability || 'all';
     },
-    { deep: true },
 );
 
 const availabilityTabs = [
-    { value: 'all', label: 'All' },
-    { value: 'this_month', label: 'This Month' },
-    { value: 'open_seats', label: 'Open Seats' },
-] as const;
+    { value: 'all', label: 'All upcoming' },
+    { value: 'open_seats', label: 'Open seats' },
+    { value: 'this_month', label: 'This month' },
+];
 
-const hasActiveFilters = computed(
-    () => search.value.trim() !== '' || availability.value !== 'all',
-);
+const tableColumns: DataTableColumn[] = [
+    { key: 'schedule', label: 'Date & Time', tabular: true },
+    { key: 'title', label: 'Session' },
+    { key: 'venue', label: 'Venue' },
+    { key: 'seats', label: 'Seats', tabular: true },
+    { key: 'priceLabel', label: 'Fee', align: 'right', tabular: true },
+];
 
-function visitSessions(): void {
-    const query: Record<string, string> = {};
+type SessionRow = UpcomingSessionItem & Record<string, unknown>;
+const sessionRows = computed<SessionRow[]>(() => props.sessions as SessionRow[]);
 
-    if (search.value.trim() !== '') {
-        query.q = search.value.trim();
-    }
+function applyFilters(): void {
+    const params: Record<string, string> = {};
+    if (q.value.trim()) params.q = q.value.trim();
+    if (category.value) params.category = category.value;
+    if (availability.value && availability.value !== 'all') params.availability = availability.value;
 
-    if (availability.value !== 'all') {
-        query.availability = availability.value;
-    }
-
-    router.get(routes.value.sessions, query, {
+    router.get(props.routes.sessions, params, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
-        onStart: () => {
-            isFiltering.value = true;
-        },
-        onFinish: () => {
-            isFiltering.value = false;
-        },
     });
 }
 
-watch(search, () => {
-    if (syncingFromProps) {
-        return;
-    }
-
-    if (searchTimer) {
-        clearTimeout(searchTimer);
-    }
-
-    searchTimer = setTimeout(() => {
-        visitSessions();
-    }, 280);
-});
-
-onBeforeUnmount(() => {
-    if (searchTimer) {
-        clearTimeout(searchTimer);
-    }
-});
-
-function setAvailability(nextAvailability: string | number): void {
-    const resolved = String(nextAvailability);
-    if (availability.value === resolved) {
-        return;
-    }
-
-    availability.value = resolved;
-    visitSessions();
+function setAvailability(val: string): void {
+    availability.value = val;
+    applyFilters();
 }
 
-function clearSearch(): void {
-    if (searchTimer) {
-        clearTimeout(searchTimer);
-    }
-
-    search.value = '';
-    visitSessions();
-}
-
-function clearFilters(): void {
-    if (searchTimer) {
-        clearTimeout(searchTimer);
-    }
-
-    syncingFromProps = true;
-    search.value = '';
+function resetFilters(): void {
+    q.value = '';
+    category.value = '';
     availability.value = 'all';
-    syncingFromProps = false;
-
-    visitSessions();
+    applyFilters();
 }
+
+function sessionTone(session: UpcomingSessionItem): StatusTone {
+    if (!session.isOpenForBooking || session.remainingSeats <= 0) return 'danger';
+    if (session.remainingSeats <= 5) return 'warning';
+    return 'success';
+}
+
+const hasActiveFilters = () => Boolean(q.value.trim() || category.value || availability.value !== 'all');
 </script>
 
 <template>
-    <Head title="Upcoming Physical Sessions" />
-
     <PublicLayout>
-        <section class="border-b border-[#272d38]/10 bg-white py-12 lg:py-16">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <Head title="Live Training Sessions" />
+
+        <!-- Page Header & Filter Bar -->
+        <section class="border-b border-line bg-sand-50/70">
+            <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+                <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                     <div class="max-w-2xl">
-                        <h1 class="text-3xl font-bold text-[#272d38] sm:text-4xl">
-                            Upcoming Physical Sessions
-                        </h1>
-                        <p class="mt-3 text-[16px] leading-relaxed text-[#272d38]/70">
-                            Scheduled instructor-led technical workshops across Malaysia. All session times in Malaysia Time (MYT).
+                        <h1 class="type-page-title">Live training sessions</h1>
+                        <p class="mt-2 text-sm leading-relaxed text-muted sm:text-base">
+                            Scheduled field workshops and technical seminars across Malaysia with live seat availability.
                         </p>
                     </div>
 
-                    <div class="shrink-0 sm:text-right">
-                        <p class="text-2xl font-bold text-[#272d38] tabular-nums">
-                            {{ pagination.total }}
-                        </p>
-                        <p class="text-[14px] text-[#272d38]/65 tabular-nums">
-                            {{ pluralize(pagination.total, 'upcoming session') }}
-                            <template v-if="hasActiveFilters">
-                                of {{ totalUpcomingCount }}
-                            </template>
-                        </p>
+                    <p class="tabular text-sm font-medium text-muted">
+                        <span class="font-semibold text-navy-950">{{ totalUpcomingCount }}</span>
+                        scheduled {{ totalUpcomingCount === 1 ? 'session' : 'sessions' }}
+                    </p>
+                </div>
+
+                <!-- Search & Category Filter Form -->
+                <form
+                    class="mt-7 grid gap-3 rounded-2xl bg-white p-3.5 shadow-card ring-1 ring-neutral-200/80 md:grid-cols-12"
+                    @submit.prevent="applyFilters"
+                >
+                    <div class="md:col-span-5">
+                        <label for="sessions-q" class="sr-only">Search live sessions</label>
+                        <div class="relative">
+                            <Search
+                                class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted"
+                                aria-hidden="true"
+                            />
+                            <input
+                                id="sessions-q"
+                                v-model="q"
+                                type="text"
+                                placeholder="Search title, session code, venue, or city..."
+                                class="h-10.5 w-full rounded-xl border border-line-strong/80 bg-white pr-3.5 pl-10 text-sm text-ink placeholder:text-muted/75 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-4">
+                        <label for="sessions-category" class="sr-only">Subject area</label>
+                        <select
+                            id="sessions-category"
+                            v-model="category"
+                            class="h-10.5 w-full rounded-xl border border-line-strong/80 bg-white px-3.5 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            @change="applyFilters"
+                        >
+                            <option value="">All subjects</option>
+                            <option v-for="cat in categories" :key="cat.id" :value="cat.slug">
+                                {{ cat.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2 md:col-span-3">
+                        <AppButton type="submit" variant="primary" size="md" class="h-10.5 flex-1">
+                            Filter
+                        </AppButton>
+                        <AppButton
+                            v-if="hasActiveFilters()"
+                            type="button"
+                            variant="outline"
+                            size="md"
+                            icon-only
+                            class="h-10.5 w-10.5"
+                            aria-label="Reset filters"
+                            @click="resetFilters"
+                        >
+                            <RotateCcw class="size-4" aria-hidden="true" />
+                        </AppButton>
+                    </div>
+                </form>
+
+                <!-- Availability Pills + View Switcher -->
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            v-for="tab in availabilityTabs"
+                            :key="tab.value"
+                            type="button"
+                            class="cursor-pointer rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                            :class="
+                                availability === tab.value
+                                    ? 'bg-navy-950 text-white'
+                                    : 'bg-white text-muted ring-1 ring-line hover:bg-sand-100 hover:text-navy-950'
+                            "
+                            @click="setAvailability(tab.value)"
+                        >
+                            {{ tab.label }}
+                        </button>
+                    </div>
+
+                    <div class="inline-flex rounded-full bg-white p-1 shadow-xs ring-1 ring-line">
+                        <button
+                            type="button"
+                            class="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                            :class="viewMode === 'cards' ? 'bg-navy-950 text-white' : 'text-muted hover:text-navy-950'"
+                            @click="viewMode = 'cards'"
+                        >
+                            <LayoutGrid class="size-3.5" aria-hidden="true" />
+                            <span>Cards</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                            :class="viewMode === 'table' ? 'bg-navy-950 text-white' : 'text-muted hover:text-navy-950'"
+                            @click="viewMode = 'table'"
+                        >
+                            <List class="size-3.5" aria-hidden="true" />
+                            <span>Table</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section class="bg-white py-12 lg:py-16" aria-label="Upcoming training sessions">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <div class="flex flex-col gap-4 border-b border-[#272d38]/10 pb-6">
-                    <div class="relative">
-                        <label for="sessions-search-input" class="sr-only">
-                            Search physical sessions
-                        </label>
-                        <Search
-                            class="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-[#272d38]/50"
-                            aria-hidden="true"
-                        />
-                        <Input
-                            id="sessions-search-input"
-                            v-model="search"
-                            type="search"
-                            placeholder="Search by session title, code, venue, or city..."
-                            class="pr-9 pl-10"
-                        />
-                        <button
-                            v-if="search !== ''"
-                            type="button"
-                            aria-label="Clear search"
-                            class="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#272d38]/50 transition-colors hover:text-[#272d38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
-                            @click="clearSearch"
-                        >
-                            <X class="h-4 w-4" aria-hidden="true" />
-                        </button>
-                    </div>
-
-                    <div class="flex flex-wrap items-center justify-between gap-4 pt-1">
-                        <Tabs
-                            :model-value="availability"
-                            @update:model-value="setAvailability"
-                        >
-                            <TabsList aria-label="Filter sessions by timing and seat availability">
-                                <TabsTrigger
-                                    v-for="tab in availabilityTabs"
-                                    :key="tab.value"
-                                    :value="tab.value"
-                                >
-                                    {{ tab.label }}
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
-
-                        <div class="flex items-center gap-4">
-                            <span
-                                v-if="isFiltering"
-                                class="text-[14px] text-[#272d38]/65"
-                                aria-live="polite"
-                            >
-                                Updating...
-                            </span>
-                            <button
-                                v-if="hasActiveFilters"
-                                type="button"
-                                class="rounded-md text-[15px] font-bold text-[#272d38] transition-colors hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#272d38]/30"
-                                @click="clearFilters"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    </div>
+        <!-- Results -->
+        <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+            <template v-if="sessions.length > 0">
+                <div v-if="viewMode === 'cards'" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <SessionCard
+                        v-for="session in sessions"
+                        :key="session.id"
+                        :session="session"
+                    />
                 </div>
 
-                <SessionsDataTable
-                    v-if="sessions.length > 0"
-                    :sessions="sessions"
-                    :class="cn('mt-6 transition-opacity duration-150', isFiltering && 'opacity-65')"
-                />
-
-                <Card
+                <DataTable
                     v-else
-                    class="mt-8 px-6 py-14 text-center"
+                    :columns="tableColumns"
+                    :rows="sessionRows"
+                    row-key="id"
                 >
-                    <h2 class="text-[19px] font-bold text-[#272d38]">
-                        No upcoming sessions match your filter
-                    </h2>
-                    <p class="mx-auto mt-2 max-w-md text-[16px] text-[#272d38]/65">
-                        Clear active filters to view all scheduled workshops, or explore our self-paced training catalogue.
-                    </p>
-                    <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
-                        <Button
-                            v-if="hasActiveFilters"
-                            type="button"
-                            variant="outline"
-                            @click="clearFilters"
-                        >
-                            Clear filters
-                        </Button>
-                        <Button as-child>
-                            <Link :href="routes.catalogue">Browse Standalone Modules</Link>
-                        </Button>
-                    </div>
-                </Card>
+                    <template #cell-schedule="{ row }">
+                        <div class="font-semibold text-navy-950">{{ row.dateRangeLabel }}</div>
+                        <div class="mt-0.5 text-xs text-muted">{{ row.timeLabel }}</div>
+                    </template>
 
-                <PublicPagination
-                    :pagination="pagination"
-                    :item-label="pluralize(pagination.total, 'session')"
-                />
-            </div>
+                    <template #cell-title="{ row }">
+                        <Link
+                            :href="row.detailUrl"
+                            class="font-semibold text-navy-950 transition-colors hover:text-primary-600"
+                        >
+                            {{ row.title }}
+                        </Link>
+                        <div class="mt-1 text-xs text-muted">
+                            <span class="tabular-nums-mono">{{ row.sessionCode }}</span>
+                            <span v-if="row.instructorNames"> &middot; {{ row.instructorNames }}</span>
+                        </div>
+                    </template>
+
+                    <template #cell-venue="{ row }">
+                        <div class="inline-flex items-start gap-1.5 text-sm">
+                            <MapPin class="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden="true" />
+                            <span>
+                                {{ row.venueName }}
+                                <span v-if="row.venueLocation" class="block text-xs text-muted">{{ row.venueLocation }}</span>
+                            </span>
+                        </div>
+                    </template>
+
+                    <template #cell-seats="{ row }">
+                        <StatusBadge :tone="sessionTone(row)" dot>
+                            <template v-if="row.isOpenForBooking && row.remainingSeats > 0">
+                                {{ row.remainingSeats }} / {{ row.capacity }} open
+                            </template>
+                            <template v-else>
+                                {{ row.statusLabel }}
+                            </template>
+                        </StatusBadge>
+                    </template>
+
+                    <template #cell-priceLabel="{ row }">
+                        <span class="font-semibold text-navy-950">{{ row.priceLabel }}</span>
+                    </template>
+
+                    <template #actions="{ row }">
+                        <AppButton
+                            :href="row.detailUrl"
+                            :variant="row.isOpenForBooking ? 'primary' : 'outline'"
+                            size="sm"
+                            pill
+                        >
+                            {{ row.isOpenForBooking ? 'Reserve' : 'Details' }}
+                        </AppButton>
+                    </template>
+                </DataTable>
+            </template>
+
+            <EmptyState
+                v-else
+                :icon="CalendarDays"
+                title="No live sessions match your filter"
+                description="Try broadening your availability window, clearing keywords, or browsing self-paced modules."
+            >
+                <template #action>
+                    <div class="flex flex-wrap items-center justify-center gap-2.5">
+                        <AppButton variant="outline" size="sm" pill @click="resetFilters">
+                            Reset filters
+                        </AppButton>
+                        <AppButton :href="routes.catalogue" variant="primary" size="sm" pill>
+                            Browse Modules
+                        </AppButton>
+                    </div>
+                </template>
+            </EmptyState>
+
+            <PublicPagination :pagination="pagination" item-label="sessions" />
         </section>
     </PublicLayout>
 </template>

@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { AlertCircle, ArrowLeft, ArrowRight, Calendar, Clock, Download, ExternalLink, MapPin } from 'lucide-vue-next';
-import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    AlertCircle,
+    ArrowLeft,
+    ArrowUpRight,
+    Calendar,
+    Check,
+    Clock,
+    Download,
+    ExternalLink,
+    FileText,
+    MapPin,
+    Receipt,
+    Video,
+} from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import StatusBadge, { type StatusTone } from '@/components/ds/StatusBadge.vue';
+import UserAvatar from '@/components/ds/UserAvatar.vue';
 import { useRoutes } from '@/composables/useRoutes';
 import FocusedLayout from '@/layouts/FocusedLayout.vue';
 import PortalLayout from '@/layouts/PortalLayout.vue';
@@ -16,10 +28,33 @@ const props = defineProps<PortalBookingShowProps>();
 const { routes } = useRoutes();
 const paying = ref(false);
 
+const steps = [
+    { key: 'reserved', label: 'Reserved' },
+    { key: 'confirmed', label: 'Confirmed' },
+    { key: 'attended', label: 'Attended' },
+    { key: 'completed', label: 'Completed' },
+];
+
+const activeStepIndex = computed(() => {
+    if (props.booking.isHoldActive) return 0;
+    if (props.booking.attendance) return 3;
+    if (props.booking.isConfirmed) return 1;
+    return 0;
+});
+
+const hasMaterials = computed(
+    () => Boolean(props.booking.session.materials && props.booking.session.materials.length > 0),
+);
+
+function statusTone(statusValue: string): StatusTone {
+    if (['confirmed', 'paid', 'completed', 'present', 'verified', 'approved'].includes(statusValue)) return 'success';
+    if (['pending_payment', 'pending', 'submitted'].includes(statusValue)) return 'warning';
+    if (['cancelled', 'expired', 'refunded', 'absent', 'rejected'].includes(statusValue)) return 'danger';
+    return 'primary';
+}
+
 function triggerOnlinePayment(): void {
-    if (!props.booking.order?.payUrl || paying.value) {
-        return;
-    }
+    if (!props.booking.order?.payUrl || paying.value) return;
 
     paying.value = true;
     router.post(
@@ -35,519 +70,450 @@ function triggerOnlinePayment(): void {
 </script>
 
 <template>
-    <Head :title="`Booking ${booking.bookingReference}`" />
+    <Head :title="booking.session.title" />
 
+    <!-- Focused Checkout View when Payment Hold is Active -->
     <FocusedLayout v-if="booking.isHoldActive">
-        <div class="mx-auto max-w-3xl space-y-6">
-            <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="mx-auto max-w-2xl space-y-6">
+            <div class="flex items-center justify-between gap-3">
                 <Link
                     :href="routes.portalBookings"
-                    class="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors duration-150 hover:text-[#0F4C81]"
+                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-navy-950"
                 >
-                    <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-                    <span>Back to My Bookings</span>
+                    <ArrowLeft class="size-4" aria-hidden="true" />
+                    <span>Live Sessions</span>
                 </Link>
 
-                <span class="rounded-[6px] border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                <StatusBadge tone="warning" dot>
                     {{ booking.statusLabel }}
-                </span>
+                </StatusBadge>
             </div>
 
-            <div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span
-                        v-if="booking.session.sessionCode"
-                        class="rounded-[6px] border border-neutral-200 bg-white px-2.5 py-0.5 font-mono text-xs font-medium text-neutral-700"
-                    >
-                        {{ booking.session.sessionCode }}
-                    </span>
-                    <span class="font-mono text-xs text-neutral-500 tabular-nums">
-                        {{ booking.bookingReference }}
-                    </span>
-                </div>
-                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-                    {{ booking.session.title }}
-                </h1>
-            </div>
-
-            <div
-                role="status"
-                class="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50/70 p-5 sm:flex-row sm:items-center sm:justify-between"
-            >
-                <div class="flex items-start gap-3">
-                    <Clock class="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
-                    <div>
-                        <p class="text-sm font-semibold text-neutral-900 tabular-nums">
-                            Complete Payment Before {{ booking.holdExpiresLabel }}
-                        </p>
-                        <p class="mt-1 text-sm text-neutral-700">
-                            Your seat is held for 15 minutes. Complete online payment to confirm your registration.
-                        </p>
-                    </div>
-                </div>
-
-                <Button
-                    v-if="booking.order"
-                    type="button"
-                    class="h-10 shrink-0 rounded-[6px] bg-[#0F4C81] px-5 text-sm font-medium text-white transition-colors duration-150 hover:bg-[#0F4C81]/90"
-                    :disabled="paying"
-                    @click="triggerOnlinePayment"
-                >
-                    {{ paying ? 'Connecting...' : 'Pay Online Now' }}
-                </Button>
-            </div>
-
-            <div class="rounded-lg border border-neutral-200 bg-white p-6">
-                <dl class="grid gap-5 sm:grid-cols-2">
-                    <div class="flex items-start gap-2.5">
-                        <Calendar class="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-                        <div>
-                            <dt class="text-xs font-medium text-neutral-500">Schedule</dt>
-                            <dd class="mt-1 text-sm font-semibold text-neutral-900 tabular-nums">
-                                {{ booking.session.scheduleLabel }}
-                            </dd>
-                            <dd class="mt-0.5 text-xs text-neutral-500 tabular-nums">
-                                {{ booking.session.durationLabel }}
-                            </dd>
-                        </div>
-                    </div>
-
-                    <div class="flex items-start gap-2.5">
-                        <MapPin class="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-                        <div>
-                            <dt class="text-xs font-medium text-neutral-500">Venue</dt>
-                            <dd class="mt-1 text-sm font-semibold text-neutral-900">
-                                {{ booking.session.venueName }}
-                            </dd>
-                            <dd v-if="booking.session.venueAddressLine" class="mt-0.5 text-xs text-neutral-500">
-                                {{ booking.session.venueAddressLine }}
-                            </dd>
-                        </div>
-                    </div>
-                </dl>
-
-                <div
-                    v-if="booking.order"
-                    class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-200 pt-5"
-                >
-                    <div class="text-sm text-neutral-600">
-                        Order <span class="font-mono font-medium text-neutral-900">{{ booking.order.orderNumber }}</span>
-                    </div>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-sm text-neutral-600">Total Payable</span>
-                        <span class="text-xl font-bold text-neutral-900 tabular-nums">
-                            {{ booking.order.totalLabel }}
+            <div class="overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-neutral-200/80">
+                <div class="border-b border-line p-6">
+                    <h1 class="type-page-title">{{ booking.session.title }}</h1>
+                    <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted">
+                        <span class="tabular inline-flex items-center gap-1.5 font-medium text-ink">
+                            <Calendar class="size-4 text-coral-500" aria-hidden="true" />
+                            {{ booking.session.scheduleLabel }}
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 font-medium text-ink">
+                            <MapPin class="size-4 text-primary-600" aria-hidden="true" />
+                            {{ booking.session.venueName }}
                         </span>
                     </div>
+                </div>
+
+                <div class="bg-warning-50/90 px-6 py-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-2.5">
+                            <Clock class="mt-0.5 size-4.5 shrink-0 text-warning-600" aria-hidden="true" />
+                            <div>
+                                <p class="tabular text-sm font-bold text-navy-950">
+                                    Complete payment before {{ booking.holdExpiresLabel }}
+                                </p>
+                                <p class="mt-0.5 text-xs text-warning-700">
+                                    Your seat is temporarily held until checkout completes.
+                                </p>
+                            </div>
+                        </div>
+
+                        <AppButton
+                            v-if="booking.order"
+                            type="button"
+                            variant="warm"
+                            size="md"
+                            pill
+                            :loading="paying"
+                            @click="triggerOnlinePayment"
+                        >
+                            {{ paying ? 'Connecting...' : 'Pay Now' }}
+                        </AppButton>
+                    </div>
+                </div>
+
+                <div v-if="booking.order" class="flex items-center justify-between gap-4 px-6 py-5">
+                    <span class="text-sm text-muted">
+                        Order <span class="tabular-nums-mono font-semibold text-navy-950">{{ booking.order.orderNumber }}</span>
+                    </span>
+                    <span class="tabular text-xl font-bold text-navy-950">
+                        {{ booking.order.totalLabel }}
+                    </span>
                 </div>
             </div>
         </div>
     </FocusedLayout>
 
-    <PortalLayout v-else :breadcrumb="booking.bookingReference">
-        <div class="mx-auto max-w-[1440px] space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
+    <!-- Full Portal Session Details -->
+    <PortalLayout v-else :breadcrumb="booking.session.title">
+        <div class="mx-auto max-w-6xl space-y-6">
+            <!-- Back Link -->
+            <div>
                 <Link
                     :href="routes.portalBookings"
-                    class="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[#5942B5] transition-colors hover:text-[#7057D9] hover:underline underline-offset-4"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-navy-950"
                 >
-                    <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-                    <span>Back to My Bookings</span>
+                    <ArrowLeft class="size-3.5" aria-hidden="true" />
+                    <span>Back to Live Sessions</span>
                 </Link>
-
-                <PortalStatusBadge
-                    :status="booking.statusValue"
-                    :label="booking.statusLabel"
-                />
             </div>
 
-            <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div class="space-y-2">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <Badge v-if="booking.session.moduleCode" variant="secondary">
-                            {{ booking.session.moduleCode }}
-                        </Badge>
-                        <Badge v-if="booking.session.sessionCode" variant="outline">
-                            {{ booking.session.sessionCode }}
-                        </Badge>
+            <!-- Unified Session Header & Progress Card -->
+            <section class="overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-neutral-200/80">
+                <div class="p-6 sm:p-7">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <StatusBadge :tone="statusTone(booking.statusValue)" dot>
+                                    {{ booking.statusLabel }}
+                                </StatusBadge>
+                                <span
+                                    v-if="booking.session.sessionCode"
+                                    class="tabular-nums-mono text-xs font-medium text-muted"
+                                >
+                                    {{ booking.session.sessionCode }}
+                                </span>
+                            </div>
+
+                            <h1 class="type-page-title mt-3">
+                                {{ booking.session.title }}
+                            </h1>
+                        </div>
+
+                        <div v-if="booking.session.recordingsUrl" class="shrink-0">
+                            <AppButton
+                                :href="booking.session.recordingsUrl"
+                                variant="primary"
+                                size="sm"
+                                pill
+                            >
+                                <Video class="size-3.5" aria-hidden="true" />
+                                <span>Watch Recordings</span>
+                            </AppButton>
+                        </div>
                     </div>
-                    <h1 class="text-[24px] font-extrabold leading-tight tracking-tight text-[#282338] sm:text-[26px]">
-                        {{ booking.session.title }}
-                    </h1>
-                    <p class="text-[13.5px] text-[#625D6D] tabular-nums">
-                        Booking reference {{ booking.bookingReference }}
+
+                    <!-- Key Logistics Strip -->
+                    <dl class="mt-6 grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-xl bg-sand-50 px-4 py-3">
+                            <dt class="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+                                <Calendar class="size-3.5 text-coral-500" aria-hidden="true" />
+                                <span>Schedule</span>
+                            </dt>
+                            <dd class="tabular mt-1.5 text-sm font-semibold text-navy-950">
+                                {{ booking.session.scheduleLabel }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-xl bg-sand-50 px-4 py-3">
+                            <dt class="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+                                <Clock class="size-3.5 text-accent-600" aria-hidden="true" />
+                                <span>Duration</span>
+                            </dt>
+                            <dd class="tabular mt-1.5 text-sm font-semibold text-navy-950">
+                                {{ booking.session.durationLabel }}
+                            </dd>
+                        </div>
+
+                        <div class="rounded-xl bg-sand-50 px-4 py-3">
+                            <dt class="flex items-center justify-between gap-2 text-[11px] font-semibold tracking-wide text-muted uppercase">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <MapPin class="size-3.5 text-primary-600" aria-hidden="true" />
+                                    <span>Venue</span>
+                                </span>
+                                <a
+                                    v-if="booking.session.venueMapUrl"
+                                    :href="booking.session.venueMapUrl"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-0.5 text-[11px] font-semibold text-primary-600 normal-case hover:text-primary-700"
+                                >
+                                    <span>Map</span>
+                                    <ExternalLink class="size-3" aria-hidden="true" />
+                                </a>
+                            </dt>
+                            <dd class="mt-1.5 text-sm font-semibold text-navy-950">
+                                {{ booking.session.venueName }}
+                            </dd>
+                            <dd v-if="booking.session.venueAddressLine" class="mt-0.5 truncate text-xs text-muted">
+                                {{ booking.session.venueAddressLine }}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <p v-if="booking.session.venueNotes" class="mt-3 text-xs text-muted">
+                        <span class="font-semibold text-navy-950">Venue note:</span>
+                        {{ booking.session.venueNotes }}
                     </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <Button
-                        v-if="booking.session.sessionDetailUrl"
-                        as-child
-                        variant="outline"
+                <!-- Compact Progress Footer (Active/Confirmed Bookings) -->
+                <div
+                    v-if="!booking.isExpired && !booking.isCancelled && !booking.isRefunded"
+                    class="border-t border-line bg-sand-50/70 px-6 py-4 sm:px-7"
+                >
+                    <ol class="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Session progress">
+                        <li
+                            v-for="(step, idx) in steps"
+                            :key="step.key"
+                            class="flex items-center gap-2"
+                        >
+                            <span
+                                class="flex size-5.5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                                :class="
+                                    idx <= activeStepIndex
+                                        ? 'bg-success-600 text-white'
+                                        : 'bg-white text-muted ring-1 ring-line'
+                                "
+                            >
+                                <Check v-if="idx <= activeStepIndex" class="size-3" aria-hidden="true" />
+                                <span v-else class="tabular">{{ idx + 1 }}</span>
+                            </span>
+                            <span
+                                class="text-xs font-semibold"
+                                :class="idx <= activeStepIndex ? 'text-navy-950' : 'text-muted'"
+                            >
+                                {{ step.label }}
+                            </span>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Exception Alert Strip (Expired / Cancelled / Refunded) -->
+                <div
+                    v-else
+                    role="status"
+                    class="flex flex-col justify-between gap-3 border-t border-danger-600/15 bg-danger-50 px-6 py-4 sm:flex-row sm:items-center sm:px-7"
+                >
+                    <div class="flex items-start gap-2.5">
+                        <AlertCircle class="mt-0.5 size-4.5 shrink-0 text-danger-600" aria-hidden="true" />
+                        <p class="text-xs font-medium text-danger-700">
+                            <template v-if="booking.isExpired">
+                                This reservation hold expired before payment was completed.
+                            </template>
+                            <template v-else-if="booking.isCancelled">
+                                {{ booking.cancellationReason || 'This booking was cancelled.' }}
+                            </template>
+                            <template v-else-if="booking.isRefunded">
+                                This booking has been refunded. See your linked receipt for details.
+                            </template>
+                        </p>
+                    </div>
+                    <AppButton
+                        v-if="booking.isExpired && booking.session.bookAgainUrl"
+                        :href="booking.session.bookAgainUrl"
+                        variant="warm"
+                        size="sm"
+                        pill
                     >
-                        <Link :href="booking.session.sessionDetailUrl">
-                            View Session Details
-                        </Link>
-                    </Button>
+                        Book Again
+                    </AppButton>
                 </div>
-            </header>
+            </section>
 
-            <Card
-                v-if="booking.isHoldActive"
-                role="status"
-                class="flex flex-col gap-4 border-[#E8CFA1] bg-[#FBF2E3] p-4 shadow-none sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#8B5A17]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536] tabular-nums">
-                            Complete Payment Before {{ booking.holdExpiresLabel }}
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            Your seat is temporarily held while payment is pending. If payment is not completed within the hold window, the reservation is released automatically.
-                        </p>
-                    </div>
-                </div>
+            <!-- 2-Column Content -->
+            <div class="grid gap-6 lg:grid-cols-12 lg:items-start">
+                <!-- Left Column: Materials, Instructors, Attendance (only what's relevant) -->
+                <div class="space-y-6 lg:col-span-8">
+                    <!-- Teaching Materials (for confirmed bookings) -->
+                    <section
+                        v-if="booking.isConfirmed"
+                        class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <h2 class="text-base font-bold text-navy-950">Session materials</h2>
+                            <span
+                                v-if="hasMaterials"
+                                class="tabular rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-semibold text-navy-900"
+                            >
+                                {{ booking.session.materials?.length }}
+                            </span>
+                        </div>
 
-                <Button
-                    v-if="booking.order"
-                    type="button"
-                    size="sm"
-                    class="shrink-0"
-                    :disabled="paying"
-                    @click="triggerOnlinePayment"
-                >
-                    {{ paying ? 'Connecting...' : 'Pay Online Now' }}
-                </Button>
-            </Card>
-
-            <Card
-                v-else-if="booking.isExpired"
-                role="status"
-                class="flex flex-col gap-4 border-[#ECC4CA] bg-[#FBECEE] p-4 shadow-none sm:flex-row sm:items-center sm:justify-between sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#A33C48]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">
-                            Seat Reservation Expired
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            This temporary hold expired before payment was completed and your seat was released.
-                        </p>
-                    </div>
-                </div>
-
-                <Button
-                    v-if="booking.session.bookAgainUrl"
-                    as-child
-                    size="sm"
-                    class="shrink-0"
-                >
-                    <Link :href="booking.session.bookAgainUrl">
-                        Book Seat Again
-                    </Link>
-                </Button>
-            </Card>
-
-            <Card
-                v-else-if="booking.isCancelled"
-                role="status"
-                class="border-[#ECC4CA] bg-[#FBECEE] p-4 shadow-none sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#A33C48]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">
-                            Booking Cancelled
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            {{ booking.cancellationReason || 'This session booking was cancelled.' }}
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <Card
-                v-else-if="booking.isRefunded"
-                role="status"
-                class="border-[#ECC4CA] bg-[#FBECEE] p-4 shadow-none sm:px-5"
-            >
-                <div class="flex items-start gap-3">
-                    <AlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-[#A33C48]" aria-hidden="true" />
-                    <div>
-                        <p class="text-[14.5px] font-bold text-[#292536]">
-                            Booking Refunded
-                        </p>
-                        <p class="mt-1 text-[13px] leading-relaxed text-[#403B4B]">
-                            This booking has been refunded. Check your linked order record for payment and refund tracking details.
-                        </p>
-                    </div>
-                </div>
-            </Card>
-
-            <div class="grid gap-5 lg:grid-cols-3">
-                <div class="space-y-5 lg:col-span-2">
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Training Session Details</CardTitle>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <dl class="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Schedule</dt>
-                                    <dd class="mt-1 text-[13.5px] font-bold text-[#282338] tabular-nums">
-                                        {{ booking.session.scheduleLabel }}
-                                    </dd>
+                        <ul v-if="hasMaterials" class="mt-4 divide-y divide-neutral-100">
+                            <li
+                                v-for="material in booking.session.materials"
+                                :key="material.id"
+                                class="flex flex-col gap-3 py-3.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <div class="flex items-start gap-3">
+                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-50 text-accent-700">
+                                        <FileText class="size-4" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-navy-950">{{ material.title }}</p>
+                                        <p class="tabular mt-0.5 text-xs text-muted">
+                                            {{ material.typeLabel }} &middot; {{ material.fileSizeLabel }}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Duration</dt>
-                                    <dd class="mt-1 text-[13.5px] text-[#292536] tabular-nums">
-                                        {{ booking.session.durationLabel }}
-                                    </dd>
+                                <AppButton
+                                    v-if="material.isDownloadable && material.downloadUrl"
+                                    :href="material.downloadUrl"
+                                    external
+                                    variant="outline"
+                                    size="sm"
+                                    pill
+                                >
+                                    <Download class="size-3.5" aria-hidden="true" />
+                                    <span>Download</span>
+                                </AppButton>
+                            </li>
+                        </ul>
+
+                        <p v-else class="mt-3 text-sm text-muted">
+                            Materials will appear here once published by your instructor.
+                        </p>
+                    </section>
+
+                    <!-- Assigned Instructors (modern interactive cards with photo & profile action) -->
+                    <section
+                        v-if="booking.session.instructors.length > 0"
+                        class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="text-base font-bold text-navy-950">Instructors</h2>
+                            <span class="tabular rounded-full bg-sand-100 px-2.5 py-0.5 text-xs font-semibold text-navy-900">
+                                {{ booking.session.instructors.length }}
+                            </span>
+                        </div>
+
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <component
+                                :is="instructor.profileUrl ? Link : 'div'"
+                                v-for="instructor in booking.session.instructors"
+                                :key="instructor.name"
+                                :href="instructor.profileUrl || undefined"
+                                class="group flex items-center justify-between gap-3.5 rounded-2xl bg-sand-50/90 p-4 transition-all duration-150"
+                                :class="
+                                    instructor.profileUrl
+                                        ? 'cursor-pointer hover:bg-sand-100/90 focus-visible:outline-2 focus-visible:outline-primary-600'
+                                        : ''
+                                "
+                            >
+                                <div class="flex min-w-0 items-center gap-3.5">
+                                    <UserAvatar
+                                        :src="instructor.photoUrl"
+                                        :name="instructor.name"
+                                        size="md"
+                                    />
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-semibold text-navy-950 transition-colors group-hover:text-primary-600">
+                                            {{ instructor.name }}
+                                        </p>
+                                        <p v-if="instructor.title || instructor.roleLabel" class="mt-0.5 truncate text-xs text-muted">
+                                            {{ instructor.title || instructor.roleLabel }}
+                                        </p>
+                                        <p v-if="instructor.qualifications" class="mt-0.5 truncate text-[11px] text-accent-700">
+                                            {{ instructor.qualifications }}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Venue</dt>
-                                    <dd class="mt-1 text-[13.5px] font-bold text-[#282338]">
-                                        {{ booking.session.venueName }}
-                                    </dd>
-                                    <dd
-                                        v-if="booking.session.venueAddressLine"
-                                        class="mt-0.5 text-[12.5px] text-[#625D6D]"
-                                    >
-                                        {{ booking.session.venueAddressLine }}
+                                <span
+                                    v-if="instructor.profileUrl"
+                                    class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-navy-950 shadow-xs ring-1 ring-line transition-all duration-150 group-hover:bg-navy-950 group-hover:text-white group-hover:ring-navy-950"
+                                >
+                                    <span>Profile</span>
+                                    <ArrowUpRight
+                                        class="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                                        aria-hidden="true"
+                                    />
+                                </span>
+                            </component>
+                        </div>
+                    </section>
+
+                    <!-- Attendance Record (only rendered once recorded) -->
+                    <section
+                        v-if="booking.attendance"
+                        class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80"
+                    >
+                        <h2 class="text-base font-bold text-navy-950">Attendance</h2>
+                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <StatusBadge :tone="statusTone(booking.attendance.attendanceStatusValue)" dot>
+                                    {{ booking.attendance.attendanceStatusLabel }}
+                                </StatusBadge>
+                                <StatusBadge :tone="statusTone(booking.attendance.reviewStatusValue)">
+                                    {{ booking.attendance.reviewStatusLabel }}
+                                </StatusBadge>
+                            </div>
+                            <p v-if="booking.attendance.remarks" class="text-sm text-muted">
+                                {{ booking.attendance.remarks }}
+                            </p>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column: Clean Payment & Receipt Card -->
+                <aside class="lg:sticky lg:top-24 lg:col-span-4">
+                    <div class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80">
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="text-base font-bold text-navy-950">Payment</h2>
+                            <StatusBadge
+                                v-if="booking.order"
+                                :tone="statusTone(booking.order.statusValue)"
+                                dot
+                            >
+                                {{ booking.order.statusLabel }}
+                            </StatusBadge>
+                        </div>
+
+                        <template v-if="booking.order">
+                            <p class="tabular mt-3 text-2xl font-bold tracking-tight text-navy-950">
+                                {{ booking.order.totalLabel }}
+                            </p>
+
+                            <dl class="mt-4 space-y-2.5 border-t border-line pt-4 text-xs">
+                                <div class="flex items-center justify-between gap-2">
+                                    <dt class="text-muted">Order</dt>
+                                    <dd class="tabular-nums-mono font-semibold text-navy-950">
+                                        {{ booking.order.orderNumber }}
                                     </dd>
                                 </div>
-
-                                <div>
-                                    <dt class="text-[12.5px] font-semibold text-[#625D6D]">Assigned Instructors</dt>
-                                    <dd class="mt-1 text-[13.5px] text-[#292536]">
-                                        <ul
-                                            v-if="booking.session.instructors.length > 0"
-                                            class="space-y-2"
-                                        >
-                                            <li
-                                                v-for="instructor in booking.session.instructors"
-                                                :key="instructor.name"
-                                                class="flex items-center gap-2.5"
-                                            >
-                                                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#F1EDFB] text-[11px] font-extrabold text-[#5942B5]">
-                                                    {{ instructor.initials }}
-                                                </span>
-                                                <span class="min-w-0">
-                                                    <span class="block font-bold text-[#282338]">{{ instructor.name }}</span>
-                                                    <span v-if="instructor.title" class="block text-[12.5px] text-[#625D6D]">
-                                                        {{ instructor.title }}
-                                                    </span>
-                                                </span>
-                                            </li>
-                                        </ul>
-                                        <span v-else class="text-[#625D6D]">To be assigned</span>
+                                <div class="flex items-center justify-between gap-2">
+                                    <dt class="text-muted">Booking ref</dt>
+                                    <dd class="tabular-nums-mono font-semibold text-navy-950">
+                                        {{ booking.bookingReference }}
+                                    </dd>
+                                </div>
+                                <div class="flex items-center justify-between gap-2">
+                                    <dt class="text-muted">Registration</dt>
+                                    <dd class="font-medium text-navy-950">
+                                        {{ booking.order.registrationTypeLabel }}
+                                    </dd>
+                                </div>
+                                <div v-if="booking.order.companyName" class="flex items-start justify-between gap-2">
+                                    <dt class="text-muted">Organisation</dt>
+                                    <dd class="text-right font-medium text-navy-950">
+                                        {{ booking.order.companyName }}
                                     </dd>
                                 </div>
                             </dl>
 
-                            <div
-                                v-if="booking.session.venueNotes || booking.session.venueMapUrl"
-                                class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEEAF2] pt-4"
+                            <AppButton
+                                :href="booking.order.detailUrl"
+                                variant="outline"
+                                size="md"
+                                class="mt-5 w-full"
                             >
-                                <p
-                                    v-if="booking.session.venueNotes"
-                                    class="text-[13px] text-[#403B4B]"
-                                >
-                                    <span class="font-bold text-[#282338]">Venue notes:</span>
-                                    {{ booking.session.venueNotes }}
-                                </p>
+                                <Receipt class="size-4" aria-hidden="true" />
+                                <span>View Receipt</span>
+                            </AppButton>
+                        </template>
 
-                                <Button
-                                    v-if="booking.session.venueMapUrl"
-                                    as="a"
-                                    :href="booking.session.venueMapUrl"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    variant="outline"
-                                    size="sm"
-                                >
-                                    <span>Open Venue Map</span>
-                                    <ExternalLink class="h-3.5 w-3.5" aria-hidden="true" />
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        <p v-else class="mt-3 text-sm text-muted">
+                            No linked payment record.
+                        </p>
 
-                    <Card>
-                        <CardHeader class="flex flex-row items-center justify-between gap-4 space-y-0 border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Attendance Status</CardTitle>
-                            <Link
-                                v-if="booking.session.recordingsUrl"
-                                :href="booking.session.recordingsUrl"
-                                class="inline-flex items-center gap-1 text-[12.5px] font-bold text-[#5942B5] transition-colors hover:text-[#7057D9] hover:underline underline-offset-4"
-                            >
-                                <span>Session Recordings</span>
-                                <ArrowRight class="h-3.5 w-3.5" aria-hidden="true" />
-                            </Link>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <div
-                                v-if="booking.attendance"
-                                class="flex flex-wrap items-center justify-between gap-4"
-                            >
-                                <div>
-                                    <p class="text-[12.5px] font-semibold text-[#625D6D]">
-                                        Recorded Attendance
-                                    </p>
-                                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                                        <PortalStatusBadge
-                                            :status="booking.attendance.attendanceStatusValue"
-                                            :label="booking.attendance.attendanceStatusLabel"
-                                        />
-                                        <PortalStatusBadge
-                                            :status="booking.attendance.reviewStatusValue"
-                                            :label="booking.attendance.reviewStatusLabel"
-                                        />
-                                    </div>
-                                </div>
-
-                                <p
-                                    v-if="booking.attendance.remarks"
-                                    class="text-[13px] text-[#403B4B]"
-                                >
-                                    {{ booking.attendance.remarks }}
-                                </p>
-                            </div>
-
-                            <p v-else class="text-[13.5px] text-[#625D6D]">
-                                Attendance has not been recorded for this session yet.
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card v-if="booking.isConfirmed">
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>
-                                Session Teaching Materials ({{ booking.session.materials?.length ?? 0 }})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <div
-                                v-if="booking.session.materials && booking.session.materials.length > 0"
-                                class="divide-y divide-[#EEEAF2]"
-                            >
-                                <div
-                                    v-for="material in booking.session.materials"
-                                    :key="material.id"
-                                    class="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-                                >
-                                    <div class="min-w-0 space-y-1">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="text-[14px] font-bold text-[#282338]">
-                                                {{ material.title }}
-                                            </span>
-                                            <Badge variant="outline">
-                                                {{ material.typeLabel }}
-                                            </Badge>
-                                        </div>
-                                        <p
-                                            v-if="material.description"
-                                            class="text-[13px] text-[#403B4B]"
-                                        >
-                                            {{ material.description }}
-                                        </p>
-                                        <p class="text-[12px] text-[#625D6D] tabular-nums">
-                                            {{ material.originalFilename }} &middot; {{ material.fileSizeLabel }}
-                                        </p>
-                                    </div>
-                                    <div class="shrink-0">
-                                        <Button
-                                            v-if="material.isDownloadable && material.downloadUrl"
-                                            as="a"
-                                            :href="material.downloadUrl"
-                                            size="sm"
-                                        >
-                                            <Download class="h-3.5 w-3.5" aria-hidden="true" />
-                                            <span>Download</span>
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p v-else class="text-[13.5px] text-[#625D6D]">
-                                No teaching materials have been published for this training session yet.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div class="space-y-5">
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Booking Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <template v-if="booking.order">
-                                <dl class="space-y-3 text-[13.5px]">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <dt class="text-[#625D6D]">Order Number</dt>
-                                        <dd class="font-bold text-[#282338] tabular-nums">
-                                            {{ booking.order.orderNumber }}
-                                        </dd>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-3">
-                                        <dt class="text-[#625D6D]">Payment Status</dt>
-                                        <dd>
-                                            <PortalStatusBadge
-                                                :status="booking.order.statusValue"
-                                                :label="booking.order.statusLabel"
-                                            />
-                                        </dd>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-3">
-                                        <dt class="text-[#625D6D]">Registration Type</dt>
-                                        <dd class="font-semibold text-[#292536]">
-                                            {{ booking.order.registrationTypeLabel }}
-                                        </dd>
-                                    </div>
-                                    <div
-                                        v-if="booking.order.companyName"
-                                        class="flex items-start justify-between gap-3"
-                                    >
-                                        <dt class="text-[#625D6D]">Organisation</dt>
-                                        <dd class="text-right font-semibold text-[#292536]">
-                                            {{ booking.order.companyName }}
-                                        </dd>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-3 border-t border-[#EEEAF2] pt-3">
-                                        <dt class="font-bold text-[#282338]">Total Fee</dt>
-                                        <dd class="text-[16px] font-extrabold text-[#282338] tabular-nums">
-                                            {{ booking.order.totalLabel }}
-                                        </dd>
-                                    </div>
-                                </dl>
-
-                                <Button as-child variant="outline" class="mt-4 w-full">
-                                    <Link :href="booking.order.detailUrl">
-                                        View Full Order &amp; Receipt
-                                    </Link>
-                                </Button>
-                            </template>
-                            <p v-else class="text-[13.5px] text-[#625D6D]">
-                                No linked order record available for this booking.
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader class="border-b border-[#EEEAF2] pb-3.5">
-                            <CardTitle>Cancellation &amp; Refund Policy</CardTitle>
-                        </CardHeader>
-                        <CardContent class="pt-4">
-                            <p class="text-[13px] leading-relaxed text-[#403B4B]">
-                                Cancellations and refund requests are handled directly by Ecohydrotech administration. Please contact our support team with your booking reference if your schedule changes.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
+                        <p class="mt-4 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
+                            Need to reschedule or request a refund? Contact administration with reference
+                            <span class="tabular-nums-mono font-semibold text-navy-900">{{ booking.bookingReference }}</span>.
+                        </p>
+                    </div>
+                </aside>
             </div>
         </div>
     </PortalLayout>

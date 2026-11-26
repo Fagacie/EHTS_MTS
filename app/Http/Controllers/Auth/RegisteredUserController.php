@@ -8,12 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Notification\EtmsNotificationService;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -34,6 +32,7 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
+            'photo' => ['nullable', 'image', 'max:5120'],
             'job_title' => ['nullable', 'string', 'max:120'],
             'billing_contact_name' => ['nullable', 'string', 'max:150'],
             'billing_email' => ['nullable', 'email', 'max:255'],
@@ -46,11 +45,19 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        $user = DB::transaction(function () use ($validated): User {
+        $storedPhotoKey = null;
+        if ($request->hasFile('photo')) {
+            $storedPhotoKey = $request->file('photo')->store('users/avatars', 'public');
+        }
+
+        $user = DB::transaction(function () use ($validated, $storedPhotoKey): User {
             $user = User::query()->create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => $validated['password'],
+                'email_verified_at' => now(),
+                'photo_storage_disk' => $storedPhotoKey ? 'public' : null,
+                'photo_storage_key' => $storedPhotoKey,
                 'status' => UserStatus::Active->value,
             ]);
 
@@ -85,15 +92,13 @@ class RegisteredUserController extends Controller
             return $user;
         });
 
-        event(new Registered($user));
-
         app(EtmsNotificationService::class)->notifyUser(
             user: $user,
             eventType: 'user.registered',
             title: 'Welcome to Ecohydrotech Training Portal',
-            message: 'Your customer account has been created. Please verify your email address to access bookings, downloads, and certificates.',
+            message: 'Your account is active. You can now book live training sessions, purchase self-paced modules, and download certificates.',
             actionUrl: route('portal.dashboard', [], false),
-            actionLabel: 'Open Customer Portal',
+            actionLabel: 'Open Learner Portal',
             details: [
                 'Account Name' => $user->name,
                 'Email' => $user->email,
@@ -103,7 +108,10 @@ class RegisteredUserController extends Controller
         );
 
         Auth::login($user);
+        $request->session()->regenerate();
 
-        return redirect()->route('verification.notice');
+        return redirect()
+            ->route('portal.dashboard')
+            ->with('status', "Welcome to Ecohydrotech Solution, {$user->name}! Your account is ready.");
     }
 }

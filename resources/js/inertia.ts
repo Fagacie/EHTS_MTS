@@ -1,5 +1,6 @@
 import { createApp, h, type DefineComponent } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
+import { createPinia } from 'pinia';
 
 const pages = import.meta.glob<{ default: DefineComponent }>('./pages/**/*.vue');
 
@@ -16,12 +17,15 @@ createInertiaApp({
         return mod.default;
     },
     setup({ el, App, props, plugin }) {
+        const pinia = createPinia();
+
         createApp({ render: () => h(App, props) })
             .use(plugin)
+            .use(pinia)
             .mount(el);
     },
     progress: {
-        color: '#272d38',
+        color: '#2e5fd0',
         showSpinner: false,
     },
 });

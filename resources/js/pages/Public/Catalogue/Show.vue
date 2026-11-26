@@ -1,280 +1,269 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { BookOpen, Check, Download, FileText, Lock, PlayCircle } from 'lucide-vue-next';
-import ProgrammeBanner from '@/components/public/ProgrammeBanner.vue';
-import { Badge } from '@/components/ui/badge';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { useAuth } from '@/composables/useAuth';
-import { useRoutes } from '@/composables/useRoutes';
+    ArrowLeft,
+    ArrowRight,
+    CheckCircle2,
+    Download,
+    FileText,
+    Lock,
+    PlayCircle,
+} from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
 import PublicLayout from '@/layouts/PublicLayout.vue';
-import { formatDisplayFee, pluralize } from '@/lib/utils';
 import type { CatalogueShowProps } from '@/types/etms';
 
-const props = defineProps<CatalogueShowProps>();
-
-const { routes } = useRoutes();
-const { isAuthenticated } = useAuth();
-
-const hasLessonPreview = computed(
-    () => props.materials.length > 0 || props.videos.length > 0,
-);
+defineProps<CatalogueShowProps>();
 </script>
 
 <template>
-    <Head :title="module.title" />
-
     <PublicLayout>
-        <section class="border-b border-[#272d38]/10 bg-white py-6 lg:py-8">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem>
-                            <BreadcrumbLink :href="routes.catalogue">Standalone Modules</BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator />
-                        <BreadcrumbItem>
-                            <BreadcrumbPage class="line-clamp-1">{{ module.title }}</BreadcrumbPage>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
+        <Head :title="module.title" />
+
+        <!-- Top Breadcrumb & Title -->
+        <section class="border-b border-line bg-sand-50/70">
+            <div class="mx-auto max-w-7xl px-4 py-9 sm:px-6 sm:py-11 lg:px-8">
+                <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-muted">
+                    <Link :href="routes.catalogue" class="inline-flex items-center gap-1 transition-colors hover:text-navy-950">
+                        <ArrowLeft class="size-3.5" aria-hidden="true" />
+                        <span>Training Modules</span>
+                    </Link>
+                    <span>/</span>
+                    <Link :href="module.categoryUrl" class="transition-colors hover:text-navy-950">
+                        {{ module.categoryName }}
+                    </Link>
+                    <span>/</span>
+                    <span class="tabular-nums-mono text-navy-900">{{ module.code }}</span>
+                </div>
+
+                <div class="mt-4 max-w-3xl">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <StatusBadge tone="accent">{{ module.categoryName }}</StatusBadge>
+                        <span class="tabular-nums-mono rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-navy-900 ring-1 ring-line">
+                            {{ module.code }}
+                        </span>
+                        <StatusBadge v-if="module.hasActiveEntitlement" tone="success" dot>
+                            Active in Your Portal
+                        </StatusBadge>
+                    </div>
+
+                    <h1 class="type-page-title mt-3.5">{{ module.title }}</h1>
+
+                    <p v-if="module.summary" class="mt-2.5 text-base leading-relaxed text-muted">
+                        {{ module.summary }}
+                    </p>
+
+                    <div class="mt-5 flex flex-wrap items-center gap-5 text-sm font-medium text-ink">
+                        <span class="inline-flex items-center gap-2 tabular">
+                            <FileText class="size-4 text-accent-600" aria-hidden="true" />
+                            {{ materials.length }} {{ materials.length === 1 ? 'document' : 'documents' }}
+                        </span>
+                        <span class="inline-flex items-center gap-2 tabular">
+                            <PlayCircle class="size-4 text-primary-600" aria-hidden="true" />
+                            {{ videos.length }} {{ videos.length === 1 ? 'video' : 'videos' }}
+                        </span>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <section class="bg-white py-10 lg:py-14">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <div class="grid gap-10 lg:grid-cols-12 lg:items-start">
-                    <div class="space-y-10 lg:col-span-8">
-                        <div>
-                            <div class="overflow-hidden rounded-xl border border-[#272d38]/12 bg-white shadow-[0_1px_2px_rgba(39,45,56,0.04)]">
-                                <ProgrammeBanner
-                                    :cover-image-url="module.coverImageUrl"
-                                    :category-slug="module.categorySlug"
-                                    :title="module.title"
-                                    aspect-class="aspect-[21/9]"
-                                    :bordered-bottom="false"
-                                />
-                            </div>
+        <!-- 2-Column Content -->
+        <section class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+            <div class="grid gap-10 lg:grid-cols-12 lg:items-start">
+                <div class="space-y-10 lg:col-span-8">
+                    <div
+                        v-if="module.coverImageUrl"
+                        class="overflow-hidden rounded-2xl bg-navy-900 shadow-card ring-1 ring-neutral-200/80"
+                    >
+                        <img
+                            :src="module.coverImageUrl"
+                            :alt="module.title"
+                            class="aspect-[16/9] w-full object-cover"
+                        />
+                    </div>
 
-                            <div class="mt-6">
-                                <p class="text-[14px] text-[#272d38]/65 tabular-nums">
-                                    Standalone Learning Module &middot; {{ module.code }}
-                                </p>
-                                <h1 class="mt-2 text-3xl font-bold text-[#272d38] sm:text-4xl">
-                                    {{ module.title }}
-                                </h1>
-                                <p
-                                    v-if="module.summary"
-                                    class="mt-4 text-[16px] leading-relaxed text-[#272d38]/70"
-                                >
-                                    {{ module.summary }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="module.learningObjectives.length > 0"
-                            class="border-t border-[#272d38]/10 pt-8"
-                        >
-                            <h2 class="text-[22px] font-bold text-[#272d38]">
-                                Learning Outcomes
-                            </h2>
-                            <ul class="mt-5 grid gap-3.5 sm:grid-cols-2">
-                                <li
-                                    v-for="objective in module.learningObjectives"
-                                    :key="objective"
-                                    class="flex items-start gap-2.5 text-[15px] leading-relaxed text-[#272d38]"
-                                >
-                                    <Check class="mt-1 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
-                                    <span>{{ objective }}</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div class="border-t border-[#272d38]/10 pt-8">
-                            <h2 class="text-[22px] font-bold text-[#272d38]">
-                                Programme Syllabus &amp; Overview
-                            </h2>
-                            <div class="mt-4 whitespace-pre-line text-[16px] leading-relaxed text-[#272d38]/75">
-                                {{ module.description }}
-                            </div>
-                        </div>
-
-                        <div class="border-t border-[#272d38]/10 pt-8">
-                            <div class="flex flex-wrap items-baseline justify-between gap-2">
-                                <h2 class="text-[22px] font-bold text-[#272d38]">
-                                    Included Materials &amp; Lessons
-                                </h2>
-                                <p class="text-[14px] text-[#272d38]/65 tabular-nums">
-                                    {{ materials.length }} {{ pluralize(materials.length, 'workbook') }}
-                                    <template v-if="videos.length > 0">
-                                        &middot; {{ videos.length }} {{ pluralize(videos.length, 'lesson recording') }}
-                                    </template>
-                                </p>
-                            </div>
-
-                            <Card v-if="hasLessonPreview" class="mt-5 divide-y divide-[#272d38]/8 overflow-hidden">
-                                <div
-                                    v-for="material in materials"
-                                    :key="`mat-${material.id}`"
-                                    class="flex flex-wrap items-center justify-between gap-4 p-4 sm:px-5"
-                                >
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <FileText class="mt-0.5 h-4 w-4 shrink-0 text-[#272d38]/70" aria-hidden="true" />
-                                        <div class="min-w-0">
-                                            <p class="text-[15px] font-bold text-[#272d38]">
-                                                {{ material.title }}
-                                            </p>
-                                            <p
-                                                v-if="material.description"
-                                                class="mt-0.5 text-[14px] text-[#272d38]/65"
-                                            >
-                                                {{ material.description }}
-                                            </p>
-                                            <p class="mt-1 text-[14px] text-[#272d38]/60 tabular-nums">
-                                                {{ material.typeLabel }} &middot; {{ material.fileSizeLabel }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="shrink-0">
-                                        <Button
-                                            v-if="material.canDownload && material.downloadUrl"
-                                            as="a"
-                                            :href="material.downloadUrl"
-                                            variant="outline"
-                                            size="sm"
-                                        >
-                                            <Download class="h-4 w-4" aria-hidden="true" />
-                                            <span>Download</span>
-                                        </Button>
-                                        <Badge v-else variant="outline" class="gap-1.5 px-3 py-1 font-normal text-[#272d38]/70">
-                                            <Lock class="h-3.5 w-3.5" aria-hidden="true" />
-                                            <span>Portal access after purchase</span>
-                                        </Badge>
-                                    </div>
-                                </div>
-
-                                <div
-                                    v-for="video in videos"
-                                    :key="`vid-${video.id}`"
-                                    class="flex flex-wrap items-center justify-between gap-4 p-4 sm:px-5"
-                                >
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <PlayCircle class="mt-0.5 h-4 w-4 shrink-0 text-[#272d38]/70" aria-hidden="true" />
-                                        <div class="min-w-0">
-                                            <p class="text-[15px] font-bold text-[#272d38]">
-                                                {{ video.title }}
-                                            </p>
-                                            <p
-                                                v-if="video.description"
-                                                class="mt-0.5 text-[14px] text-[#272d38]/65"
-                                            >
-                                                {{ video.description }}
-                                            </p>
-                                            <p class="mt-1 text-[14px] text-[#272d38]/60 tabular-nums">
-                                                Video Lesson &middot; {{ video.durationLabel }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <Badge variant="outline" class="gap-1.5 px-3 py-1 font-normal text-[#272d38]/70">
-                                        <Lock class="h-3.5 w-3.5" aria-hidden="true" />
-                                        <span>Portal video access</span>
-                                    </Badge>
-                                </div>
-                            </Card>
-
-                            <p v-else class="mt-4 text-[16px] text-[#272d38]/70">
-                                Technical workbooks and reference materials are provided directly inside your learning portal.
-                            </p>
+                    <div>
+                        <h2 class="type-section-title text-navy-950">About this module</h2>
+                        <div class="mt-3.5 whitespace-pre-line text-sm leading-7 text-ink/90 sm:text-[15px]">
+                            {{ module.description }}
                         </div>
                     </div>
 
-                    <aside class="space-y-6 lg:sticky lg:top-24 lg:col-span-4">
-                        <Card
-                            v-if="module.isAvailableIndependently && module.independentPriceLabel"
-                            class="p-6"
-                        >
-                            <div class="flex items-center gap-2 text-[14px] font-bold text-[#272d38]">
-                                <BookOpen class="h-4 w-4 text-[#272d38]" aria-hidden="true" />
-                                <span>Independent Learning</span>
-                            </div>
+                    <div
+                        v-if="module.learningObjectives.length > 0"
+                        class="rounded-2xl border border-line bg-sand-50 p-6 sm:p-7"
+                    >
+                        <h2 class="type-section-title text-navy-950">Learning objectives</h2>
+                        <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+                            <li
+                                v-for="(objective, index) in module.learningObjectives"
+                                :key="index"
+                                class="flex items-start gap-2.5 text-sm leading-relaxed text-ink"
+                            >
+                                <CheckCircle2 class="mt-0.5 size-4 shrink-0 text-success-600" aria-hidden="true" />
+                                <span>{{ objective }}</span>
+                            </li>
+                        </ul>
+                    </div>
 
-                            <div class="mt-4 flex items-baseline gap-2">
-                                <span class="text-3xl font-bold text-[#272d38] tabular-nums">
-                                    {{ formatDisplayFee(module.independentPriceLabel) }}
+                    <div v-if="videos.length > 0">
+                        <h2 class="type-section-title text-navy-950">Video lessons</h2>
+                        <div class="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-neutral-200/80">
+                            <div
+                                v-for="(video, idx) in videos"
+                                :key="video.id"
+                                class="flex items-center justify-between gap-4 px-5 py-4"
+                            >
+                                <div class="flex items-start gap-3">
+                                    <span class="tabular mt-0.5 text-xs font-semibold text-muted">
+                                        {{ String(idx + 1).padStart(2, '0') }}
+                                    </span>
+                                    <div>
+                                        <p class="text-sm font-semibold text-navy-950">{{ video.title }}</p>
+                                        <p v-if="video.description" class="mt-0.5 text-xs text-muted">
+                                            {{ video.description }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2.5">
+                                    <span class="tabular text-xs font-medium text-muted">
+                                        {{ video.durationLabel }}
+                                    </span>
+                                    <Lock
+                                        v-if="!module.hasActiveEntitlement"
+                                        class="size-3.5 text-muted"
+                                        aria-hidden="true"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="materials.length > 0">
+                        <h2 class="type-section-title text-navy-950">Manuals &amp; downloadable files</h2>
+                        <div class="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-neutral-200/80">
+                            <div
+                                v-for="material in materials"
+                                :key="material.id"
+                                class="flex flex-wrap items-center justify-between gap-4 px-5 py-4"
+                            >
+                                <div class="flex items-start gap-3">
+                                    <FileText class="mt-0.5 size-4 shrink-0 text-accent-600" aria-hidden="true" />
+                                    <div>
+                                        <p class="text-sm font-semibold text-navy-950">{{ material.title }}</p>
+                                        <p class="mt-0.5 text-xs text-muted">
+                                            {{ material.typeLabel }} &middot;
+                                            <span class="tabular">{{ material.fileSizeLabel }}</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <AppButton
+                                    v-if="material.canDownload && material.downloadUrl"
+                                    :href="material.downloadUrl"
+                                    external
+                                    variant="outline"
+                                    size="sm"
+                                    pill
+                                >
+                                    <Download class="size-3.5" aria-hidden="true" />
+                                    <span>Download</span>
+                                </AppButton>
+                                <span
+                                    v-else
+                                    class="inline-flex items-center gap-1.5 rounded-full bg-sand-100 px-3 py-1 text-xs font-medium text-muted"
+                                >
+                                    <Lock class="size-3" aria-hidden="true" />
+                                    <span>Enrolled access</span>
                                 </span>
-                                <span class="text-[14px] text-[#272d38]/65">one-time fee</span>
                             </div>
-
-                            <ul class="mt-5 space-y-2.5 border-t border-[#272d38]/10 pt-5 text-[14px] text-[#272d38]">
-                                <li class="flex items-start gap-2">
-                                    <Check class="mt-0.5 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
-                                    <span>Start anytime with lifetime portal access</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <Check class="mt-0.5 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
-                                    <span>Downloadable engineering workbooks &amp; video lessons</span>
-                                </li>
-                                <li class="flex items-start gap-2">
-                                    <Check class="mt-0.5 h-4 w-4 shrink-0 text-[#272d38]" aria-hidden="true" />
-                                    <span>No physical session seat booking required</span>
-                                </li>
-                            </ul>
-
-                            <div class="mt-6">
-                                <template v-if="module.hasActiveEntitlement">
-                                    <p class="mb-3 rounded-lg border border-[#272d38]/15 bg-[#272d38]/[0.04] px-3.5 py-2.5 text-[14px] font-bold text-[#272d38]">
-                                        Included in your Learning Portal
-                                    </p>
-                                    <Button as-child class="w-full">
-                                        <Link :href="module.portalModuleUrl">
-                                            Open in Learning Portal
-                                        </Link>
-                                    </Button>
-                                </template>
-                                <template v-else-if="isAuthenticated && module.canPurchaseAsCustomer && module.checkoutUrl">
-                                    <Button as-child class="w-full">
-                                        <Link :href="module.checkoutUrl">
-                                            Purchase Module ({{ formatDisplayFee(module.independentPriceLabel) }})
-                                        </Link>
-                                    </Button>
-                                </template>
-                                <template v-else-if="isAuthenticated">
-                                    <p class="rounded-lg border border-[#272d38]/12 bg-[#272d38]/[0.03] px-3.5 py-3 text-[14px] text-[#272d38]/70">
-                                        Module purchases require a trainee account.
-                                    </p>
-                                </template>
-                                <template v-else>
-                                    <Button v-if="module.checkoutUrl" as-child class="w-full">
-                                        <a :href="module.checkoutUrl">
-                                            Sign in to Purchase ({{ formatDisplayFee(module.independentPriceLabel) }})
-                                        </a>
-                                    </Button>
-                                    <Button v-else as-child class="w-full">
-                                        <Link :href="routes.login">
-                                            Sign in to Purchase ({{ formatDisplayFee(module.independentPriceLabel) }})
-                                        </Link>
-                                    </Button>
-                                </template>
-                            </div>
-
-                            <p class="mt-4 text-[14px] leading-relaxed text-[#272d38]/65">
-                                Self-paced module access is separate from physical session registration and attendance certificates.
-                            </p>
-                        </Card>
-                    </aside>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Sticky Access Card -->
+                <aside class="lg:sticky lg:top-24 lg:col-span-4">
+                    <div class="rounded-2xl bg-white p-6 shadow-elevated ring-1 ring-neutral-200/80">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <p class="tabular text-3xl font-bold tracking-tight text-navy-950">
+                                {{ module.independentPriceLabel ?? 'Cohort Only' }}
+                            </p>
+                            <StatusBadge v-if="module.isAvailableIndependently" tone="success">
+                                Instant Access
+                            </StatusBadge>
+                        </div>
+
+                        <p class="mt-2 text-xs leading-relaxed text-muted">
+                            Includes portal access to published manuals and video lessons immediately after payment confirmation.
+                        </p>
+
+                        <div class="mt-6 space-y-2.5">
+                            <template v-if="module.hasActiveEntitlement">
+                                <AppButton :href="module.portalModuleUrl" variant="secondary" size="lg" class="w-full">
+                                    <span>Open in Learner Portal</span>
+                                    <ArrowRight class="size-4" aria-hidden="true" />
+                                </AppButton>
+                            </template>
+
+                            <template v-else-if="module.isAvailableIndependently && module.checkoutUrl">
+                                <AppButton
+                                    v-if="module.canPurchaseAsCustomer"
+                                    :href="module.checkoutUrl"
+                                    variant="warm"
+                                    size="lg"
+                                    class="w-full"
+                                >
+                                    <span>Purchase Module</span>
+                                    <ArrowRight class="size-4" aria-hidden="true" />
+                                </AppButton>
+
+                                <template v-else-if="!auth.user">
+                                    <AppButton :href="routes.login" variant="warm" size="lg" class="w-full">
+                                        <span>Sign in to Purchase</span>
+                                        <ArrowRight class="size-4" aria-hidden="true" />
+                                    </AppButton>
+                                    <AppButton :href="routes.register" variant="outline" size="md" class="w-full">
+                                        Create Learner Account
+                                    </AppButton>
+                                </template>
+
+                                <p
+                                    v-else
+                                    class="rounded-xl bg-warning-50 px-3.5 py-2.5 text-xs font-medium text-warning-700"
+                                >
+                                    Module purchases require a learner (customer) account.
+                                </p>
+                            </template>
+
+                            <template v-else>
+                                <AppButton :href="routes.sessions" variant="primary" size="lg" class="w-full">
+                                    <span>View Live Sessions</span>
+                                    <ArrowRight class="size-4" aria-hidden="true" />
+                                </AppButton>
+                            </template>
+                        </div>
+
+                        <dl class="mt-6 space-y-3 border-t border-line pt-5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-muted">Module code</dt>
+                                <dd class="tabular-nums-mono font-semibold text-navy-950">{{ module.code }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-muted">Subject</dt>
+                                <dd class="font-semibold text-navy-950">{{ module.categoryName }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-muted">Files included</dt>
+                                <dd class="tabular font-semibold text-navy-950">{{ materials.length }}</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-muted">Video lessons</dt>
+                                <dd class="tabular font-semibold text-navy-950">{{ videos.length }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </aside>
             </div>
         </section>
     </PublicLayout>

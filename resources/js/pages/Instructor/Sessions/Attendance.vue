@@ -1,26 +1,22 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue';
+import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,
     CheckCircle2,
-    Clock,
     Lock,
     Save,
     Send,
-    ShieldAlert,
     ShieldCheck,
     Users,
 } from 'lucide-vue-next';
-import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Button } from '@/components/ui/button';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
 import InstructorLayout from '@/layouts/InstructorLayout.vue';
 import type { InstructorAttendanceProps } from '@/types/etms';
 
 const props = defineProps<InstructorAttendanceProps>();
 
-// Initialise reactive draft form
 const formRecords: Record<number, { attendance_status: string; remarks: string }> = {};
 props.attendances.forEach((record) => {
     formRecords[record.id] = {
@@ -35,153 +31,140 @@ const draftForm = useForm({
 
 const submitForm = useForm({});
 
-// Calculate live client-side unmarked count based on current form selections
-const liveUnmarkedCount = computed(() => {
-    return Object.values(draftForm.records).filter(
-        (r) => r.attendance_status === 'pending'
-    ).length;
-});
+const liveUnmarkedCount = computed(() =>
+    Object.values(draftForm.records).filter((r) => r.attendance_status === 'pending').length,
+);
 
-const canSubmit = computed(() => {
-    return (
+const canSubmit = computed(
+    () =>
         !props.isLockedVerified &&
         props.attendances.length > 0 &&
         liveUnmarkedCount.value === 0 &&
-        props.allMarked
-    );
-});
+        props.allMarked,
+);
 
-function saveDraft() {
+function markAllPresent(): void {
+    if (props.isLockedVerified) return;
+    Object.keys(draftForm.records).forEach((key) => {
+        draftForm.records[Number(key)].attendance_status = 'present';
+    });
+}
+
+function saveDraft(): void {
     draftForm.put(props.updateAttendanceUrl, {
         preserveScroll: true,
     });
 }
 
-function submitForVerification() {
+function submitForVerification(): void {
     if (!canSubmit.value) return;
     submitForm.post(props.submitAttendanceUrl, {
         preserveScroll: true,
     });
+}
+
+function reviewTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
+    if (status === 'verified') return 'success';
+    if (status === 'submitted' || status === 'draft') return 'warning';
+    if (status === 'correction_requested') return 'danger';
+    return 'neutral';
 }
 </script>
 
 <template>
     <Head :title="`Attendance — ${session.sessionCode} — Ecohydrotech Training`" />
 
-    <InstructorLayout
-        :breadcrumb="`${session.sessionCode} / Attendance`"
-        :title="`${session.sessionCode} — ${session.title}`"
-        :subtitle="`${session.scheduleLabel} · ${session.venueName}`"
-    >
+    <InstructorLayout :breadcrumb="`${session.sessionCode} / Attendance`">
         <div class="space-y-6">
-            <!-- Header Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
+            <!-- Header -->
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-[#F1EDFB] px-2.5 py-1 font-mono text-xs font-bold text-[#5942B5]">
-                            {{ session.sessionCode }}
-                        </span>
-                        <span class="text-xs font-semibold uppercase tracking-wider text-[#7057D9]">
-                            Attendance Governance (INS-04, FR-16, D-020)
-                        </span>
-                    </div>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#292536]">
-                        {{ session.title }}
-                    </h1>
-                    <p class="mt-1 text-sm text-[#625D6D]">
+                    <Link
+                        :href="session.showUrl"
+                        class="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition hover:text-ink"
+                    >
+                        <ArrowLeft class="size-3.5" aria-hidden="true" />
+                        <span>Back to {{ session.sessionCode }}</span>
+                    </Link>
+                    <h1 class="type-page-title mt-1.5 text-ink">Attendance — {{ session.title }}</h1>
+                    <p class="mt-1 text-sm text-muted">
                         {{ session.scheduleLabel }} · {{ session.venueName }} ({{ session.venueCity }})
                     </p>
                 </div>
 
-                <div>
-                    <Button as-child variant="outline" size="sm" class="h-9 rounded-xl border-[#E5E1EB] px-3.5 text-xs font-semibold text-[#292536] hover:bg-[#F7F6FA]">
-                        <Link :href="session.showUrl">
-                            <ArrowLeft class="mr-1.5 h-3.5 w-3.5" />
-                            Back to Session Roster
-                        </Link>
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Two-Step Attendance Governance Notice (D-020) -->
-            <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 text-xs leading-relaxed text-[#625D6D] shadow-sm">
-                <div class="flex items-start gap-3">
-                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#EAE5F8] text-[#5942B5]">
-                        <ShieldCheck class="h-4 w-4" />
-                    </div>
-                    <div>
-                        <strong class="font-bold text-[#292536]">Two-Step Attendance Governance (D-020):</strong>
-                        <p class="mt-0.5">
-                            Mark each confirmed participant as <strong>Present</strong>, <strong>Absent</strong>, or <strong>Excused</strong> and save your draft. Once every participant on the roster has a marked status (no rows left as <em>Pending</em>), submit the sheet for Administrator Verification.
-                        </p>
-                    </div>
+                <div v-if="isLockedVerified" class="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-700">
+                    <Lock class="size-3.5" aria-hidden="true" />
+                    <span>Verified &amp; locked</span>
                 </div>
             </div>
 
             <!-- Empty State -->
-            <div
+            <section
                 v-if="attendances.length === 0"
-                class="rounded-2xl border border-[#E5E1EB] bg-white p-12 text-center shadow-sm"
+                class="rounded-2xl border border-line/85 bg-surface px-6 py-12 text-center shadow-card"
             >
-                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F1EDFB] text-[#7057D9]">
-                    <Users class="h-6 w-6" />
-                </div>
-                <h3 class="mt-3 text-base font-bold text-[#292536]">No confirmed participants on this roster</h3>
-                <p class="mx-auto mt-1 max-w-md text-xs text-[#625D6D]">
+                <Users class="mx-auto size-8 text-muted/60" aria-hidden="true" />
+                <p class="mt-2.5 text-sm font-semibold text-ink">No confirmed participants for this session</p>
+                <p class="mx-auto mt-1 max-w-md text-xs text-muted">
                     Attendance rows appear automatically once participants hold confirmed bookings for this session.
                 </p>
-            </div>
+            </section>
 
-            <!-- Attendance Sheet Card -->
-            <div v-else class="rounded-2xl border border-[#E5E1EB] bg-white shadow-sm overflow-hidden">
-                <div class="border-b border-[#E5E1EB] p-5 sm:p-6">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-base font-bold text-[#292536]">
-                                Participant Attendance Sheet ({{ attendances.length }})
-                            </h2>
-                            <p class="mt-0.5 text-xs text-[#625D6D]">
-                                Save draft marks as the session progresses, then submit the completed roster for administrator verification.
-                            </p>
-                        </div>
-                        <div v-if="isLockedVerified" class="flex items-center gap-1.5 rounded-full bg-[#E8F4ED] px-3 py-1 text-xs font-bold text-[#28734F]">
-                            <Lock class="h-3.5 w-3.5" />
-                            Roster Verified & Locked
-                        </div>
+            <!-- Attendance Sheet -->
+            <section
+                v-else
+                class="overflow-hidden rounded-2xl border border-line/85 bg-surface shadow-card"
+            >
+                <div class="flex flex-col gap-3 border-b border-line/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-ink">
+                            Participant attendance sheet ({{ attendances.length }})
+                        </h2>
+                        <p class="mt-0.5 text-xs text-muted">
+                            Mark every participant as Present, Absent, or Excused, save your draft, then submit for administrator verification.
+                        </p>
                     </div>
+
+                    <button
+                        v-if="!isLockedVerified"
+                        type="button"
+                        class="inline-flex h-8 shrink-0 items-center rounded-lg border border-line bg-surface px-3 text-xs font-medium text-ink transition hover:bg-sand-100"
+                        @click="markAllPresent"
+                    >
+                        Mark all present
+                    </button>
                 </div>
 
-                <!-- Form -->
-                <form @submit.prevent="saveDraft" class="p-5 sm:p-6 space-y-6">
+                <form @submit.prevent="saveDraft">
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-[#E5E1EB] text-left text-sm">
-                            <thead class="bg-[#F7F6FA]">
-                                <tr class="text-[11px] font-bold uppercase tracking-wider text-[#625D6D]">
-                                    <th class="py-3 pl-6 pr-4">Booking Ref</th>
-                                    <th class="py-3 px-4">Participant</th>
-                                    <th class="py-3 px-4">Attendance Status (Tap Target &ge;44px)</th>
-                                    <th class="py-3 px-4">Instructor Remarks</th>
-                                    <th class="py-3 pl-4 pr-6">Review State</th>
+                        <table class="w-full border-collapse text-left text-sm">
+                            <thead>
+                                <tr class="border-b border-line/80 bg-sand-50/70 text-xs font-semibold text-muted">
+                                    <th class="px-5 py-3">Booking Ref</th>
+                                    <th class="px-4 py-3">Participant</th>
+                                    <th class="px-4 py-3">Attendance</th>
+                                    <th class="px-4 py-3">Remarks</th>
+                                    <th class="px-5 py-3">Review</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-[#E5E1EB] bg-white">
+                            <tbody class="divide-y divide-line/65">
                                 <tr
                                     v-for="record in attendances"
                                     :key="record.id"
-                                    class="transition hover:bg-[#F7F6FA]/50"
+                                    class="hover:bg-sand-50/60"
                                 >
-                                    <td class="py-4 pl-6 pr-4 align-middle font-mono font-bold text-[#292536]">
+                                    <td class="tabular-nums-mono px-5 py-3.5 text-xs font-semibold text-ink">
                                         {{ record.bookingReference }}
                                     </td>
-                                    <td class="py-4 px-4 align-middle">
-                                        <p class="font-bold text-[#292536]">{{ record.participantName }}</p>
-                                        <p class="text-xs text-[#625D6D]">{{ record.organisation }}</p>
+                                    <td class="px-4 py-3.5">
+                                        <p class="font-medium text-ink">{{ record.participantName }}</p>
+                                        <p class="text-xs text-muted">{{ record.organisation }}</p>
                                     </td>
-                                    <td class="py-4 px-4 align-middle">
+                                    <td class="px-4 py-3.5">
                                         <select
                                             v-model="draftForm.records[record.id].attendance_status"
                                             :disabled="isLockedVerified || draftForm.processing"
-                                            class="min-h-[44px] w-full max-w-[160px] rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-xs font-bold text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9] disabled:bg-[#F7F6FA] disabled:text-[#625D6D]"
+                                            class="h-10 w-full min-w-[130px] max-w-[160px] rounded-xl border border-line bg-surface px-3 text-sm font-medium text-ink focus:border-primary-600 focus:outline-none disabled:bg-sand-50 disabled:text-muted"
                                         >
                                             <option value="pending">Pending</option>
                                             <option value="present">Present</option>
@@ -189,18 +172,18 @@ function submitForVerification() {
                                             <option value="excused">Excused</option>
                                         </select>
                                     </td>
-                                    <td class="py-4 px-4 align-middle">
+                                    <td class="px-4 py-3.5">
                                         <input
-                                            type="text"
                                             v-model="draftForm.records[record.id].remarks"
+                                            type="text"
                                             :disabled="isLockedVerified || draftForm.processing"
-                                            placeholder="Optional note (e.g. arrived on time, practical lab completed)"
-                                            class="min-h-[44px] w-full rounded-xl border border-[#E5E1EB] bg-white px-3.5 py-2 text-xs text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9] disabled:bg-[#F7F6FA] disabled:text-[#625D6D]"
+                                            placeholder="Optional note..."
+                                            class="h-10 w-full min-w-[200px] rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none disabled:bg-sand-50 disabled:text-muted"
                                         />
                                     </td>
-                                    <td class="py-4 pl-4 pr-6 align-middle">
-                                        <PortalStatusBadge
-                                            :status="record.reviewStatus"
+                                    <td class="px-5 py-3.5">
+                                        <StatusBadge
+                                            :tone="reviewTone(record.reviewStatus)"
                                             :label="record.reviewStatusLabel"
                                         />
                                     </td>
@@ -209,63 +192,56 @@ function submitForVerification() {
                         </table>
                     </div>
 
-                    <!-- Draft Save Button -->
-                    <div v-if="!isLockedVerified" class="flex flex-wrap items-center justify-end gap-3 border-t border-[#E5E1EB] pt-4">
-                        <Button
-                            type="submit"
-                            variant="outline"
-                            :disabled="draftForm.processing"
-                            class="min-h-[44px] rounded-xl border-[#E5E1EB] px-5 text-xs font-semibold text-[#292536] hover:bg-[#F7F6FA]"
-                        >
-                            <Save class="mr-1.5 h-4 w-4 text-[#7057D9]" />
-                            {{ draftForm.processing ? 'Saving Draft...' : 'Save Attendance Draft' }}
-                        </Button>
-                    </div>
-                </form>
-
-                <!-- Final Verification Submission Card (INS-04, D-020) -->
-                <div v-if="!isLockedVerified" class="border-t border-[#E5E1EB] bg-[#F7F6FA] p-5 sm:p-6">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div class="max-w-xl text-xs text-[#625D6D]">
-                            <div v-if="allMarked && liveUnmarkedCount === 0" class="flex items-center gap-2 text-[#28734F]">
-                                <CheckCircle2 class="h-4 w-4 shrink-0 text-[#28734F]" />
-                                <div>
-                                    <strong class="font-bold">All participants marked.</strong>
-                                    You can now submit this attendance sheet for Administrator Verification.
-                                </div>
-                            </div>
-                            <div v-else class="flex items-center gap-2 text-[#8B5A17]">
-                                <AlertCircle class="h-4 w-4 shrink-0 text-[#8B5A17]" />
-                                <div>
-                                    <strong class="font-bold">Action required before submission:</strong>
-                                    Save a non-pending attendance status (Present, Absent, or Excused) for every participant first
-                                    <span v-if="liveUnmarkedCount > 0"> ({{ liveUnmarkedCount }} still pending)</span>.
-                                </div>
-                            </div>
+                    <!-- Footer Actions -->
+                    <div
+                        v-if="!isLockedVerified"
+                        class="flex flex-col gap-4 border-t border-line/80 bg-sand-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <div class="text-xs">
+                            <p v-if="allMarked && liveUnmarkedCount === 0" class="flex items-center gap-1.5 font-medium text-success-700">
+                                <CheckCircle2 class="size-4 shrink-0" aria-hidden="true" />
+                                <span>All participants marked. Ready to submit for administrator verification.</span>
+                            </p>
+                            <p v-else class="flex items-center gap-1.5 text-warning-700">
+                                <AlertCircle class="size-4 shrink-0" aria-hidden="true" />
+                                <span>
+                                    Save a non-pending status for every participant before submitting
+                                    <span v-if="liveUnmarkedCount > 0"> ({{ liveUnmarkedCount }} pending)</span>.
+                                </span>
+                            </p>
                         </div>
 
-                        <form @submit.prevent="submitForVerification">
-                            <Button
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button
                                 type="submit"
-                                :disabled="!canSubmit || submitForm.processing"
-                                class="min-h-[44px] rounded-xl bg-[#7057D9] px-6 text-xs font-bold text-white shadow-none hover:bg-[#5942B5] disabled:cursor-not-allowed disabled:bg-[#E5E1EB] disabled:text-[#625D6D]"
+                                :disabled="draftForm.processing"
+                                class="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-sand-100 disabled:opacity-50"
                             >
-                                <Send class="mr-1.5 h-4 w-4" />
-                                {{ submitForm.processing ? 'Submitting...' : 'Submit Attendance for Verification' }}
-                            </Button>
-                        </form>
-                    </div>
-                </div>
+                                <Save class="size-4 text-muted" aria-hidden="true" />
+                                <span>{{ draftForm.processing ? 'Saving…' : 'Save draft' }}</span>
+                            </button>
 
-                <!-- Verified & Locked Notice -->
-                <div v-else class="border-t border-[#E5E1EB] bg-[#E8F4ED]/40 p-5 text-center text-xs text-[#28734F]">
-                    <ShieldCheck class="mx-auto h-5 w-5 text-[#28734F]" />
-                    <p class="mt-1 font-bold">Attendance Records Verified & Locked</p>
-                    <p class="mt-0.5 text-[#625D6D]">
-                        This session's attendance roster has been approved by administrators. Certificates may now be issued.
-                    </p>
-                </div>
-            </div>
+                            <button
+                                type="button"
+                                :disabled="!canSubmit || submitForm.processing"
+                                class="inline-flex h-10 items-center gap-1.5 rounded-xl bg-navy-950 px-4 text-sm font-semibold text-white transition hover:bg-navy-900 disabled:opacity-45"
+                                @click="submitForVerification"
+                            >
+                                <Send class="size-4" aria-hidden="true" />
+                                <span>{{ submitForm.processing ? 'Submitting…' : 'Submit for verification' }}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        v-else
+                        class="flex items-center justify-center gap-2 border-t border-line/80 bg-success-50/60 px-5 py-4 text-xs font-medium text-success-700"
+                    >
+                        <ShieldCheck class="size-4 shrink-0" aria-hidden="true" />
+                        <span>Attendance has been verified by an administrator and locked for certificate issuance.</span>
+                    </div>
+                </form>
+            </section>
         </div>
     </InstructorLayout>
 </template>

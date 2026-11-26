@@ -28,10 +28,20 @@ export interface AdminCalendarSession {
     detailUrl: string;
 }
 
-const props = defineProps<{
-    sessions: AdminCalendarSession[];
-    initialDate?: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        sessions: AdminCalendarSession[];
+        initialDate?: string;
+        title?: string;
+        allSessionsHref?: string;
+        createSessionHref?: string | null;
+    }>(),
+    {
+        title: 'Training schedule calendar',
+        allSessionsHref: '/admin-vue/sessions',
+        createSessionHref: '/admin-vue/sessions/create',
+    },
+);
 
 function parseYmd(ymd?: string): Date {
     if (ymd && /^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
@@ -207,7 +217,7 @@ function statusTone(statusValue: string): StatusTone {
             <div class="flex items-center gap-2.5">
                 <CalendarDays class="size-4 text-primary-600" aria-hidden="true" />
                 <div>
-                    <h2 class="text-sm font-semibold text-navy-950">Training schedule calendar</h2>
+                    <h2 class="text-sm font-semibold text-navy-950">{{ title }}</h2>
                     <p class="tabular text-xs text-muted">
                         {{ sessionsInViewMonth }}
                         {{ sessionsInViewMonth === 1 ? 'session' : 'sessions' }} in {{ monthTitle }}
@@ -354,13 +364,14 @@ function statusTone(statusValue: string): StatusTone {
 
                 <div class="mt-4 flex items-center justify-between gap-2 border-t border-line/70 pt-3">
                     <Link
-                        href="/admin-vue/sessions"
+                        :href="allSessionsHref"
                         class="text-xs font-semibold text-muted transition-colors hover:text-navy-950"
                     >
                         All sessions
                     </Link>
                     <Link
-                        href="/admin-vue/sessions/create"
+                        v-if="createSessionHref"
+                        :href="createSessionHref"
                         class="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 transition-colors hover:text-primary-700"
                     >
                         <Plus class="size-3.5" aria-hidden="true" />

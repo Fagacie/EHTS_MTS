@@ -1078,6 +1078,29 @@ export interface InstructorSessionItem {
     recordingsUrl: string;
 }
 
+export interface InstructorDashboardActionItem {
+    id: string;
+    label: string;
+    detail: string;
+    tone: 'warning' | 'neutral';
+    href: string;
+}
+
+export interface InstructorDashboardCalendarSession {
+    id: number;
+    title: string;
+    sessionCode: string;
+    startDate: string;
+    timeLabel: string;
+    venue: string;
+    instructors: string[];
+    confirmedBookings: number;
+    capacity: number;
+    statusValue: string;
+    status: string;
+    detailUrl: string;
+}
+
 export interface InstructorDashboardProps extends EtmsSharedProps {
     instructor: {
         displayName: string;
@@ -1087,10 +1110,17 @@ export interface InstructorDashboardProps extends EtmsSharedProps {
     };
     kpis: {
         assignedSessionsCount: number;
+        upcomingSessionsCount?: number;
+        completedSessionsCount?: number;
+        totalConfirmedParticipants?: number;
         pendingAttendanceCount: number;
         submittedRecordingsCount: number;
+        submittedMaterialsCount?: number;
     };
     assignedSessions: InstructorSessionItem[];
+    calendarSessions?: InstructorDashboardCalendarSession[];
+    todayYmd?: string;
+    actionItems?: InstructorDashboardActionItem[];
 }
 
 export interface InstructorSessionsIndexProps extends EtmsSharedProps {

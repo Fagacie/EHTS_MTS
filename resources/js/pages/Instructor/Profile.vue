@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
-import {
-    CheckCircle2,
-    ExternalLink,
-    Save,
-    UserCheck,
-} from 'lucide-vue-next';
-import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Button } from '@/components/ui/button';
+import { computed, ref } from 'vue';
+import { Head, useForm } from '@inertiajs/vue3';
+import { Camera, ExternalLink, Save } from 'lucide-vue-next';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
 import InstructorLayout from '@/layouts/InstructorLayout.vue';
 import type { InstructorProfileProps } from '@/types/etms';
 
 const props = defineProps<InstructorProfileProps>();
+
+const photoInput = ref<HTMLInputElement | null>(null);
 const photo = ref<File | null>(null);
 const photoPreview = ref<string | null>(props.profile.photoUrl);
-
-function handlePhoto(event: Event): void {
-    photo.value = (event.target as HTMLInputElement).files?.[0] ?? null;
-    photoPreview.value = photo.value ? URL.createObjectURL(photo.value) : props.profile.photoUrl;
-}
 
 const form = useForm({
     display_name: props.profile.displayName || props.user.name,
@@ -30,188 +21,205 @@ const form = useForm({
     biography: props.profile.biography || '',
 });
 
-function submitProfile() {
-    router.post(props.updateUrl, {
+const initials = computed(() =>
+    (form.display_name || props.user.name || 'I')
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? '')
+        .join(''),
+);
+
+function handlePhoto(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    photo.value = file;
+    photoPreview.value = file ? URL.createObjectURL(file) : props.profile.photoUrl;
+}
+
+function submitProfile(): void {
+    form.transform((data) => ({
+        ...data,
         _method: 'PUT',
-        display_name: form.display_name,
-        professional_title: form.professional_title,
-        qualifications: form.qualifications,
-        short_bio: form.short_bio,
-        specialisations_text: form.specialisations_text,
-        biography: form.biography,
-        photo: photo.value,
-    }, {
+        ...(photo.value ? { photo: photo.value } : {}),
+    })).post(props.updateUrl, {
         forceFormData: true,
         preserveScroll: true,
+        onSuccess: () => {
+            photo.value = null;
+        },
     });
 }
 </script>
 
 <template>
-    <Head title="My Instructor Profile — Ecohydrotech Training" />
+    <Head title="My Profile — Ecohydrotech Training" />
 
-    <InstructorLayout
-        breadcrumb="Instructor Profile"
-        title="My Instructor Profile"
-        subtitle="Maintain your professional biography, qualifications, and domain specialisations displayed on public session pages (INS-07, FR-15)."
-    >
+    <InstructorLayout breadcrumb="My Profile">
         <div class="mx-auto max-w-4xl space-y-6">
-            <!-- Header Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[#E5E1EB] bg-white p-5">
+            <!-- Header -->
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-[#292536]">
-                        My Instructor Profile
-                    </h1>
-                    <p class="mt-1 text-sm text-[#625D6D]">
-                        Professional credentials & public profile management for {{ user.email }}
+                    <h1 class="type-page-title text-ink">My Profile</h1>
+                    <p class="mt-1 text-sm text-muted">
+                        {{ user.email }} · Credentials and biography shown on public training pages.
                     </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    <PortalStatusBadge
-                        :status="profile.isPublic ? 'published' : 'draft'"
-                        :label="profile.isPublic ? 'Published on Public Directory' : 'Hidden from Public Directory'"
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <StatusBadge
+                        :tone="profile.isPublic ? 'success' : 'neutral'"
+                        :label="profile.isPublic ? 'Public directory active' : 'Hidden from directory'"
                     />
                     <a
                         v-if="profile.isPublic && profile.publicProfileUrl"
                         :href="profile.publicProfileUrl"
                         target="_blank"
-                        class="inline-flex items-center gap-1 text-xs font-semibold text-[#5942B5] hover:underline"
+                        class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-xs font-medium text-ink transition hover:bg-sand-100"
                     >
-                        View Public Profile
-                        <ExternalLink class="h-3.5 w-3.5" />
+                        <span>View public profile</span>
+                        <ExternalLink class="size-3.5 text-muted" aria-hidden="true" />
                     </a>
                 </div>
             </div>
 
             <!-- Profile Form Card -->
-            <div class="rounded-lg border border-[#E5E1EB] bg-white p-5 sm:p-6">
-                <div class="border-b border-[#E5E1EB] pb-4">
-                    <h2 class="text-base font-bold text-[#292536]">Professional Credentials & Biography</h2>
-                    <p class="mt-0.5 text-xs text-[#625D6D]">
-                        Public directory listing and session brochure visibility is governed by administrators.
-                    </p>
-                </div>
-
-                <form @submit.prevent="submitProfile" class="mt-6 space-y-5">
-                    <div class="flex items-center gap-4 rounded-lg border border-[#E5E1EB] bg-[#FAF9FC] p-4">
-                        <img
-                            v-if="photoPreview"
-                            :src="photoPreview"
-                            alt="Instructor profile photo"
-                            class="h-24 w-24 rounded-full object-cover border border-[#E5E1EB]"
-                        />
-                        <span v-else class="grid h-24 w-24 place-items-center rounded-full bg-[#F1EDFB] text-2xl font-bold text-[#5942B5]">
-                            {{ (props.profile.displayName || props.user.name).slice(0, 1).toUpperCase() }}
-                        </span>
-                        <div>
-                            <label for="instructor-photo" class="block text-sm font-bold text-[#292536]">Profile photo</label>
-                            <p class="mt-1 text-xs text-[#625D6D]">PNG, JPG or WebP. Maximum 5 MB.</p>
-                            <input
-                                id="instructor-photo"
-                                name="photo"
-                                type="file"
-                                accept="image/*"
-                                class="mt-2 block max-w-xs text-xs text-[#625D6D]"
-                                @change="handlePhoto"
-                            />
-                        </div>
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <label for="display_name" class="block text-sm font-medium text-[#403B4B]">
-                                Public Display Name <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="display_name"
-                                type="text"
-                                v-model="form.display_name"
-                                required
-                                class="mt-1 h-10 w-full rounded-md border border-[#E5E1EB] bg-white px-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                            />
-                            <p v-if="form.errors.display_name" class="mt-1 text-xs text-red-600">
-                                {{ form.errors.display_name }}
-                            </p>
-                        </div>
-
-                        <div>
-                            <label for="professional_title" class="block text-sm font-medium text-[#403B4B]">
-                                Professional Title
-                            </label>
-                            <input
-                                id="professional_title"
-                                type="text"
-                                v-model="form.professional_title"
-                                placeholder="Principal Hydrologist / Senior Water Resources Engineer"
-                                class="mt-1 h-10 w-full rounded-md border border-[#E5E1EB] bg-white px-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="qualifications" class="block text-sm font-medium text-[#403B4B]">
-                            Academic & Professional Qualifications
-                        </label>
-                        <input
-                            id="qualifications"
-                            type="text"
-                            v-model="form.qualifications"
-                            placeholder="PhD (Hydrology), BEM P.Eng, MIEM, Certified Flood Modeller"
-                            class="mt-1 h-10 w-full rounded-md border border-[#E5E1EB] bg-white px-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="short_bio" class="block text-sm font-medium text-[#403B4B]">
-                            Short Summary Bio
-                        </label>
-                        <input
-                            id="short_bio"
-                            type="text"
-                            v-model="form.short_bio"
-                            placeholder="1-sentence summary displayed on session cards and marketing brochures"
-                            class="mt-1 h-10 w-full rounded-md border border-[#E5E1EB] bg-white px-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="specialisations_text" class="block text-sm font-medium text-[#403B4B]">
-                            Domain Specialisations (Comma-Separated)
-                        </label>
-                        <input
-                            id="specialisations_text"
-                            type="text"
-                            v-model="form.specialisations_text"
-                            placeholder="Flood Forecasting, HEC-RAS 2D, Urban Stormwater MSMA, Hydrodynamic Modelling"
-                            class="mt-1 h-10 w-full rounded-md border border-[#E5E1EB] bg-white px-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="biography" class="block text-sm font-medium text-[#403B4B]">
-                            Professional Biography
-                        </label>
-                        <textarea
-                            id="biography"
-                            v-model="form.biography"
-                            rows="6"
-                            placeholder="Provide your full background, consulting expertise, research publications, and training experience..."
-                            class="mt-1 w-full rounded-md border border-[#E5E1EB] bg-white p-3 text-sm leading-relaxed text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-2 focus:ring-[#7057D9]/15"
-                        />
-                    </div>
-
-                    <div class="flex justify-end border-t border-[#E5E1EB] pt-4">
-                        <Button
-                            type="submit"
-                            :disabled="form.processing"
-                            class="rounded-md bg-[#7057D9] px-5 py-2 text-sm font-medium text-white hover:bg-[#5942B5] disabled:bg-[#E5E1EB]"
+            <form
+                class="rounded-2xl border border-line/85 bg-surface p-6 shadow-card sm:p-8"
+                @submit.prevent="submitProfile"
+            >
+                <div class="flex flex-col gap-8 md:flex-row md:items-start">
+                    <!-- Left: Circular Avatar Uploader -->
+                    <div class="flex flex-col items-center md:w-44 md:shrink-0">
+                        <button
+                            type="button"
+                            class="group relative size-36 overflow-hidden rounded-full border border-line bg-sand-100 shadow-xs transition hover:border-navy-950/30"
+                            aria-label="Upload profile photo"
+                            @click="photoInput?.click()"
                         >
-                            <Save class="mr-1.5 h-4 w-4" />
-                            {{ form.processing ? 'Saving...' : 'Save Profile Changes' }}
-                        </Button>
+                            <img
+                                v-if="photoPreview"
+                                :src="photoPreview"
+                                alt="Instructor profile photo"
+                                class="size-full object-cover"
+                            />
+                            <span
+                                v-else
+                                class="grid size-full place-items-center text-3xl font-bold text-navy-950"
+                            >
+                                {{ initials }}
+                            </span>
+                            <span
+                                class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-navy-950/55 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100"
+                            >
+                                <Camera class="size-5" aria-hidden="true" />
+                                <span>Change photo</span>
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            class="mt-3 text-xs font-medium text-primary-600 hover:underline"
+                            @click="photoInput?.click()"
+                        >
+                            {{ photoPreview ? 'Update photo' : 'Upload photo' }}
+                        </button>
+                        <p class="mt-1 text-center text-[11px] text-muted">
+                            JPG, PNG, or WebP · max 5 MB
+                        </p>
+                        <input
+                            ref="photoInput"
+                            type="file"
+                            accept="image/*"
+                            class="hidden"
+                            @change="handlePhoto"
+                        />
                     </div>
-                </form>
-            </div>
+
+                    <!-- Right: Fields -->
+                    <div class="min-w-0 flex-1 space-y-5">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Public display name</span>
+                                <input
+                                    v-model="form.display_name"
+                                    type="text"
+                                    required
+                                    maxlength="150"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                                <span v-if="form.errors.display_name" class="text-danger-600">
+                                    {{ form.errors.display_name }}
+                                </span>
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Professional title</span>
+                                <input
+                                    v-model="form.professional_title"
+                                    type="text"
+                                    maxlength="150"
+                                    placeholder="e.g., Principal Hydrologist"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                        </div>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Academic &amp; professional qualifications</span>
+                            <input
+                                v-model="form.qualifications"
+                                type="text"
+                                maxlength="255"
+                                placeholder="e.g., PhD (Hydrology), BEM P.Eng, MIEM"
+                                class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Short summary</span>
+                            <input
+                                v-model="form.short_bio"
+                                type="text"
+                                maxlength="500"
+                                placeholder="One-sentence summary shown on session cards"
+                                class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Domain specialisations (comma-separated)</span>
+                            <input
+                                v-model="form.specialisations_text"
+                                type="text"
+                                maxlength="500"
+                                placeholder="Flood Forecasting, HEC-RAS 2D, Urban Stormwater MSMA"
+                                class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Biography</span>
+                            <textarea
+                                v-model="form.biography"
+                                rows="6"
+                                maxlength="5000"
+                                placeholder="Full background, consulting expertise, publications, and training experience..."
+                                class="rounded-xl border border-line bg-surface p-3 text-sm leading-relaxed text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+
+                        <div class="flex justify-end border-t border-line/80 pt-5">
+                            <button
+                                type="submit"
+                                :disabled="form.processing"
+                                class="inline-flex h-10 items-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-semibold text-white transition hover:bg-navy-900 disabled:opacity-50"
+                            >
+                                <Save class="size-4" aria-hidden="true" />
+                                <span>{{ form.processing ? 'Saving…' : 'Save changes' }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
     </InstructorLayout>
 </template>

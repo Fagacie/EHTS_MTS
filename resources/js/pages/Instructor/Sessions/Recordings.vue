@@ -1,20 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import {
-    ArrowLeft,
-    CheckCircle2,
-    FileVideo,
-    HardDrive,
-    Info,
-    UploadCloud,
-    Video,
-} from 'lucide-vue-next';
-import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, UploadCloud, Video } from 'lucide-vue-next';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
 import InstructorLayout from '@/layouts/InstructorLayout.vue';
 import type { InstructorRecordingsProps } from '@/types/etms';
 
 const props = defineProps<InstructorRecordingsProps>();
+const fileInputKey = ref(0);
 
 const form = useForm({
     title: '',
@@ -24,204 +17,177 @@ const form = useForm({
     duration_seconds: 3600,
 });
 
-function onFileSelected(event: Event) {
+function onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-        form.video_file = input.files[0];
-    } else {
-        form.video_file = null;
-    }
+    form.video_file = input.files?.[0] ?? null;
 }
 
-function submitRecording() {
+function submitRecording(): void {
     form.post(props.submitUrl, {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
             form.reset('title', 'description', 'video_file', 'provider_video_id');
+            fileInputKey.value++;
         },
     });
+}
+
+function statusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
+    const s = status.toLowerCase();
+    if (['published', 'approved', 'ready', 'completed'].includes(s)) return 'success';
+    if (['pending', 'pending_review', 'queued', 'processing'].includes(s)) return 'warning';
+    if (['rejected', 'failed'].includes(s)) return 'danger';
+    return 'neutral';
 }
 </script>
 
 <template>
     <Head :title="`Recordings — ${session.sessionCode} — Ecohydrotech Training`" />
 
-    <InstructorLayout
-        :breadcrumb="`${session.sessionCode} / Recordings`"
-        :title="`${session.sessionCode} — ${session.title}`"
-        :subtitle="`Recording Access Policy: ${session.recordingAccessPolicyLabel} (INS-06, FR-08, D-017)`"
-    >
+    <InstructorLayout :breadcrumb="`${session.sessionCode} / Recordings`">
         <div class="space-y-6">
-            <!-- Header Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-[#F1EDFB] px-2.5 py-1 font-mono text-xs font-bold text-[#5942B5]">
-                            {{ session.sessionCode }}
-                        </span>
-                        <span class="text-xs font-semibold uppercase tracking-wider text-[#7057D9]">
-                            Session Recording Upload (INS-06, FR-08, D-017)
-                        </span>
-                    </div>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#292536]">
-                        {{ session.title }}
-                    </h1>
-                    <p class="mt-1 text-sm text-[#625D6D]">
-                        Recording Access Policy: <strong class="text-[#292536]">{{ session.recordingAccessPolicyLabel }}</strong>
-                    </p>
-                </div>
-
-                <Button as-child variant="outline" size="sm" class="h-9 rounded-xl border-[#E5E1EB] px-3.5 text-xs font-semibold text-[#292536] hover:bg-[#F7F6FA]">
-                    <Link :href="session.showUrl">
-                        <ArrowLeft class="mr-1.5 h-3.5 w-3.5" />
-                        Back to Session
-                    </Link>
-                </Button>
+            <!-- Header -->
+            <div>
+                <Link
+                    :href="session.showUrl"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition hover:text-ink"
+                >
+                    <ArrowLeft class="size-3.5" aria-hidden="true" />
+                    <span>Back to {{ session.sessionCode }}</span>
+                </Link>
+                <h1 class="type-page-title mt-1.5 text-ink">Session Recordings</h1>
+                <p class="mt-1 text-sm text-muted">
+                    {{ session.sessionCode }} · {{ session.title }} · Access policy:
+                    <strong class="font-medium text-ink">{{ session.recordingAccessPolicyLabel }}</strong>
+                </p>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-12">
-                <!-- Submitted Recordings Column (col-span-7) -->
-                <div class="space-y-6 lg:col-span-7">
-                    <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-[#E5E1EB] pb-4">
-                            <div>
-                                <h2 class="text-base font-bold text-[#292536]">
-                                    Submitted Session Recordings ({{ recordings.length }})
-                                </h2>
-                                <p class="mt-0.5 text-xs text-[#625D6D]">
-                                    Recordings are stored privately on company server, transcoded via FFmpeg HLS, and held in pending review until approved.
-                                </p>
-                            </div>
-                        </div>
-
-                        <!-- Empty State -->
-                        <div v-if="recordings.length === 0" class="py-12 text-center">
-                            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F1EDFB] text-[#7057D9]">
-                                <Video class="h-6 w-6" />
-                            </div>
-                            <h3 class="mt-3 text-base font-bold text-[#292536]">No recordings submitted yet</h3>
-                            <p class="mx-auto mt-1 max-w-sm text-xs text-[#625D6D]">
-                                Use the form to upload session lecture or workshop video files.
-                            </p>
-                        </div>
-
-                        <!-- List of Recordings -->
-                        <div v-else class="divide-y divide-[#E5E1EB]">
-                            <div
-                                v-for="rec in recordings"
-                                :key="rec.id"
-                                class="py-4 first:pt-4 last:pb-0"
-                            >
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <h3 class="text-sm font-bold text-[#292536]">{{ rec.title }}</h3>
-                                    <div class="flex items-center gap-2">
-                                        <PortalStatusBadge status="info" :label="rec.encodingStatusLabel" />
-                                        <PortalStatusBadge :status="rec.status" :label="rec.statusLabel" />
-                                    </div>
-                                </div>
-
-                                <p v-if="rec.description" class="mt-1 text-xs text-[#625D6D]">
-                                    {{ rec.description }}
-                                </p>
-
-                                <p v-if="rec.reviewNotes" class="mt-1 text-xs font-medium text-amber-800">
-                                    Administrator review note: {{ rec.reviewNotes }}
-                                </p>
-
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-[#625D6D]">
-                                    <span v-if="rec.originalFilename">File: {{ rec.originalFilename }}</span>
-                                    <span v-if="rec.durationLabel">Duration: {{ rec.durationLabel }}</span>
-                                    <span v-if="rec.submittedAtLabel">Submitted: {{ rec.submittedAtLabel }}</span>
-                                </div>
-                            </div>
-                        </div>
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                <!-- Left 7 cols: Submitted Recordings -->
+                <section class="overflow-hidden rounded-2xl border border-line/85 bg-surface shadow-card lg:col-span-7">
+                    <div class="border-b border-line/80 px-5 py-4">
+                        <h2 class="text-base font-semibold text-ink">
+                            Submitted recordings ({{ recordings.length }})
+                        </h2>
+                        <p class="mt-0.5 text-xs text-muted">
+                            Recordings are transcoded into encrypted HLS streams and reviewed by an administrator before publication.
+                        </p>
                     </div>
-                </div>
 
-                <!-- Upload Form Column (col-span-5) -->
-                <div class="space-y-6 lg:col-span-5">
-                    <div class="rounded-2xl border border-[#E5E1EB] bg-white p-5 sm:p-6 shadow-sm">
-                        <div class="border-b border-[#E5E1EB] pb-4">
-                            <h2 class="text-base font-bold text-[#292536]">Upload Session Recording</h2>
-                            <p class="mt-0.5 text-xs text-[#625D6D]">
-                                Upload an MP4 / MOV / MKV / WebM video file for automated FFmpeg HLS transcoding.
-                            </p>
-                        </div>
+                    <div v-if="recordings.length === 0" class="px-5 py-12 text-center">
+                        <Video class="mx-auto size-8 text-muted/60" aria-hidden="true" />
+                        <p class="mt-2.5 text-sm font-medium text-ink">No recordings submitted yet</p>
+                        <p class="mt-0.5 text-xs text-muted">
+                            Upload a session lecture or workshop recording using the form.
+                        </p>
+                    </div>
 
-                        <form @submit.prevent="submitRecording" class="mt-4 space-y-4">
-                            <div>
-                                <label for="title" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Recording Title <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    id="title"
-                                    type="text"
-                                    v-model="form.title"
-                                    required
-                                    placeholder="Part 1: Morning Hydrology Lecture & Calibration"
-                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white px-3.5 py-2 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9]"
-                                />
-                                <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">
-                                    {{ form.errors.title }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <label for="video_file" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Video File (MP4 / MOV / MKV / WebM) <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    id="video_file"
-                                    type="file"
-                                    required
-                                    accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
-                                    @change="onFileSelected"
-                                    class="mt-1 block w-full rounded-xl border border-[#E5E1EB] bg-white px-3 py-2 text-xs text-[#292536] file:mr-3 file:rounded-lg file:border-0 file:bg-[#F1EDFB] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[#5942B5] hover:file:bg-[#EAE5F8]"
-                                />
-                                <p v-if="form.errors.video_file" class="mt-1 text-xs text-red-600">
-                                    {{ form.errors.video_file }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <label for="description" class="block text-xs font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Recording Notes (Optional)
-                                </label>
-                                <textarea
-                                    id="description"
-                                    v-model="form.description"
-                                    rows="3"
-                                    placeholder="Key timestamps, topics covered, or lab steps demonstrated..."
-                                    class="mt-1 w-full rounded-xl border border-[#E5E1EB] bg-white p-3 text-sm text-[#292536] focus:border-[#7057D9] focus:outline-none focus:ring-1 focus:ring-[#7057D9]"
-                                />
-                            </div>
-
-                            <!-- Upload Progress Bar -->
-                            <div v-if="form.progress" class="space-y-1">
-                                <div class="flex justify-between text-xs text-[#625D6D]">
-                                    <span>Uploading video...</span>
-                                    <span>{{ form.progress.percentage }}%</span>
-                                </div>
-                                <div class="h-2 w-full rounded-full bg-[#E5E1EB] overflow-hidden">
-                                    <div
-                                        class="h-full bg-[#7057D9] transition-all duration-150"
-                                        :style="{ width: `${form.progress.percentage}%` }"
+                    <div v-else class="divide-y divide-line/70">
+                        <div v-for="rec in recordings" :key="rec.id" class="px-5 py-4">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <h3 class="text-sm font-semibold text-ink">{{ rec.title }}</h3>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <StatusBadge
+                                        :tone="statusTone(rec.encodingStatus)"
+                                        :label="rec.encodingStatusLabel"
+                                    />
+                                    <StatusBadge
+                                        :tone="statusTone(rec.status)"
+                                        :label="rec.statusLabel"
                                     />
                                 </div>
                             </div>
 
-                            <Button
-                                type="submit"
-                                :disabled="form.processing"
-                                class="w-full rounded-xl bg-[#7057D9] py-2.5 text-xs font-bold text-white shadow-none hover:bg-[#5942B5] disabled:cursor-not-allowed disabled:bg-[#E5E1EB] disabled:text-[#625D6D]"
-                            >
-                                <UploadCloud class="mr-1.5 h-4 w-4" />
-                                {{ form.processing ? 'Uploading & Transcoding...' : 'Upload & Submit for Approval' }}
-                            </Button>
-                        </form>
+                            <p v-if="rec.description" class="mt-1 text-xs text-muted">
+                                {{ rec.description }}
+                            </p>
+
+                            <p v-if="rec.reviewNotes" class="mt-1.5 text-xs font-medium text-warning-700">
+                                Review note: {{ rec.reviewNotes }}
+                            </p>
+
+                            <div class="tabular-nums-mono mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+                                <span v-if="rec.originalFilename">{{ rec.originalFilename }}</span>
+                                <span v-if="rec.durationLabel">{{ rec.durationLabel }}</span>
+                                <span v-if="rec.submittedAtLabel">Submitted {{ rec.submittedAtLabel }}</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </section>
+
+                <!-- Right 5 cols: Upload Form -->
+                <section class="rounded-2xl border border-line/85 bg-surface p-5 shadow-card lg:col-span-5">
+                    <div class="border-b border-line/80 pb-3.5">
+                        <h2 class="text-base font-semibold text-ink">Upload recording</h2>
+                        <p class="mt-0.5 text-xs text-muted">
+                            MP4, MOV, MKV, or WebM video files for automated HLS transcoding.
+                        </p>
+                    </div>
+
+                    <form class="mt-4 space-y-4" @submit.prevent="submitRecording">
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Recording title</span>
+                            <input
+                                v-model="form.title"
+                                type="text"
+                                required
+                                placeholder="e.g., Part 1: Hydrology Calibration Lecture"
+                                class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                            <span v-if="form.errors.title" class="text-danger-600">
+                                {{ form.errors.title }}
+                            </span>
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Video file</span>
+                            <input
+                                :key="fileInputKey"
+                                type="file"
+                                required
+                                accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
+                                class="block w-full rounded-xl border border-line bg-surface px-3 py-2 text-xs text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-1 file:text-xs file:font-medium file:text-navy-950"
+                                @change="onFileSelected"
+                            />
+                            <span v-if="form.errors.video_file" class="text-danger-600">
+                                {{ form.errors.video_file }}
+                            </span>
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Notes (optional)</span>
+                            <textarea
+                                v-model="form.description"
+                                rows="3"
+                                placeholder="Key timestamps, topics covered, or lab steps..."
+                                class="rounded-xl border border-line bg-surface p-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+
+                        <div v-if="form.progress" class="space-y-1">
+                            <div class="flex justify-between text-xs text-muted">
+                                <span>Uploading video…</span>
+                                <span class="tabular font-medium text-ink">{{ form.progress.percentage }}%</span>
+                            </div>
+                            <div class="h-1.5 w-full overflow-hidden rounded-full bg-sand-100">
+                                <div
+                                    class="h-full bg-navy-950 transition-all duration-150"
+                                    :style="{ width: `${form.progress.percentage}%` }"
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            :disabled="form.processing || !form.video_file || !form.title.trim()"
+                            class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-navy-950 px-4 text-sm font-semibold text-white transition hover:bg-navy-900 disabled:opacity-45"
+                        >
+                            <UploadCloud class="size-4" aria-hidden="true" />
+                            <span>{{ form.processing ? 'Uploading…' : 'Upload & submit for review' }}</span>
+                        </button>
+                    </form>
+                </section>
             </div>
         </div>
     </InstructorLayout>

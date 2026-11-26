@@ -2,48 +2,44 @@
 import { computed, onMounted, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import {
+    AlertCircle,
     Bell,
     BookOpen,
     CalendarCheck,
+    CheckCircle2,
     Compass,
     LayoutDashboard,
     LogOut,
     Menu,
     PanelLeftClose,
     PanelLeftOpen,
-    ShieldCheck,
     UserCheck,
+    X,
 } from 'lucide-vue-next';
-import PortalStatusBadge from '@/components/portal/PortalStatusBadge.vue';
-import { Button } from '@/components/ui/button';
 import {
-    DropdownMenu,
+    DialogClose,
+    DialogContent,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
+    DialogTrigger,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
+    DropdownMenuPortal,
+    DropdownMenuRoot,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
+} from 'reka-ui';
+import UserAvatar from '@/components/ds/UserAvatar.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useRoutes } from '@/composables/useRoutes';
-import { cn, getInitials } from '@/lib/utils';
-import type {
-    EtmsSharedProps,
-    PortalNotificationItem,
-} from '@/types/etms';
+import type { EtmsSharedProps, PortalNotificationItem } from '@/types/etms';
 
 interface NavEntry {
     label: string;
     href: string;
-    icon: unknown;
+    icon: typeof LayoutDashboard;
     active: boolean;
     isInertia: boolean;
     badge?: number;
@@ -64,15 +60,15 @@ const props = withDefaults(
 const STORAGE_KEY = 'etms_instructor_sidebar_collapsed';
 
 const page = usePage<EtmsSharedProps>();
-const app = computed(() => page.props.app);
 const flash = computed(() => page.props.flash);
 const instructorShell = computed(() => page.props.instructorShell);
+const shortName = computed(() => page.props.app?.shortName || 'ETMS');
 
 const { user, portals, hasMultiplePortals, loggingOut, logout } = useAuth();
 const { routes, isActive } = useRoutes();
 
 const collapsed = ref(false);
-const mobileMenuOpen = ref(false);
+const mobileOpen = ref(false);
 const notifMenuOpen = ref(false);
 const busyMarkAll = ref(false);
 const busyNotificationId = ref<string | null>(null);
@@ -93,7 +89,11 @@ const instructorNav = computed<NavEntry[]>(() => [
         label: 'Dashboard',
         href: routes.value.instructorDashboard,
         icon: LayoutDashboard,
-        active: isActive('/instructor') && !isActive('/instructor/sessions') && !isActive('/instructor/profile') && !isActive('/instructor/notifications'),
+        active:
+            isActive('/instructor') &&
+            !isActive('/instructor/sessions') &&
+            !isActive('/instructor/profile') &&
+            !isActive('/instructor/notifications'),
         isInertia: true,
     },
     {
@@ -157,12 +157,8 @@ function toggleSidebarCollapse(): void {
     try {
         window.localStorage.setItem(STORAGE_KEY, collapsed.value ? '1' : '0');
     } catch {
-        // Ignore storage write restriction
+        // Ignore storage restriction.
     }
-}
-
-function closeMobileMenu(): void {
-    mobileMenuOpen.value = false;
 }
 
 function markAllNotificationsRead(): void {
@@ -214,455 +210,435 @@ function openNotificationItem(item: PortalNotificationItem): void {
 </script>
 
 <template>
-    <div class="portal-violet min-h-screen bg-[#F7F6FA] font-sans text-[#292536] lg:flex">
+    <div class="min-h-screen bg-[#f7f6f2] text-ink">
         <a
             href="#main-content"
-            class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[#7057D9] focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white focus:outline-none"
+            class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-navy-950 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:outline-none"
         >
             Skip to main content
         </a>
 
-        <!-- Desktop Sidebar -->
+        <!-- Desktop Collapsible Sidebar -->
         <aside
-            :class="
-                cn(
-                    'hidden lg:block lg:shrink-0 lg:border-r lg:border-[#E5E1EB] lg:bg-[#F7F6FA] lg:text-[#292536] lg:transition-[width] lg:duration-150',
-                    collapsed ? 'lg:w-[74px]' : 'lg:w-[238px]',
-                )
-            "
+            class="fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line/80 bg-[#f7f6f2] transition-[width] duration-150 lg:flex"
+            :class="collapsed ? 'w-[74px]' : 'w-64'"
             aria-label="Instructor Portal Navigation"
         >
-            <div class="sticky top-0 flex h-screen flex-col">
-                <!-- Brand / Logo -->
-                <div :class="cn('px-4 pt-5 pb-5', collapsed && 'flex justify-center px-2')">
-                    <Link
-                        :href="routes.instructorDashboard"
-                        title="Ecohydrotech Instructor Portal"
-                        aria-label="Ecohydrotech Instructor Portal"
-                        :class="
-                            cn(
-                                'inline-flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/40',
-                                collapsed && 'justify-center',
-                            )
-                        "
+            <!-- Brand Header -->
+            <div class="flex h-16 shrink-0 items-center justify-between border-b border-line/70 px-4">
+                <Link
+                    v-if="!collapsed"
+                    :href="routes.instructorDashboard"
+                    class="flex min-w-0 items-center gap-2 focus-visible:outline-none"
+                >
+                    <img
+                        src="/images/ecohydrotech-logo.png"
+                        alt="Ecohydrotech"
+                        class="h-8 w-auto shrink-0 object-contain"
+                    />
+                    <span class="h-4 w-px shrink-0 bg-line-strong/80" aria-hidden="true" />
+                    <span class="truncate text-xs font-bold tracking-wider text-navy-950 uppercase">
+                        {{ shortName }}
+                    </span>
+                </Link>
+
+                <button
+                    type="button"
+                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-sand-100 hover:text-navy-950"
+                    :class="collapsed ? 'mx-auto' : ''"
+                    :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                    @click="toggleSidebarCollapse"
+                >
+                    <PanelLeftOpen v-if="collapsed" class="size-4" aria-hidden="true" />
+                    <PanelLeftClose v-else class="size-4" aria-hidden="true" />
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 space-y-4 overflow-y-auto px-3 py-4" aria-label="Instructor Sidebar">
+                <div class="space-y-0.5">
+                    <component
+                        :is="item.isInertia ? Link : 'a'"
+                        v-for="item in instructorNav"
+                        :key="item.label"
+                        :href="item.href"
+                        :title="collapsed ? item.label : undefined"
+                        :aria-current="item.active ? 'page' : undefined"
+                        class="flex h-9 items-center justify-between gap-2.5 rounded-lg px-3 text-[13px] font-medium transition-colors duration-150"
+                        :class="[
+                            item.active
+                                ? 'bg-navy-950 font-semibold text-white shadow-xs'
+                                : 'text-muted hover:bg-sand-100/80 hover:text-navy-950',
+                            collapsed ? 'justify-center px-0' : '',
+                        ]"
                     >
-                        <img
-                            :src="app.logoUrl"
-                            alt=""
-                            width="32"
-                            height="32"
-                            class="h-8 w-8 shrink-0 rounded-[8px] object-contain"
-                            aria-hidden="true"
-                        >
-                        <span v-if="!collapsed" class="truncate text-[16px] font-extrabold tracking-tight text-[#282338]">
-                            Ecohydrotech
+                        <span class="flex min-w-0 items-center gap-2.5">
+                            <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
+                            <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
                         </span>
-                    </Link>
+                        <span
+                            v-if="!collapsed && item.badge"
+                            class="tabular inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                            :class="item.active ? 'bg-white/20 text-white' : 'bg-navy-950 text-white'"
+                        >
+                            {{ item.badge }}
+                        </span>
+                    </component>
                 </div>
 
-                <!-- Instructor Navigation -->
-                <nav class="flex flex-1 flex-col overflow-y-auto px-3 pb-4" aria-label="Instructor Sidebar">
-                    <ul class="space-y-1">
-                        <li v-for="item in instructorNav" :key="item.label">
-                            <component
-                                :is="item.isInertia ? Link : 'a'"
-                                :href="item.href"
-                                :title="collapsed ? item.label : undefined"
-                                :aria-current="item.active ? 'page' : undefined"
-                                :class="
-                                    cn(
-                                        'group flex items-center justify-between gap-2.5 rounded-[8px] px-3 py-2.5 text-[13.5px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/40',
-                                        item.active
-                                            ? 'bg-[#EAE5F8] font-bold text-[#5942B5]'
-                                            : 'font-medium text-[#403B4B] hover:bg-[#EAE5F8]/60 hover:text-[#282338]',
-                                        collapsed && 'justify-center px-2',
-                                    )
-                                "
-                            >
-                                <span :class="cn('flex min-w-0 items-center gap-3', collapsed && 'gap-0')">
-                                    <component
-                                        :is="item.icon"
-                                        :class="
-                                            cn(
-                                                'h-[17px] w-[17px] shrink-0 transition-colors',
-                                                item.active
-                                                    ? 'text-[#5942B5]'
-                                                    : 'text-[#625D6D] group-hover:text-[#5942B5]',
-                                            )
-                                        "
-                                        aria-hidden="true"
-                                    />
-                                    <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
-                                </span>
-
-                                <span
-                                    v-if="!collapsed && item.badge"
-                                    class="inline-flex min-w-5 items-center justify-center rounded-full bg-[#7057D9] px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums"
-                                >
-                                    {{ item.badge }}
-                                </span>
-                            </component>
-                        </li>
-                    </ul>
-
-                    <div class="my-4 h-px bg-[#E5E1EB]" aria-hidden="true" />
-
-                    <!-- Utility Nav -->
-                    <ul class="space-y-1">
-                        <li v-for="item in utilityNav" :key="item.label">
-                            <component
-                                :is="item.isInertia ? Link : 'a'"
-                                :href="item.href"
-                                :title="collapsed ? item.label : undefined"
-                                :class="
-                                    cn(
-                                        'group flex items-center justify-between gap-2.5 rounded-[8px] px-3 py-2.5 text-[13.5px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/40',
-                                        'font-medium text-[#403B4B] hover:bg-[#EAE5F8]/60 hover:text-[#282338]',
-                                        collapsed && 'justify-center px-2',
-                                    )
-                                "
-                            >
-                                <span :class="cn('flex min-w-0 items-center gap-3', collapsed && 'gap-0')">
-                                    <component
-                                        :is="item.icon"
-                                        class="h-[17px] w-[17px] shrink-0 text-[#625D6D] transition-colors group-hover:text-[#5942B5]"
-                                        aria-hidden="true"
-                                    />
-                                    <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
-                                </span>
-                            </component>
-                        </li>
-                    </ul>
-
-                    <!-- Collapse / Expand trigger -->
-                    <div class="mt-auto pt-3">
-                        <button
-                            type="button"
-                            :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-                            :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
-                            class="flex w-full items-center justify-center gap-2 rounded-[8px] py-2 text-[12px] font-semibold text-[#625D6D] transition-colors hover:bg-[#EAE5F8]/60 hover:text-[#282338] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7057D9]/40"
-                            @click="toggleSidebarCollapse"
+                <div class="border-t border-line/70 pt-3">
+                    <p
+                        v-if="!collapsed"
+                        class="mb-1.5 px-3 text-[11px] font-semibold text-muted/80"
+                    >
+                        Links
+                    </p>
+                    <div class="space-y-0.5">
+                        <component
+                            :is="item.isInertia ? Link : 'a'"
+                            v-for="item in utilityNav"
+                            :key="item.label"
+                            :href="item.href"
+                            :title="collapsed ? item.label : undefined"
+                            class="flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium text-muted transition-colors hover:bg-sand-100/80 hover:text-navy-950"
+                            :class="collapsed ? 'justify-center px-0' : ''"
                         >
-                            <component
-                                :is="collapsed ? PanelLeftOpen : PanelLeftClose"
-                                class="h-4 w-4"
-                                aria-hidden="true"
-                            />
-                            <span v-if="!collapsed">Collapse Menu</span>
-                        </button>
+                            <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
+                            <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+                        </component>
                     </div>
-                </nav>
+                </div>
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="shrink-0 border-t border-line/70 p-3">
+                <div
+                    v-if="!collapsed"
+                    class="mb-2 flex items-center gap-2.5 rounded-lg bg-white/70 px-2.5 py-2"
+                >
+                    <UserAvatar
+                        :name="user?.name ?? 'Instructor'"
+                        :src="user?.photoUrl"
+                        size="sm"
+                    />
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-xs font-semibold text-navy-950">
+                            {{ user?.name ?? 'Instructor' }}
+                        </p>
+                        <p class="truncate text-[11px] text-muted">Instructor</p>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium text-muted transition-colors hover:bg-sand-100 hover:text-navy-950 disabled:opacity-50"
+                    :class="collapsed ? 'justify-center px-0' : ''"
+                    :title="collapsed ? 'Sign out' : undefined"
+                    :disabled="loggingOut"
+                    @click="logout"
+                >
+                    <LogOut class="size-4 shrink-0" aria-hidden="true" />
+                    <span v-if="!collapsed">{{ loggingOut ? 'Signing out...' : 'Sign out' }}</span>
+                </button>
             </div>
         </aside>
 
-        <!-- Main Body Wrapper -->
-        <div class="flex min-w-0 flex-1 flex-col">
-            <!-- Top Header Bar -->
-            <header
-                class="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b border-[#E5E1EB] bg-[#F7F6FA]/95 px-4 backdrop-blur sm:px-6 lg:px-8"
-            >
+        <!-- Main Column -->
+        <div
+            class="min-h-screen transition-[padding] duration-150"
+            :class="collapsed ? 'lg:pl-[74px]' : 'lg:pl-64'"
+        >
+            <!-- Sticky Topbar -->
+            <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line/70 bg-[#f7f6f2]/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
                 <div class="flex min-w-0 items-center gap-3">
-                    <!-- Mobile Hamburger -->
-                    <Sheet v-model:open="mobileMenuOpen">
-                        <SheetTrigger as-child>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-9 w-9 p-0 text-[#403B4B] hover:bg-[#EAE5F8] lg:hidden"
-                                aria-label="Open navigation menu"
+                    <!-- Mobile Drawer -->
+                    <DialogRoot v-model:open="mobileOpen">
+                        <DialogTrigger as-child>
+                            <button
+                                type="button"
+                                class="inline-flex size-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white hover:text-navy-950 lg:hidden"
+                                aria-label="Open menu"
                             >
-                                <Menu class="h-5 w-5" aria-hidden="true" />
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent
-                            side="left"
-                            class="w-[280px] border-r border-[#E5E1EB] bg-[#F7F6FA] p-0 text-[#292536]"
-                        >
-                            <SheetHeader class="border-b border-[#E5E1EB] p-4 text-left">
-                                <SheetTitle class="flex items-center gap-2.5 text-[16px] font-extrabold text-[#282338]">
-                                    <img
-                                        :src="app.logoUrl"
-                                        alt=""
-                                        width="28"
-                                        height="28"
-                                        class="h-7 w-7 rounded-[8px] object-contain"
-                                        aria-hidden="true"
+                                <Menu class="size-5" aria-hidden="true" />
+                            </button>
+                        </DialogTrigger>
+                        <DialogPortal>
+                            <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/50 backdrop-blur-[1px] lg:hidden" />
+                            <DialogContent
+                                class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#f7f6f2] shadow-2xl focus:outline-none lg:hidden"
+                            >
+                                <div class="flex h-16 items-center justify-between border-b border-line px-4">
+                                    <DialogTitle class="flex items-center gap-2">
+                                        <img
+                                            src="/images/ecohydrotech-logo.png"
+                                            alt="Ecohydrotech"
+                                            class="h-7 w-auto object-contain"
+                                        />
+                                        <span class="h-4 w-px bg-line-strong/80" aria-hidden="true" />
+                                        <span class="text-xs font-bold tracking-wider text-navy-950 uppercase">
+                                            {{ shortName }}
+                                        </span>
+                                    </DialogTitle>
+                                    <DialogClose
+                                        class="inline-flex size-8 items-center justify-center rounded-lg text-muted hover:bg-sand-100 hover:text-navy-950"
+                                        aria-label="Close menu"
                                     >
-                                    <span>Ecohydrotech</span>
-                                </SheetTitle>
-                                <SheetDescription class="text-[12px] text-[#625D6D]">
-                                    Instructor Portal Workspace
-                                </SheetDescription>
-                            </SheetHeader>
+                                        <X class="size-4" aria-hidden="true" />
+                                    </DialogClose>
+                                </div>
 
-                            <div class="flex flex-1 flex-col overflow-y-auto p-3">
-                                <ul class="space-y-1">
-                                    <li v-for="item in instructorNav" :key="item.label">
+                                <nav class="flex-1 space-y-4 overflow-y-auto p-3" aria-label="Mobile instructor navigation">
+                                    <div class="space-y-0.5">
                                         <component
                                             :is="item.isInertia ? Link : 'a'"
+                                            v-for="item in instructorNav"
+                                            :key="item.label"
                                             :href="item.href"
+                                            class="flex h-9 items-center justify-between rounded-lg px-3 text-[13px] font-medium transition-colors"
                                             :class="
-                                                cn(
-                                                    'flex items-center justify-between rounded-[8px] px-3 py-2 text-[13.5px] transition-colors',
-                                                    item.active
-                                                        ? 'bg-[#EAE5F8] font-bold text-[#5942B5]'
-                                                        : 'font-medium text-[#403B4B] hover:bg-[#EAE5F8]/60 hover:text-[#282338]',
-                                                )
+                                                item.active
+                                                    ? 'bg-navy-950 font-semibold text-white'
+                                                    : 'text-muted hover:bg-sand-100 hover:text-navy-950'
                                             "
-                                            @click="closeMobileMenu"
+                                            @click="mobileOpen = false"
                                         >
                                             <span class="flex items-center gap-2.5">
-                                                <component :is="item.icon" class="h-4 w-4" />
+                                                <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
                                                 <span>{{ item.label }}</span>
                                             </span>
                                             <span
                                                 v-if="item.badge"
-                                                class="rounded-full bg-[#7057D9] px-2 py-0.5 text-[10px] font-bold text-white tabular-nums"
+                                                class="tabular rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold"
                                             >
                                                 {{ item.badge }}
                                             </span>
                                         </component>
-                                    </li>
-                                </ul>
+                                    </div>
 
-                                <div class="my-4 h-px bg-[#E5E1EB]" />
+                                    <div class="border-t border-line pt-3">
+                                        <div class="space-y-0.5">
+                                            <component
+                                                :is="item.isInertia ? Link : 'a'"
+                                                v-for="item in utilityNav"
+                                                :key="item.label"
+                                                :href="item.href"
+                                                class="flex h-9 items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium text-muted hover:bg-sand-100 hover:text-navy-950"
+                                                @click="mobileOpen = false"
+                                            >
+                                                <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
+                                                <span>{{ item.label }}</span>
+                                            </component>
+                                        </div>
+                                    </div>
+                                </nav>
 
-                                <ul class="space-y-1">
-                                    <li v-for="item in utilityNav" :key="item.label">
-                                        <component
-                                            :is="item.isInertia ? Link : 'a'"
-                                            :href="item.href"
-                                            class="flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13.5px] font-medium text-[#403B4B] hover:bg-[#EAE5F8]/60 hover:text-[#282338]"
-                                            @click="closeMobileMenu"
-                                        >
-                                            <component :is="item.icon" class="h-4 w-4 text-[#625D6D]" />
-                                            <span>{{ item.label }}</span>
-                                        </component>
-                                    </li>
-                                </ul>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                                <div class="border-t border-line p-3">
+                                    <button
+                                        type="button"
+                                        class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-[13px] font-medium text-muted hover:bg-sand-100 hover:text-navy-950"
+                                        :disabled="loggingOut"
+                                        @click="logout"
+                                    >
+                                        <LogOut class="size-4" aria-hidden="true" />
+                                        <span>Sign out</span>
+                                    </button>
+                                </div>
+                            </DialogContent>
+                        </DialogPortal>
+                    </DialogRoot>
 
-                    <!-- Breadcrumbs -->
-                    <nav class="hidden min-w-0 items-center text-[13.5px] font-medium sm:flex" aria-label="Breadcrumb">
+                    <!-- Breadcrumb -->
+                    <nav class="hidden items-center gap-2 text-sm sm:flex" aria-label="Breadcrumb">
                         <Link
                             :href="routes.instructorDashboard"
-                            class="text-[#625D6D] transition-colors hover:text-[#282338]"
+                            class="font-medium text-muted transition-colors hover:text-navy-950"
                         >
                             Instructor
                         </Link>
-                        <span class="mx-2 text-[#C0BBC9]">/</span>
-                        <span class="truncate font-bold text-[#282338]">{{ breadcrumb }}</span>
+                        <span class="text-line-strong">/</span>
+                        <span class="truncate font-semibold text-navy-950">{{ breadcrumb }}</span>
                     </nav>
                 </div>
 
                 <!-- Right Header Actions -->
-                <div class="flex items-center gap-2.5 sm:gap-3">
+                <div class="flex items-center gap-2.5">
                     <!-- Notifications Dropdown -->
-                    <DropdownMenu v-model:open="notifMenuOpen">
+                    <DropdownMenuRoot v-model:open="notifMenuOpen">
                         <DropdownMenuTrigger as-child>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                class="relative h-9 w-9 border-[#E5E1EB] bg-white p-0 text-[#403B4B] shadow-none hover:border-[#B9ADE9] hover:bg-[#FAF9FE] hover:text-[#282338] focus-visible:ring-[#7057D9]/40"
+                            <button
+                                type="button"
+                                class="relative inline-flex size-9 items-center justify-center rounded-lg bg-white text-muted ring-1 ring-line transition-colors hover:bg-sand-50 hover:text-navy-950"
                                 aria-label="Notifications"
                             >
-                                <Bell class="h-4 w-4" aria-hidden="true" />
+                                <Bell class="size-4" aria-hidden="true" />
                                 <span
                                     v-if="unreadCountResolved > 0"
-                                    class="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#7057D9] px-1 text-[9.5px] font-bold text-white tabular-nums ring-2 ring-[#F7F6FA]"
+                                    class="tabular absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-navy-950 px-1 text-[9.5px] font-bold text-white ring-2 ring-[#f7f6f2]"
                                 >
                                     {{ unreadCountResolved > 9 ? '9+' : unreadCountResolved }}
                                 </span>
-                            </Button>
+                            </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            align="end"
-                            class="w-[320px] rounded-[10px] border-[#E5E1EB] bg-white p-0 text-[#292536] shadow-lg sm:w-[360px]"
-                        >
-                            <div class="flex items-center justify-between border-b border-[#EEEAF2] px-4 py-3">
-                                <div>
-                                    <p class="text-[13.5px] font-bold text-[#282338]">Notifications</p>
-                                    <p class="text-[11.5px] text-[#625D6D]">
-                                        {{ unreadCountResolved }} unread updates
-                                    </p>
-                                </div>
-                                <button
-                                    v-if="unreadCountResolved > 0"
-                                    type="button"
-                                    :disabled="busyMarkAll"
-                                    class="text-[11.5px] font-bold text-[#5942B5] transition-colors hover:text-[#7057D9] disabled:opacity-50"
-                                    @click="markAllNotificationsRead"
-                                >
-                                    {{ busyMarkAll ? 'Updating...' : 'Mark all read' }}
-                                </button>
-                            </div>
-
-                            <div v-if="recentNotifications.length === 0" class="px-4 py-8 text-center">
-                                <p class="text-[13px] font-medium text-[#625D6D]">No new notifications</p>
-                            </div>
-
-                            <ul v-else class="max-h-[300px] divide-y divide-[#EEEAF2] overflow-y-auto">
-                                <li
-                                    v-for="item in recentNotifications"
-                                    :key="item.id"
-                                    :class="
-                                        cn(
-                                            'cursor-pointer px-4 py-3 transition-colors hover:bg-[#FAF9FE]',
-                                            item.isUnread && 'bg-[#F9F7FD]',
-                                        )
-                                    "
-                                    @click="openNotificationItem(item)"
-                                >
-                                    <div class="flex items-start justify-between gap-2">
-                                        <p class="line-clamp-1 text-[13px] font-bold text-[#282338]">
-                                            {{ item.title }}
-                                        </p>
-                                        <span
-                                            v-if="item.isUnread"
-                                            class="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7057D9]"
-                                            aria-hidden="true"
-                                        />
-                                    </div>
-                                    <p class="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-[#625D6D]">
-                                        {{ item.message }}
-                                    </p>
-                                    <p class="mt-1 text-[10.5px] text-[#868092] tabular-nums">
-                                        {{ item.createdAtLabel }}
-                                    </p>
-                                </li>
-                            </ul>
-
-                            <div class="border-t border-[#EEEAF2] p-2 text-center">
-                                <Link
-                                    :href="routes.instructorNotifications"
-                                    class="block rounded-[6px] py-1.5 text-[12px] font-bold text-[#5942B5] hover:bg-[#FAF9FE] hover:text-[#7057D9]"
-                                    @click="notifMenuOpen = false"
-                                >
-                                    View all notifications
-                                </Link>
-                            </div>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <!-- Multi-role Portal Switcher Pill -->
-                    <div v-if="hasMultiplePortals" class="hidden sm:block">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger as-child>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    class="h-9 gap-1.5 border-[#E5E1EB] bg-white px-2.5 text-[12px] font-bold text-[#403B4B] shadow-none hover:border-[#B9ADE9] hover:bg-[#FAF9FE]"
-                                >
-                                    <span class="h-2 w-2 rounded-full bg-[#7057D9]" />
-                                    <span>Instructor</span>
-                                </Button>
-                            </DropdownMenuTrigger>
+                        <DropdownMenuPortal>
                             <DropdownMenuContent
                                 align="end"
-                                class="w-56 rounded-[10px] border-[#E5E1EB] bg-white text-[#292536] shadow-lg"
+                                :side-offset="6"
+                                class="z-50 w-[320px] rounded-xl border border-line bg-white p-0 shadow-elevated sm:w-[360px]"
                             >
-                                <DropdownMenuLabel class="text-[11px] font-bold uppercase tracking-wider text-[#625D6D]">
-                                    Switch Portal
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator class="bg-[#EEEAF2]" />
+                                <div class="flex items-center justify-between border-b border-line/80 px-4 py-3">
+                                    <div>
+                                        <p class="text-sm font-semibold text-ink">Notifications</p>
+                                        <p class="text-xs text-muted">{{ unreadCountResolved }} unread</p>
+                                    </div>
+                                    <button
+                                        v-if="unreadCountResolved > 0"
+                                        type="button"
+                                        :disabled="busyMarkAll"
+                                        class="text-xs font-medium text-primary-600 hover:underline disabled:opacity-50"
+                                        @click="markAllNotificationsRead"
+                                    >
+                                        {{ busyMarkAll ? 'Updating…' : 'Mark all read' }}
+                                    </button>
+                                </div>
+
+                                <div v-if="recentNotifications.length === 0" class="px-4 py-8 text-center text-xs text-muted">
+                                    No new notifications
+                                </div>
+
+                                <ul v-else class="max-h-[300px] divide-y divide-line/70 overflow-y-auto">
+                                    <li
+                                        v-for="item in recentNotifications"
+                                        :key="item.id"
+                                        class="cursor-pointer px-4 py-3 transition-colors hover:bg-sand-50"
+                                        :class="item.isUnread ? 'bg-primary-50/35' : ''"
+                                        @click="openNotificationItem(item)"
+                                    >
+                                        <div class="flex items-start justify-between gap-2">
+                                            <p class="line-clamp-1 text-xs font-semibold text-ink">
+                                                {{ item.title }}
+                                            </p>
+                                            <span
+                                                v-if="item.isUnread"
+                                                class="mt-1 size-2 shrink-0 rounded-full bg-primary-600"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
+                                        <p class="mt-0.5 line-clamp-2 text-xs text-muted">
+                                            {{ item.message }}
+                                        </p>
+                                        <p class="tabular mt-1 text-[10.5px] text-muted/80">
+                                            {{ item.createdAtLabel }}
+                                        </p>
+                                    </li>
+                                </ul>
+
+                                <div class="border-t border-line/80 p-2 text-center">
+                                    <Link
+                                        :href="routes.instructorNotifications"
+                                        class="block rounded-lg py-1.5 text-xs font-medium text-primary-600 hover:bg-sand-50"
+                                        @click="notifMenuOpen = false"
+                                    >
+                                        View all notifications
+                                    </Link>
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuRoot>
+
+                    <!-- Account Menu -->
+                    <DropdownMenuRoot>
+                        <DropdownMenuTrigger as-child>
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 ring-1 ring-line transition-colors hover:bg-sand-50"
+                                aria-label="Open instructor menu"
+                            >
+                                <UserAvatar
+                                    :name="user?.name ?? 'Instructor'"
+                                    :src="user?.photoUrl"
+                                    size="sm"
+                                />
+                                <span class="hidden max-w-32 truncate text-xs font-semibold text-navy-950 sm:inline">
+                                    {{ user?.name }}
+                                </span>
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuContent
+                                align="end"
+                                :side-offset="6"
+                                class="z-50 w-56 rounded-xl bg-white p-1.5 shadow-elevated ring-1 ring-line"
+                            >
+                                <div class="px-2.5 py-2">
+                                    <p class="truncate text-xs font-semibold text-navy-950">{{ user?.name }}</p>
+                                    <p class="truncate text-[11px] text-muted">{{ user?.email }}</p>
+                                </div>
+                                <DropdownMenuSeparator class="my-1 h-px bg-line" />
                                 <DropdownMenuItem
-                                    v-for="portal in portals"
-                                    :key="portal.slug"
                                     as-child
-                                    class="text-[13px] font-medium hover:bg-[#FAF9FE]"
+                                    class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-ink outline-none hover:bg-sand-100"
                                 >
-                                    <a :href="portal.url" class="flex flex-col items-start gap-0.5">
-                                        <span class="font-bold text-[#282338]">{{ portal.label }}</span>
-                                        <span class="text-[11px] text-[#625D6D]">{{ portal.description }}</span>
-                                    </a>
+                                    <Link :href="routes.instructorProfile">
+                                        <UserCheck class="size-3.5 text-muted" />
+                                        <span>My Profile</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    as-child
+                                    class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-ink outline-none hover:bg-sand-100"
+                                >
+                                    <Link :href="routes.instructorNotifications">
+                                        <Bell class="size-3.5 text-muted" />
+                                        <span>Notifications</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <template v-if="hasMultiplePortals">
+                                    <DropdownMenuSeparator class="my-1 h-px bg-line" />
+                                    <DropdownMenuItem
+                                        v-for="portal in portals"
+                                        :key="portal.slug"
+                                        as-child
+                                        class="flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-xs font-medium text-ink outline-none hover:bg-sand-100"
+                                    >
+                                        <a :href="portal.url">{{ portal.label }}</a>
+                                    </DropdownMenuItem>
+                                </template>
+                                <DropdownMenuSeparator class="my-1 h-px bg-line" />
+                                <DropdownMenuItem
+                                    class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-danger-600 outline-none hover:bg-danger-50"
+                                    @select="logout"
+                                >
+                                    <LogOut class="size-3.5" />
+                                    <span>{{ loggingOut ? 'Signing out...' : 'Sign out' }}</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-
-                    <!-- User Account Dropdown -->
-                    <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="flex h-9 items-center gap-2 rounded-full p-1 hover:bg-[#EAE5F8] focus-visible:ring-[#7057D9]/40"
-                                aria-label="Open user menu"
-                            >
-                                <img v-if="user?.photoUrl" :src="user.photoUrl" alt="" class="h-7 w-7 rounded-full object-cover"/>
-                                <span v-else class="flex h-7 w-7 items-center justify-center rounded-full bg-[#7057D9] text-[11px] font-extrabold text-white">
-                                    {{ getInitials(user?.name ?? '') }}
-                                </span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                            align="end"
-                            class="w-60 rounded-[10px] border-[#E5E1EB] bg-white p-1 text-[#292536] shadow-lg"
-                        >
-                            <div class="px-3 py-2.5">
-                                <p class="truncate text-[13.5px] font-bold text-[#282338]">
-                                    {{ user?.name }}
-                                </p>
-                                <p class="truncate text-[11.5px] text-[#625D6D]">
-                                    {{ user?.email }}
-                                </p>
-                            </div>
-                            <DropdownMenuSeparator class="bg-[#EEEAF2]" />
-                            <DropdownMenuItem as-child class="text-[13px] font-medium hover:bg-[#FAF9FE]">
-                                <Link :href="routes.instructorProfile" class="flex items-center gap-2.5">
-                                    <UserCheck class="h-4 w-4 text-[#625D6D]" />
-                                    <span>My Profile</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem as-child class="text-[13px] font-medium hover:bg-[#FAF9FE]">
-                                <Link :href="routes.instructorNotifications" class="flex items-center gap-2.5">
-                                    <Bell class="h-4 w-4 text-[#625D6D]" />
-                                    <span>Notifications</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator class="bg-[#EEEAF2]" />
-                            <DropdownMenuItem
-                                :disabled="loggingOut"
-                                class="text-[13px] font-bold text-[#A33C48] hover:bg-[#FBECEE]"
-                                @click="logout"
-                            >
-                                <div class="flex items-center gap-2.5">
-                                    <LogOut class="h-4 w-4" />
-                                    <span>{{ loggingOut ? 'Signing out...' : 'Sign out' }}</span>
-                                </div>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                        </DropdownMenuPortal>
+                    </DropdownMenuRoot>
                 </div>
             </header>
 
-            <!-- Flash alerts -->
-            <div
-                v-if="flash.status || flash.error"
-                class="border-b border-[#E5E1EB] bg-white px-4 py-2.5 sm:px-6 lg:px-8"
-            >
-                <div class="mx-auto max-w-[1440px] space-y-2">
-                    <p
-                        v-if="flash.status"
-                        role="status"
-                        class="rounded-[8px] border border-[#C5E1D4] bg-[#EDF7F2] px-3.5 py-2 text-[13.5px] font-medium text-[#1E5638]"
-                    >
-                        {{ flash.status }}
-                    </p>
-                    <p
-                        v-if="flash.error"
-                        role="alert"
-                        class="rounded-[8px] border border-[#ECC4CA] bg-[#FBECEE] px-3.5 py-2 text-[13.5px] font-bold text-[#A33C48]"
-                    >
-                        {{ flash.error }}
-                    </p>
+            <!-- Flash Banners -->
+            <div v-if="flash?.status || flash?.error" class="px-4 pt-4 sm:px-6 lg:px-8">
+                <div
+                    v-if="flash?.status"
+                    role="status"
+                    class="flex items-center gap-2.5 rounded-xl border border-success-600/25 bg-success-50 px-4 py-3 text-sm font-medium text-success-700"
+                >
+                    <CheckCircle2 class="size-4 shrink-0" aria-hidden="true" />
+                    <span>{{ flash.status }}</span>
+                </div>
+                <div
+                    v-if="flash?.error"
+                    role="alert"
+                    class="mt-2 flex items-center gap-2.5 rounded-xl border border-danger-600/25 bg-danger-50 px-4 py-3 text-sm font-medium text-danger-700"
+                >
+                    <AlertCircle class="size-4 shrink-0" aria-hidden="true" />
+                    <span>{{ flash.error }}</span>
                 </div>
             </div>
 
-            <!-- Page Body Content -->
-            <main id="main-content" class="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            <!-- Page Body -->
+            <main id="main-content" class="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
                 <slot />
             </main>
         </div>

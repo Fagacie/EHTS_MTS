@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Support\InstructorPresenter;
 use App\Support\PortalPresenter;
@@ -36,10 +37,10 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'app' => fn (): array => [
-                'brandName' => (string) config('etms.brand_name', 'Ecohydrotech Solution'),
-                'shortName' => (string) config('etms.short_name', 'ETMS'),
-                'displayTimezone' => (string) config('etms.display_timezone', 'Asia/Kuala_Lumpur'),
-                'currency' => (string) config('etms.currency', 'MYR'),
+                'brandName' => (string) SystemSetting::getValue('system.organisation_name', config('etms.brand_name', 'Ecohydrotech Solution')),
+                'shortName' => (string) SystemSetting::getValue('system.short_name', config('etms.short_name', 'ETMS')),
+                'displayTimezone' => (string) SystemSetting::getValue('system.display_timezone', config('etms.display_timezone', 'Asia/Kuala_Lumpur')),
+                'currency' => (string) SystemSetting::getValue('system.currency', config('etms.currency', 'MYR')),
                 'year' => (int) now()->year,
                 'logoUrl' => asset('images/ecohydrotech-logo.png'),
             ],

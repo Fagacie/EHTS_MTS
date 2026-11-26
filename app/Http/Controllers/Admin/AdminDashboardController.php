@@ -192,6 +192,54 @@ class AdminDashboardController extends Controller
             ->values()
             ->all();
 
+        $calendarSessions = TrainingSession::query()
+            ->with(['instructors:id,name'])
+            ->withCount([
+                'bookings as confirmed_bookings_count' => fn ($query) => $query->where(
+                    'status',
+                    BookingStatus::Confirmed->value,
+                ),
+            ])
+            ->whereNotNull('starts_at')
+            ->whereBetween('starts_at', [now()->subMonths(3)->startOfMonth(), now()->addMonths(12)->endOfMonth()])
+            ->orderBy('starts_at')
+            ->limit(120)
+            ->get()
+            ->map(static function (TrainingSession $session) use ($timezone): array {
+                $startLocal = $session->starts_at?->copy()->timezone($timezone);
+                $endLocal = $session->ends_at?->copy()->timezone($timezone);
+                $timeLabel = $startLocal
+                    ? ($endLocal ? $startLocal->format('h:i A').' – '.$endLocal->format('h:i A') : $startLocal->format('h:i A'))
+                    : 'Time TBA';
+
+                return [
+                    'id' => $session->id,
+                    'title' => $session->title,
+                    'sessionCode' => $session->session_code,
+                    'startDate' => $startLocal?->format('Y-m-d') ?? '',
+                    'timeLabel' => $timeLabel,
+                    'venue' => implode(', ', array_filter([
+                        $session->venue_name,
+                        $session->venue_city,
+                    ])) ?: 'Venue TBA',
+                    'instructors' => $session->instructors->pluck('name')->values()->all(),
+                    'confirmedBookings' => (int) $session->confirmed_bookings_count,
+                    'capacity' => (int) $session->capacity,
+                    'status' => $session->status instanceof SessionStatus
+                        ? $session->status->label()
+                        : (string) $session->status,
+                    'statusLabel' => $session->status instanceof SessionStatus
+                        ? $session->status->label()
+                        : (string) $session->status,
+                    'statusValue' => $session->status instanceof SessionStatus
+                        ? $session->status->value
+                        : (string) $session->status,
+                    'detailUrl' => route('admin-vue.sessions.show', $session),
+                ];
+            })
+            ->values()
+            ->all();
+
         return Inertia::render('Admin/Dashboard', [
             'report' => $report,
             'filters' => [
@@ -199,6 +247,8 @@ class AdminDashboardController extends Controller
                 'to' => $to ?: null,
             ],
             'upcomingSessions' => $upcomingSessions,
+            'calendarSessions' => $calendarSessions,
+            'calendarInitialDate' => now($timezone)->format('Y-m-d'),
             'capacitySessions' => $capacitySessions,
             'recentActivity' => $recentActivity,
             'revenueTrend' => [

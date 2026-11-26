@@ -1,12 +1,36 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
-import { Plus, Search, Users, X } from 'lucide-vue-next';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import {
+    Camera,
+    Eye,
+    EyeOff,
+    Pencil,
+    Plus,
+    RotateCcw,
+    Search,
+    ShieldAlert,
+    Trash2,
+    Users,
+    X,
+} from 'lucide-vue-next';
+import {
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
+} from 'reka-ui';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Card, CardContent } from '@/components/ui/card';
+import DataTable, { type DataTableColumn } from '@/components/ds/DataTable.vue';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
+import UserAvatar from '@/components/ds/UserAvatar.vue';
 import type { EtmsSharedProps } from '@/types/etms';
 
 interface UserRow {
+    [key: string]: unknown;
     id: number;
     name: string;
     email: string;
@@ -35,19 +59,94 @@ interface UserRow {
     instructor_is_public: boolean;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface Props extends EtmsSharedProps {
-    users: { data: UserRow[]; from: number | null; to: number | null; total: number; links: { url: string | null; label: string; active: boolean }[] };
-    filters: { q: string; status: string };
+    users: {
+        data: UserRow[];
+        from: number | null;
+        to: number | null;
+        total: number;
+        links: PaginationLink[];
+    };
+    filters: { q: string; status: string; role?: string };
     statuses: { value: string; label: string }[];
     roles: { value: string; label: string }[];
 }
 
 const props = defineProps<Props>();
-const filters = reactive({ ...props.filters });
+const page = usePage<EtmsSharedProps>();
+
+const currentUserId = computed(() => page.props.auth?.user?.id ?? null);
+const validationErrors = computed<Record<string, string>>(
+    () => (page.props.errors as Record<string, string>) ?? {},
+);
+
+const filters = reactive({
+    q: props.filters.q ?? '',
+    status: props.filters.status ?? '',
+    role: props.filters.role ?? '',
+});
+
+const hasActiveFilters = computed(() => Boolean(filters.q || filters.status || filters.role));
+
+const columns: DataTableColumn[] = [
+    { key: 'user', label: 'User' },
+    { key: 'roles', label: 'Roles' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+];
+
+function apply(): void {
+    router.get(
+        '/admin-vue/users',
+        {
+            ...(filters.q ? { q: filters.q } : {}),
+            ...(filters.status ? { status: filters.status } : {}),
+            ...(filters.role ? { role: filters.role } : {}),
+        },
+        { preserveState: true, replace: true },
+    );
+}
+
+function setRoleFilter(slug: string): void {
+    filters.role = slug;
+    apply();
+}
+
+function clearFilters(): void {
+    filters.q = '';
+    filters.status = '';
+    filters.role = '';
+    apply();
+}
+
+function statusTone(statusValue: string): 'success' | 'warning' | 'danger' | 'neutral' {
+    if (statusValue === 'active') return 'success';
+    if (statusValue === 'suspended') return 'warning';
+    if (statusValue === 'disabled' || statusValue === 'deactivated') return 'danger';
+    return 'neutral';
+}
+
+function roleBadgeClass(roleLabel: string): string {
+    const r = roleLabel.toLowerCase();
+    if (r.includes('admin')) return 'bg-navy-950 text-white';
+    if (r.includes('instructor')) return 'bg-accent-600/12 text-accent-700';
+    return 'bg-sand-100 text-ink';
+}
+
+/* Create / Edit Modal */
 const modalOpen = ref(false);
 const editing = ref<UserRow | null>(null);
 const busy = ref(false);
+const showPassword = ref(false);
 const photoPreview = ref<string | null>(null);
+const photoInput = ref<HTMLInputElement | null>(null);
+
 const form = reactive({
     name: '',
     email: '',
@@ -77,27 +176,31 @@ const form = reactive({
 const isCustomer = computed(() => form.roles.includes('customer'));
 const isInstructor = computed(() => form.roles.includes('instructor'));
 
-function apply(): void {
-    router.get('/admin-vue/users', filters, { preserveState: true, replace: true });
-}
-
-function clear(): void {
-    filters.q = '';
-    filters.status = '';
-    apply();
-}
-
 function beginCreate(): void {
     editing.value = null;
+    showPassword.value = false;
     Object.assign(form, {
-        name: '', email: '', password: '', status: 'active', roles: [],
-        profile_phone: '', profile_job_title: '',
-        profile_billing_contact_name: '', profile_billing_email: '', profile_billing_phone: '',
-        profile_billing_address_line_1: '', profile_billing_address_line_2: '',
-        profile_billing_city: '', profile_billing_state: '', profile_billing_postcode: '',
+        name: '',
+        email: '',
+        password: '',
+        status: 'active',
+        roles: ['customer'],
+        profile_phone: '',
+        profile_job_title: '',
+        profile_billing_contact_name: '',
+        profile_billing_email: '',
+        profile_billing_phone: '',
+        profile_billing_address_line_1: '',
+        profile_billing_address_line_2: '',
+        profile_billing_city: '',
+        profile_billing_state: '',
+        profile_billing_postcode: '',
         profile_billing_country: 'MY',
-        instructor_professional_title: '', instructor_qualifications: '',
-        instructor_short_bio: '', instructor_biography: '', instructor_specialisations: '',
+        instructor_professional_title: '',
+        instructor_qualifications: '',
+        instructor_short_bio: '',
+        instructor_biography: '',
+        instructor_specialisations: '',
         instructor_is_public: false,
         photo: null,
     });
@@ -107,6 +210,7 @@ function beginCreate(): void {
 
 function beginEdit(user: UserRow): void {
     editing.value = user;
+    showPassword.value = false;
     Object.assign(form, {
         name: user.name,
         email: user.email,
@@ -137,8 +241,9 @@ function beginEdit(user: UserRow): void {
 }
 
 function handlePhoto(event: Event): void {
-    form.photo = (event.target as HTMLInputElement).files?.[0] ?? null;
-    photoPreview.value = form.photo ? URL.createObjectURL(form.photo) : editing.value?.photoUrl ?? null;
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    form.photo = file;
+    photoPreview.value = file ? URL.createObjectURL(file) : (editing.value?.photoUrl ?? null);
 }
 
 function save(): void {
@@ -146,28 +251,44 @@ function save(): void {
     busy.value = true;
     const data = {
         ...form,
-        instructor_specialisations: form.instructor_specialisations.split(',').map((value) => value.trim()).filter(Boolean),
+        instructor_specialisations: form.instructor_specialisations
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean),
         photo: form.photo ?? undefined,
     };
 
     if (editing.value) {
-        router.put(`/admin-vue/users/${editing.value.id}`, data, {
-            forceFormData: true,
-            preserveScroll: true,
-            onFinish: () => { busy.value = false; },
-            onSuccess: () => { modalOpen.value = false; },
-        });
+        router.post(
+            `/admin-vue/users/${editing.value.id}`,
+            { ...data, _method: 'put' },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onFinish: () => {
+                    busy.value = false;
+                },
+                onSuccess: () => {
+                    modalOpen.value = false;
+                },
+            },
+        );
         return;
     }
 
     router.post('/admin-vue/users', data, {
         forceFormData: true,
         preserveScroll: true,
-        onFinish: () => { busy.value = false; },
-        onSuccess: () => { modalOpen.value = false; },
+        onFinish: () => {
+            busy.value = false;
+        },
+        onSuccess: () => {
+            modalOpen.value = false;
+        },
     });
 }
 
+/* Change Status Modal */
 const statusAction = ref<UserRow | null>(null);
 const statusForm = reactive({ status: 'active', status_reason: '' });
 
@@ -182,55 +303,690 @@ function submitStatus(): void {
     busy.value = true;
     router.post(`/admin-vue/users/${statusAction.value.id}/status`, statusForm, {
         preserveScroll: true,
-        onFinish: () => { busy.value = false; statusAction.value = null; },
+        onFinish: () => {
+            busy.value = false;
+            statusAction.value = null;
+        },
     });
 }
 
+/* Delete Modal */
 const deleting = ref<UserRow | null>(null);
 function destroyUser(): void {
     if (!deleting.value) return;
+    busy.value = true;
     router.delete(`/admin-vue/users/${deleting.value.id}`, {
         preserveScroll: true,
-        onFinish: () => { deleting.value = null; },
+        onFinish: () => {
+            busy.value = false;
+            deleting.value = null;
+        },
     });
+}
+
+function cleanPaginationLabel(label: string): string {
+    return label.replace(/&laquo;/g, '←').replace(/&raquo;/g, '→');
 }
 </script>
 
 <template>
-<AdminLayout>
-    <div class="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div><p class="text-sm font-medium text-[#0F4C81]">Administration</p><h1 class="mt-1 text-2xl font-semibold">Users and roles</h1><p class="mt-1 text-sm text-slate-500">Create and manage administrator, instructor and customer accounts.</p></div>
-        <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md bg-[#0F4C81] px-4 text-sm font-medium text-white" @click="beginCreate"><Plus :size="16"/>Create user</button>
-    </div>
+    <Head title="Users & Roles — Admin" />
 
-    <Card><CardContent class="p-4"><form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto_auto]" @submit.prevent="apply"><label class="relative"><Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="16"/><input v-model="filters.q" class="h-10 w-full rounded-md border pl-9 pr-3 text-sm" placeholder="Name or email"/></label><select v-model="filters.status" class="h-10 rounded-md border px-3 text-sm"><option value="">All statuses</option><option v-for="status in statuses" :key="status.value" :value="status.value">{{status.label}}</option></select><button class="h-10 rounded-md bg-slate-900 px-4 text-sm text-white">Apply</button><button type="button" class="h-10 rounded-md border px-3 text-sm" @click="clear"><X :size="14" class="mr-1 inline"/>Clear</button></form></CardContent></Card>
+    <AdminLayout>
+        <div class="space-y-6">
+            <!-- Page Header -->
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="type-page-title text-ink">Users &amp; Roles</h1>
+                    <p class="mt-1 text-sm text-muted">
+                        Manage administrator, instructor, and trainee accounts across the platform.
+                    </p>
+                </div>
 
-    <Card class="mt-6 overflow-hidden"><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="border-b bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">User</th><th class="px-4 py-3">Roles</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Security</th><th class="px-4 py-3 text-right">Actions</th></tr></thead><tbody class="divide-y"><tr v-for="user in users.data" :key="user.id">    <td class="px-4 py-4"><div class="flex items-center gap-3"><img v-if="user.photoUrl" :src="user.photoUrl" alt="" class="h-9 w-9 rounded-full object-cover"/><span v-else class="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{{user.name.slice(0,1).toUpperCase()}}</span><div><p class="font-medium">{{user.name}}</p><p class="text-xs text-slate-500">{{user.email}}</p></div></div></td><td class="px-4 py-4"><span v-for="role in user.roleLabels" :key="role" class="mr-1 rounded-full bg-slate-100 px-2 py-1 text-xs">{{role}}</span></td><td class="px-4 py-4">{{user.status}}</td><td class="px-4 py-4 text-xs text-slate-600">Email {{user.verified?'verified':'unverified'}}</td><td class="px-4 py-4"><div class="flex justify-end gap-2"><button type="button" class="rounded-md border border-amber-300 px-3 py-1.5 text-xs text-amber-800" @click="beginStatus(user)">Change status</button><button type="button" class="rounded-md border px-3 py-1.5 text-xs text-[#0F4C81]" @click="beginEdit(user)">Edit</button><button type="button" class="rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-700" @click="deleting=user">Delete</button></div></td></tr><tr v-if="!users.data.length"><td colspan="5" class="p-12 text-center text-slate-500"><Users class="mx-auto mb-2" :size="24"/>No users found.</td></tr></tbody></table></div></Card>
+                <button
+                    type="button"
+                    class="inline-flex h-10 items-center gap-2 rounded-xl bg-navy-950 px-4 text-sm font-semibold text-white transition hover:bg-navy-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                    @click="beginCreate"
+                >
+                    <Plus class="size-4" aria-hidden="true" />
+                    <span>Create user</span>
+                </button>
+            </div>
 
-    <div v-if="modalOpen" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" role="dialog" aria-modal="true">
-        <div class="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <div class="flex items-start justify-between gap-4"><div><h2 class="text-lg font-semibold">{{editing?'Edit user':'Create user'}}</h2><p class="mt-1 text-sm text-slate-500">{{editing?'Update account details and role-specific information.':'Create an account and enter only the fields required by the selected role.'}}</p></div><button type="button" class="grid h-9 w-9 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Close" @click="modalOpen=false"><X :size="18"/></button></div>
-            <form class="mt-5 space-y-5" @submit.prevent="save">
-                <section class="grid gap-4 md:grid-cols-2">
-                    <label class="text-sm">Full name<input v-model="form.name" required maxlength="150" class="mt-1 h-10 w-full rounded-md border px-3"/></label>
-                    <label class="text-sm">Email address<input v-model="form.email" type="email" required maxlength="255" class="mt-1 h-10 w-full rounded-md border px-3"/></label>
-                    <label class="text-sm">{{editing?'New password (leave blank to keep)':'Password'}}<input v-model="form.password" type="password" :required="!editing" minlength="8" class="mt-1 h-10 w-full rounded-md border px-3"/></label>
-                    <label class="text-sm">Account status<select v-model="form.status" required class="mt-1 h-10 w-full rounded-md border px-3"><option v-for="status in statuses" :key="status.value" :value="status.value">{{status.label}}</option></select></label>
-                    <div class="md:col-span-2 flex items-center gap-4"><img v-if="photoPreview" :src="photoPreview" alt="User photo" class="h-20 w-20 rounded-full object-cover border"/><span v-else class="grid h-20 w-20 place-items-center rounded-full bg-slate-100 text-xl font-bold text-slate-600">{{(form.name||'U').slice(0,1).toUpperCase()}}</span><label class="text-sm">Profile image<input type="file" accept="image/*" class="mt-1 block w-full text-sm" @change="handlePhoto"/></label></div>
-                </section>
-                <section class="rounded-lg border p-4"><h3 class="text-sm font-semibold">Roles</h3><div class="mt-3 grid gap-3 sm:grid-cols-3"><label v-for="role in roles" :key="role.value" class="flex items-center gap-2 text-sm"><input v-model="form.roles" type="checkbox" :value="role.value"/>{{role.label}}</label></div></section>
+            <!-- Filter Bar -->
+            <section class="rounded-2xl border border-line/85 bg-surface p-4 shadow-card">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-xs font-medium transition"
+                            :class="
+                                !filters.role
+                                    ? 'bg-navy-950 text-white'
+                                    : 'bg-sand-100 text-muted hover:text-ink'
+                            "
+                            @click="setRoleFilter('')"
+                        >
+                            All roles
+                        </button>
+                        <button
+                            v-for="role in roles"
+                            :key="role.value"
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-xs font-medium transition"
+                            :class="
+                                filters.role === role.value
+                                    ? 'bg-navy-950 text-white'
+                                    : 'bg-sand-100 text-muted hover:text-ink'
+                            "
+                            @click="setRoleFilter(role.value)"
+                        >
+                            {{ role.label }}
+                        </button>
+                    </div>
 
-                <section v-if="isInstructor" class="grid gap-4 rounded-lg border p-4 md:grid-cols-2"><h3 class="text-sm font-semibold md:col-span-2">Instructor profile</h3><label class="text-sm">Professional title<input v-model="form.instructor_professional_title" maxlength="150" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Qualifications<input v-model="form.instructor_qualifications" maxlength="255" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm md:col-span-2">Short summary<textarea v-model="form.instructor_short_bio" rows="2" maxlength="500" class="mt-1 w-full rounded-md border px-3 py-2"/></label><label class="text-sm md:col-span-2">Biography<textarea v-model="form.instructor_biography" rows="4" class="mt-1 w-full rounded-md border px-3 py-2"/></label><label class="text-sm md:col-span-2">Specialisations <span class="text-xs text-slate-500">(comma separated)</span><input v-model="form.instructor_specialisations" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="flex items-center gap-2 text-sm md:col-span-2"><input v-model="form.instructor_is_public" type="checkbox"/>Publish in public instructor directory</label></section>
+                    <form class="flex flex-wrap items-center gap-2" @submit.prevent="apply">
+                        <label class="relative min-w-[210px] flex-1 sm:flex-initial">
+                            <Search
+                                class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+                                aria-hidden="true"
+                            />
+                            <input
+                                v-model="filters.q"
+                                type="search"
+                                placeholder="Search name or email..."
+                                class="h-9 w-full rounded-lg border border-line bg-surface pr-3 pl-9 text-sm text-ink placeholder:text-muted/70 focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
 
-                <section v-if="isCustomer" class="grid gap-4 rounded-lg border p-4 md:grid-cols-2"><h3 class="text-sm font-semibold md:col-span-2">Trainee profile</h3><label class="text-sm">Phone<input v-model="form.profile_phone" maxlength="30" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Job title<input v-model="form.profile_job_title" maxlength="120" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Billing contact<input v-model="form.profile_billing_contact_name" maxlength="150" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Billing email<input v-model="form.profile_billing_email" type="email" maxlength="255" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Billing phone<input v-model="form.profile_billing_phone" maxlength="30" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm md:col-span-2">Address line 1<input v-model="form.profile_billing_address_line_1" maxlength="255" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm md:col-span-2">Address line 2<input v-model="form.profile_billing_address_line_2" maxlength="255" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">City<input v-model="form.profile_billing_city" maxlength="100" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">State<input v-model="form.profile_billing_state" maxlength="100" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Postcode<input v-model="form.profile_billing_postcode" maxlength="20" class="mt-1 h-10 w-full rounded-md border px-3"/></label><label class="text-sm">Country (ISO-2)<input v-model="form.profile_billing_country" maxlength="2" class="mt-1 h-10 w-full rounded-md border px-3"/></label></section>
+                        <select
+                            v-model="filters.status"
+                            class="h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            @change="apply"
+                        >
+                            <option value="">All statuses</option>
+                            <option v-for="s in statuses" :key="s.value" :value="s.value">
+                                {{ s.label }}
+                            </option>
+                        </select>
 
-                <div class="flex justify-end gap-2"><button type="button" class="h-10 rounded-md border px-4 text-sm" @click="modalOpen=false">Cancel</button><button type="submit" :disabled="busy||form.roles.length===0" class="h-10 rounded-md bg-[#0F4C81] px-4 text-sm text-white">{{busy?'Saving…':editing?'Save user':'Create user'}}</button></div>
-            </form>
+                        <button
+                            type="submit"
+                            class="inline-flex h-9 items-center rounded-lg bg-navy-950 px-3.5 text-sm font-medium text-white transition hover:bg-navy-900"
+                        >
+                            Search
+                        </button>
+
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-muted transition hover:bg-sand-100 hover:text-ink"
+                            @click="clearFilters"
+                        >
+                            <RotateCcw class="size-3.5" aria-hidden="true" />
+                            <span>Reset</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Users Table -->
+            <DataTable :columns="columns" :rows="users.data" row-key="id">
+                <template #cell-user="{ row }">
+                    <div class="flex items-center gap-3">
+                        <UserAvatar
+                            :name="(row as UserRow).name"
+                            :src="(row as UserRow).photoUrl"
+                            size="sm"
+                        />
+                        <div class="min-w-0">
+                            <p class="truncate font-medium text-ink">
+                                {{ (row as UserRow).name }}
+                                <span
+                                    v-if="(row as UserRow).id === currentUserId"
+                                    class="ml-1.5 rounded-md bg-sand-100 px-1.5 py-0.5 text-[10px] font-semibold text-muted"
+                                >
+                                    You
+                                </span>
+                            </p>
+                            <p class="truncate text-xs text-muted">{{ (row as UserRow).email }}</p>
+                        </div>
+                    </div>
+                </template>
+
+                <template #cell-roles="{ row }">
+                    <div class="flex flex-wrap gap-1.5">
+                        <span
+                            v-for="label in (row as UserRow).roleLabels"
+                            :key="label"
+                            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                            :class="roleBadgeClass(label)"
+                        >
+                            {{ label }}
+                        </span>
+                    </div>
+                </template>
+
+                <template #cell-status="{ row }">
+                    <StatusBadge
+                        :tone="statusTone((row as UserRow).statusValue)"
+                        :label="(row as UserRow).status"
+                    />
+                </template>
+
+                <template #cell-actions="{ row }">
+                    <div class="flex items-center justify-end gap-1.5">
+                        <button
+                            type="button"
+                            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink transition hover:bg-sand-100"
+                            @click="beginEdit(row as UserRow)"
+                        >
+                            <Pencil class="size-3.5 text-muted" aria-hidden="true" />
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            v-if="(row as UserRow).id !== currentUserId"
+                            type="button"
+                            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink transition hover:bg-sand-100"
+                            @click="beginStatus(row as UserRow)"
+                        >
+                            <ShieldAlert class="size-3.5 text-muted" aria-hidden="true" />
+                            <span>Status</span>
+                        </button>
+                        <button
+                            v-if="(row as UserRow).id !== currentUserId"
+                            type="button"
+                            aria-label="Delete user"
+                            class="inline-flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-muted transition hover:border-danger-200 hover:bg-danger-50 hover:text-danger-600"
+                            @click="deleting = row as UserRow"
+                        >
+                            <Trash2 class="size-3.5" aria-hidden="true" />
+                        </button>
+                    </div>
+                </template>
+
+                <template #empty>
+                    <div class="py-10 text-center">
+                        <Users class="mx-auto size-8 text-muted/60" aria-hidden="true" />
+                        <p class="mt-2 text-sm font-medium text-ink">No users found</p>
+                        <p class="mt-0.5 text-xs text-muted">
+                            Try adjusting your search or role filters, or create a new user.
+                        </p>
+                    </div>
+                </template>
+            </DataTable>
+
+            <!-- Pagination -->
+            <div
+                v-if="users.total > 0"
+                class="flex flex-col items-center justify-between gap-3 text-xs text-muted sm:flex-row"
+            >
+                <p>
+                    Showing <strong class="font-medium text-ink">{{ users.from ?? 0 }}</strong> to
+                    <strong class="font-medium text-ink">{{ users.to ?? 0 }}</strong> of
+                    <strong class="font-medium text-ink">{{ users.total }}</strong> users
+                </p>
+
+                <nav v-if="users.links.length > 3" class="flex flex-wrap items-center gap-1">
+                    <template v-for="(link, idx) in users.links" :key="idx">
+                        <Link
+                            v-if="link.url"
+                            :href="link.url"
+                            preserve-scroll
+                            class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 font-medium transition"
+                            :class="
+                                link.active
+                                    ? 'bg-navy-950 text-white'
+                                    : 'border border-line bg-surface text-ink hover:bg-sand-100'
+                            "
+                        >
+                            {{ cleanPaginationLabel(link.label) }}
+                        </Link>
+                        <span
+                            v-else
+                            class="inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-muted/50"
+                        >
+                            {{ cleanPaginationLabel(link.label) }}
+                        </span>
+                    </template>
+                </nav>
+            </div>
         </div>
-    </div>
 
-    <div v-if="statusAction" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"><div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold">Change account status</h2><p class="mt-1 text-sm text-slate-500">{{statusAction.name}} · {{statusAction.email}}</p><select v-model="statusForm.status" class="mt-4 h-10 w-full rounded-md border px-3 text-sm"><option v-for="status in statuses" :key="status.value" :value="status.value">{{status.label}}</option></select><textarea v-model="statusForm.status_reason" class="mt-3 min-h-24 w-full rounded-md border p-3 text-sm" placeholder="Mandatory audit reason" maxlength="500"/><div class="mt-4 flex justify-end gap-2"><button type="button" class="h-10 rounded-md border px-4 text-sm" @click="statusAction=null">Cancel</button><button type="button" :disabled="busy||statusForm.status_reason.trim().length<5" class="h-10 rounded-md bg-[#0F4C81] px-4 text-sm text-white" @click="submitStatus">Save status</button></div></div></div>
+        <!-- Create / Edit User Dialog -->
+        <DialogRoot :open="modalOpen" @update:open="modalOpen = $event">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/45 backdrop-blur-[2px]" />
+                <DialogContent
+                    class="fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[94vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-elevated focus:outline-none"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <DialogTitle class="text-lg font-semibold text-ink">
+                                {{ editing ? 'Edit user' : 'Create user' }}
+                            </DialogTitle>
+                            <DialogDescription class="mt-1 text-sm text-muted">
+                                {{
+                                    editing
+                                        ? 'Update account details, assigned roles, and profile information.'
+                                        : 'Create a new administrator, instructor, or trainee account.'
+                                }}
+                            </DialogDescription>
+                        </div>
+                        <DialogClose
+                            class="inline-flex size-8 items-center justify-center rounded-lg text-muted transition hover:bg-sand-100 hover:text-ink"
+                            aria-label="Close"
+                        >
+                            <X class="size-4" />
+                        </DialogClose>
+                    </div>
 
-    <div v-if="deleting" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"><div class="w-full max-w-md rounded-lg bg-white p-6"><h2 class="text-lg font-semibold">Delete user</h2><p class="mt-2 text-sm text-slate-500">{{deleting.name}} · {{deleting.email}}</p><p class="mt-2 text-xs text-red-700">Protected users or users with records cannot be deleted.</p><div class="mt-4 flex justify-end gap-2"><button class="h-10 rounded-md border px-4 text-sm" @click="deleting=null">Cancel</button><button class="h-10 rounded-md bg-red-700 px-4 text-sm text-white" @click="destroyUser">Delete user</button></div></div></div>
-</AdminLayout>
+                    <div
+                        v-if="Object.keys(validationErrors).length"
+                        class="mt-4 rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-xs text-danger-700"
+                    >
+                        <p v-for="(msg, key) in validationErrors" :key="key">{{ msg }}</p>
+                    </div>
+
+                    <form class="mt-5 space-y-5" @submit.prevent="save">
+                        <!-- Avatar Uploader -->
+                        <div class="flex items-center gap-4">
+                            <button
+                                type="button"
+                                class="group relative size-16 shrink-0 overflow-hidden rounded-full border border-line bg-sand-100"
+                                @click="photoInput?.click()"
+                            >
+                                <img
+                                    v-if="photoPreview"
+                                    :src="photoPreview"
+                                    alt="User avatar"
+                                    class="size-full object-cover"
+                                />
+                                <span
+                                    v-else
+                                    class="grid size-full place-items-center text-lg font-semibold text-navy-950"
+                                >
+                                    {{ (form.name || 'U').slice(0, 1).toUpperCase() }}
+                                </span>
+                                <span
+                                    class="absolute inset-0 flex items-center justify-center bg-navy-950/50 text-white opacity-0 transition group-hover:opacity-100"
+                                >
+                                    <Camera class="size-4" />
+                                </span>
+                            </button>
+                            <div>
+                                <p class="text-sm font-medium text-ink">Profile photo</p>
+                                <p class="text-xs text-muted">Optional JPG or PNG, up to 5 MB.</p>
+                                <button
+                                    type="button"
+                                    class="mt-1 text-xs font-medium text-primary-600 hover:underline"
+                                    @click="photoInput?.click()"
+                                >
+                                    {{ photoPreview ? 'Change photo' : 'Upload photo' }}
+                                </button>
+                                <input
+                                    ref="photoInput"
+                                    type="file"
+                                    accept="image/*"
+                                    class="hidden"
+                                    @change="handlePhoto"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Account Details -->
+                        <section class="grid gap-4 sm:grid-cols-2">
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Full name</span>
+                                <input
+                                    v-model="form.name"
+                                    required
+                                    maxlength="150"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Email address</span>
+                                <input
+                                    v-model="form.email"
+                                    type="email"
+                                    required
+                                    maxlength="255"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>{{ editing ? 'New password (optional)' : 'Password' }}</span>
+                                <div class="relative">
+                                    <input
+                                        v-model="form.password"
+                                        :type="showPassword ? 'text' : 'password'"
+                                        :required="!editing"
+                                        minlength="8"
+                                        class="h-10 w-full rounded-xl border border-line bg-surface pr-10 pl-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted hover:text-ink"
+                                        :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                                        @click="showPassword = !showPassword"
+                                    >
+                                        <EyeOff v-if="showPassword" class="size-4" />
+                                        <Eye v-else class="size-4" />
+                                    </button>
+                                </div>
+                            </label>
+
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Account status</span>
+                                <select
+                                    v-model="form.status"
+                                    required
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                >
+                                    <option v-for="s in statuses" :key="s.value" :value="s.value">
+                                        {{ s.label }}
+                                    </option>
+                                </select>
+                            </label>
+                        </section>
+
+                        <!-- Roles -->
+                        <section class="rounded-xl border border-line bg-sand-50/60 p-4">
+                            <p class="text-xs font-semibold text-ink">Assigned roles</p>
+                            <p class="mt-0.5 text-xs text-muted">Select at least one role for this account.</p>
+                            <div class="mt-3 grid gap-2.5 sm:grid-cols-3">
+                                <label
+                                    v-for="role in roles"
+                                    :key="role.value"
+                                    class="flex cursor-pointer items-center gap-2.5 rounded-xl border bg-surface px-3 py-2.5 text-sm font-medium transition"
+                                    :class="
+                                        form.roles.includes(role.value)
+                                            ? 'border-navy-950 text-navy-950'
+                                            : 'border-line text-muted hover:border-line hover:text-ink'
+                                    "
+                                >
+                                    <input
+                                        v-model="form.roles"
+                                        type="checkbox"
+                                        :value="role.value"
+                                        class="size-4 rounded accent-navy-950"
+                                    />
+                                    <span>{{ role.label }}</span>
+                                </label>
+                            </div>
+                        </section>
+
+                        <!-- Instructor Profile Fields -->
+                        <section
+                            v-if="isInstructor"
+                            class="grid gap-4 rounded-xl border border-line p-4 sm:grid-cols-2"
+                        >
+                            <h3 class="text-sm font-semibold text-ink sm:col-span-2">Instructor profile</h3>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Professional title</span>
+                                <input
+                                    v-model="form.instructor_professional_title"
+                                    maxlength="150"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Qualifications</span>
+                                <input
+                                    v-model="form.instructor_qualifications"
+                                    maxlength="255"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2">
+                                <span>Short summary</span>
+                                <textarea
+                                    v-model="form.instructor_short_bio"
+                                    rows="2"
+                                    maxlength="500"
+                                    class="rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2">
+                                <span>Biography</span>
+                                <textarea
+                                    v-model="form.instructor_biography"
+                                    rows="3"
+                                    class="rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2">
+                                <span>Specialisations (comma separated)</span>
+                                <input
+                                    v-model="form.instructor_specialisations"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-ink sm:col-span-2">
+                                <input
+                                    v-model="form.instructor_is_public"
+                                    type="checkbox"
+                                    class="size-4 rounded accent-navy-950"
+                                />
+                                <span>Show in public instructor directory</span>
+                            </label>
+                        </section>
+
+                        <!-- Trainee / Customer Profile Fields -->
+                        <section
+                            v-if="isCustomer"
+                            class="grid gap-4 rounded-xl border border-line p-4 sm:grid-cols-2"
+                        >
+                            <h3 class="text-sm font-semibold text-ink sm:col-span-2">Trainee &amp; billing profile</h3>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Phone</span>
+                                <input
+                                    v-model="form.profile_phone"
+                                    maxlength="30"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Job title</span>
+                                <input
+                                    v-model="form.profile_job_title"
+                                    maxlength="120"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Billing contact</span>
+                                <input
+                                    v-model="form.profile_billing_contact_name"
+                                    maxlength="150"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Billing email</span>
+                                <input
+                                    v-model="form.profile_billing_email"
+                                    type="email"
+                                    maxlength="255"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Billing phone</span>
+                                <input
+                                    v-model="form.profile_billing_phone"
+                                    maxlength="30"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>Country (ISO-2)</span>
+                                <input
+                                    v-model="form.profile_billing_country"
+                                    maxlength="2"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink uppercase focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2">
+                                <span>Address line 1</span>
+                                <input
+                                    v-model="form.profile_billing_address_line_1"
+                                    maxlength="255"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted sm:col-span-2">
+                                <span>Address line 2</span>
+                                <input
+                                    v-model="form.profile_billing_address_line_2"
+                                    maxlength="255"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                <span>City</span>
+                                <input
+                                    v-model="form.profile_billing_city"
+                                    maxlength="100"
+                                    class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                />
+                            </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                    <span>State</span>
+                                    <input
+                                        v-model="form.profile_billing_state"
+                                        maxlength="100"
+                                        class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                    />
+                                </label>
+                                <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                                    <span>Postcode</span>
+                                    <input
+                                        v-model="form.profile_billing_postcode"
+                                        maxlength="20"
+                                        class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                                    />
+                                </label>
+                            </div>
+                        </section>
+
+                        <div class="flex justify-end gap-2 border-t border-line pt-4">
+                            <button
+                                type="button"
+                                class="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-sand-100"
+                                @click="modalOpen = false"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                :disabled="busy || form.roles.length === 0"
+                                class="h-10 rounded-xl bg-navy-950 px-4 text-sm font-semibold text-white transition hover:bg-navy-900 disabled:opacity-50"
+                            >
+                                {{ busy ? 'Saving…' : editing ? 'Save changes' : 'Create user' }}
+                            </button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
+
+        <!-- Change Account Status Dialog -->
+        <DialogRoot :open="Boolean(statusAction)" @update:open="(v) => !v && (statusAction = null)">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/45 backdrop-blur-[2px]" />
+                <DialogContent
+                    class="fixed top-1/2 left-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-surface p-6 shadow-elevated focus:outline-none"
+                >
+                    <DialogTitle class="text-lg font-semibold text-ink">Change account status</DialogTitle>
+                    <DialogDescription class="mt-1 text-sm text-muted">
+                        {{ statusAction?.name }} · {{ statusAction?.email }}
+                    </DialogDescription>
+
+                    <div class="mt-4 space-y-3">
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>New status</span>
+                            <select
+                                v-model="statusForm.status"
+                                class="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            >
+                                <option v-for="s in statuses" :key="s.value" :value="s.value">
+                                    {{ s.label }}
+                                </option>
+                            </select>
+                        </label>
+
+                        <label class="flex flex-col gap-1 text-xs font-medium text-muted">
+                            <span>Audit reason (min 5 characters)</span>
+                            <textarea
+                                v-model="statusForm.status_reason"
+                                rows="3"
+                                maxlength="500"
+                                placeholder="Explain why this account status is being updated..."
+                                class="rounded-xl border border-line bg-surface p-3 text-sm text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                        </label>
+                    </div>
+
+                    <div class="mt-5 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            class="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-sand-100"
+                            @click="statusAction = null"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="busy || statusForm.status_reason.trim().length < 5"
+                            class="h-10 rounded-xl bg-navy-950 px-4 text-sm font-semibold text-white transition hover:bg-navy-900 disabled:opacity-50"
+                            @click="submitStatus"
+                        >
+                            {{ busy ? 'Updating…' : 'Save status' }}
+                        </button>
+                    </div>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
+
+        <!-- Delete Confirmation Dialog -->
+        <DialogRoot :open="Boolean(deleting)" @update:open="(v) => !v && (deleting = null)">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/45 backdrop-blur-[2px]" />
+                <DialogContent
+                    class="fixed top-1/2 left-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line bg-surface p-6 shadow-elevated focus:outline-none"
+                >
+                    <DialogTitle class="text-lg font-semibold text-ink">Delete user</DialogTitle>
+                    <DialogDescription class="mt-1 text-sm text-muted">
+                        {{ deleting?.name }} · {{ deleting?.email }}
+                    </DialogDescription>
+                    <p class="mt-3 rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-2.5 text-xs text-danger-700">
+                        This action removes the user account. Protected administrators or users with linked training records cannot be deleted.
+                    </p>
+
+                    <div class="mt-5 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            class="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-sand-100"
+                            @click="deleting = null"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="busy"
+                            class="h-10 rounded-xl bg-danger-600 px-4 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-50"
+                            @click="destroyUser"
+                        >
+                            {{ busy ? 'Deleting…' : 'Delete user' }}
+                        </button>
+                    </div>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
+    </AdminLayout>
 </template>

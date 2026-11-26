@@ -55,14 +55,25 @@
             width: 190px;
             height: 190px;
         }
-        .watermark {
+        .watermark-org {
             position: absolute;
             top: 50%;
-            left: 50%;
-            width: 360px;
-            height: 360px;
-            margin-top: -180px;
-            margin-left: -180px;
+            left: 0;
+            right: 0;
+            margin-top: -18px;
+            text-align: center;
+            z-index: 1;
+        }
+        .watermark-org-text {
+            font-family: Georgia, "Times New Roman", DejaVu Serif, serif;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            color: #0b2a5b;
+            opacity: 0.04;
+            margin: 0;
+            line-height: 1.1;
         }
         .content-table {
             position: relative;
@@ -180,10 +191,23 @@
         }
         .sig-rule-right {
             display: inline-block;
-            width: 265px;
+            width: 245px;
+            text-align: center;
+        }
+        .sig-img-box {
+            height: 44px;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .sig-img-box img {
+            max-height: 42px;
+            max-width: 175px;
+            display: inline-block;
+            vertical-align: bottom;
+        }
+        .sig-line {
             border-top: 1.5px solid #0b2a5b;
             padding-top: 6px;
-            text-align: right;
         }
         .meta-value {
             font-family: DejaVu Sans, Arial, sans-serif;
@@ -239,12 +263,10 @@
                     <polygon points="18,190 13,190 190,13 190,18" fill="#c89d46" />
                 </svg>
 
-                <!-- Subtle Parchment Watermark Crest -->
-                <svg class="watermark" viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="180" cy="180" r="155" fill="none" stroke="#c89d46" stroke-width="1.5" opacity="0.14" />
-                    <circle cx="180" cy="180" r="136" fill="none" stroke="#0b2a5b" stroke-width="1" stroke-dasharray="4 6" opacity="0.10" />
-                    <circle cx="180" cy="180" r="98" fill="none" stroke="#2d8a3e" stroke-width="1" opacity="0.09" />
-                </svg>
+                <!-- Subtle Organisation Name Watermark -->
+                <div class="watermark-org">
+                    <p class="watermark-org-text">{{ $certificate->issuing_organisation_snapshot }}</p>
+                </div>
 
                 <table class="content-table">
                     <tr>
@@ -305,16 +327,20 @@
                                     </td>
 
                                     <td class="footer-right">
-                                        @if (! empty($signatureDataUri))
-                                            <img src="{{ $signatureDataUri }}" alt="Authorised signature" style="display: inline-block; max-height: 40px; max-width: 180px; margin-bottom: 4px;">
-                                        @endif
                                         <div class="sig-rule-right">
-                                            <p class="meta-value">{{ $certificate->signatory_name_snapshot }}</p>
-                                            <p class="signatory-title">{{ $certificate->signatory_title_snapshot }}</p>
+                                            <div class="sig-img-box">
+                                                @if (! empty($signatureDataUri))
+                                                    <img src="{{ $signatureDataUri }}" alt="Authorised signature">
+                                                @endif
+                                            </div>
+                                            <div class="sig-line">
+                                                <p class="meta-value">{{ $certificate->signatory_name_snapshot }}</p>
+                                                <p class="signatory-title">{{ $certificate->signatory_title_snapshot }}</p>
+                                            </div>
+                                            <p class="cert-ref">
+                                                Issued {{ $certificate->issued_at?->timezone(config('etms.display_timezone', 'Asia/Kuala_Lumpur'))->format('d M Y') }}
+                                            </p>
                                         </div>
-                                        <p class="cert-ref">
-                                            Issued {{ $certificate->issued_at?->timezone(config('etms.display_timezone', 'Asia/Kuala_Lumpur'))->format('d M Y') }}
-                                        </p>
                                     </td>
                                 </tr>
                             </table>

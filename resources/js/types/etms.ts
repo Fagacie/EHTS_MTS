@@ -742,6 +742,7 @@ export interface PortalCertificateDetail extends PortalCertificateCard {
 export interface PortalCertificateShowProps extends EtmsSharedProps {
     certificate: PortalCertificateDetail;
     logoDataUri: string | null;
+    signatureDataUri?: string | null;
 }
 
 export interface PortalModuleEntitlementItem {

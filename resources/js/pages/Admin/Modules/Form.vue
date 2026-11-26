@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { AlertCircle, Download, Film, Trash2, Upload } from 'lucide-vue-next';
+import {
+    AlertCircle,
+    ArrowLeft,
+    Download,
+    FileText,
+    Film,
+    ImagePlus,
+    Plus,
+    Trash2,
+    Upload,
+    X,
+} from 'lucide-vue-next';
+import StatusBadge from '@/components/ds/StatusBadge.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 import type { EtmsSharedProps } from '@/types/etms';
 
@@ -63,10 +75,10 @@ interface Props extends EtmsSharedProps {
 const props = defineProps<Props>();
 const page = usePage();
 
-const serverErrors = () => {
+const serverErrors = computed(() => {
     const errors = (page.props as { errors?: Record<string, string> }).errors ?? {};
     return Object.values(errors).filter(Boolean);
-};
+});
 
 const form = reactive({
     code: props.module?.code ?? '',
@@ -81,14 +93,38 @@ const form = reactive({
 });
 
 const busy = ref(false);
-const coverPreview = ref<string | null>(props.module?.cover_image_url ?? null);
+const coverInputRef = ref<HTMLInputElement | null>(null);
+const objectCoverUrl = ref<string | null>(null);
+const coverPreview = computed(() => objectCoverUrl.value ?? props.module?.cover_image_url ?? null);
 
 function onCoverImage(event: Event): void {
-    form.cover_image = (event.target as HTMLInputElement).files?.[0] ?? null;
-    coverPreview.value = form.cover_image
-        ? URL.createObjectURL(form.cover_image)
-        : (props.module?.cover_image_url ?? null);
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    if (objectCoverUrl.value) {
+        URL.revokeObjectURL(objectCoverUrl.value);
+        objectCoverUrl.value = null;
+    }
+    form.cover_image = file;
+    if (file) {
+        objectCoverUrl.value = URL.createObjectURL(file);
+    }
 }
+
+function clearCoverSelection(): void {
+    if (objectCoverUrl.value) {
+        URL.revokeObjectURL(objectCoverUrl.value);
+        objectCoverUrl.value = null;
+    }
+    form.cover_image = null;
+    if (coverInputRef.value) {
+        coverInputRef.value.value = '';
+    }
+}
+
+onBeforeUnmount(() => {
+    if (objectCoverUrl.value) {
+        URL.revokeObjectURL(objectCoverUrl.value);
+    }
+});
 
 function addObjective(): void {
     form.learning_objectives.push('');
@@ -133,7 +169,7 @@ const materialForm = reactive({
     file: null as File | null,
 });
 const materialBusy = ref(false);
-const materialFileKey = ref(0);
+const materialFileRef = ref<HTMLInputElement | null>(null);
 
 function onMaterialFile(event: Event): void {
     materialForm.file = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -154,7 +190,9 @@ function uploadMaterial(): void {
             materialForm.title = '';
             materialForm.description = '';
             materialForm.file = null;
-            materialFileKey.value++;
+            if (materialFileRef.value) {
+                materialFileRef.value.value = '';
+            }
         },
     });
 }
@@ -175,7 +213,7 @@ const videoForm = reactive({
     file: null as File | null,
 });
 const videoBusy = ref(false);
-const videoFileKey = ref(0);
+const videoFileRef = ref<HTMLInputElement | null>(null);
 
 function onVideoFile(event: Event): void {
     videoForm.file = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -196,7 +234,9 @@ function uploadVideo(): void {
             videoForm.title = '';
             videoForm.description = '';
             videoForm.file = null;
-            videoFileKey.value++;
+            if (videoFileRef.value) {
+                videoFileRef.value.value = '';
+            }
         },
     });
 }
@@ -212,409 +252,534 @@ function removeVideo(videoId: number): void {
 </script>
 
 <template>
-    <Head :title="mode === 'create' ? 'Create Standalone Module' : `Edit ${module?.title}`" />
+    <Head :title="mode === 'create' ? 'Create Module' : `Edit ${module?.title}`" />
 
-    <AdminLayout>
-        <Link href="/admin-vue/modules" class="mb-4 inline-block text-sm text-neutral-600 hover:text-neutral-900">
-            ← Back to standalone modules
-        </Link>
+    <AdminLayout :breadcrumb="mode === 'create' ? 'Create Module' : 'Edit Module'">
+        <div class="mx-auto max-w-[1200px] space-y-6">
+            <!-- Top Back Link & Header -->
+            <div class="space-y-3">
+                <Link
+                    href="/admin-vue/modules"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-navy-950"
+                >
+                    <ArrowLeft class="size-3.5" aria-hidden="true" />
+                    <span>Modules</span>
+                </Link>
 
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <h1 class="text-2xl font-semibold text-neutral-900">
-                {{ mode === 'create' ? 'Create standalone learning module' : 'Edit standalone learning module' }}
-            </h1>
-            <button
-                v-if="mode === 'edit' && module"
-                type="button"
-                class="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                @click="deleteModule"
-            >
-                Delete module
-            </button>
-        </div>
+                <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h1 class="type-page-title">
+                            {{ mode === 'create' ? 'Create learning module' : 'Edit learning module' }}
+                        </h1>
+                        <p class="mt-1 text-sm text-muted">
+                            {{
+                                mode === 'create'
+                                    ? 'Configure module syllabus, cover image, learning outcomes, and standalone price.'
+                                    : 'Update module details and manage downloadable materials and video lessons.'
+                            }}
+                        </p>
+                    </div>
 
-        <form class="mt-6 max-w-5xl space-y-6" @submit.prevent="submitModule">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            v-if="mode === 'edit' && module"
+                            type="button"
+                            class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-3.5 text-xs font-semibold text-danger-700 ring-1 ring-danger-600/25 transition-colors hover:bg-danger-50"
+                            @click="deleteModule"
+                        >
+                            <Trash2 class="size-3.5" aria-hidden="true" />
+                            <span>Delete</span>
+                        </button>
+
+                        <Link
+                            href="/admin-vue/modules"
+                            class="inline-flex h-9 items-center rounded-lg bg-white px-4 text-xs font-semibold text-muted ring-1 ring-line transition-colors hover:text-navy-950"
+                        >
+                            Cancel
+                        </Link>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-9 items-center rounded-lg bg-navy-950 px-5 text-xs font-semibold text-white transition-colors hover:bg-navy-900 disabled:opacity-50"
+                            :disabled="busy"
+                            @click="submitModule"
+                        >
+                            {{ busy ? 'Saving...' : mode === 'create' ? 'Create module' : 'Save changes' }}
+                        </button>
+                    </div>
+                </header>
+            </div>
+
+            <!-- Validation Errors -->
             <section
-                v-if="serverErrors().length"
+                v-if="serverErrors.length > 0"
                 role="alert"
-                class="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                class="flex items-start gap-3 rounded-xl bg-danger-50 p-4 text-sm text-danger-700 ring-1 ring-danger-600/20"
             >
-                <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <AlertCircle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 <div>
                     <p class="font-semibold">Please correct the following before saving:</p>
-                    <ul class="mt-1 list-disc space-y-0.5 pl-5">
-                        <li v-for="error in serverErrors()" :key="error">{{ error }}</li>
+                    <ul class="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                        <li v-for="error in serverErrors" :key="error">{{ error }}</li>
                     </ul>
                 </div>
             </section>
 
-            <section class="grid gap-4 rounded-lg border border-neutral-200 bg-white p-5 md:grid-cols-2">
-                <label class="text-sm">
-                    Module title <span class="text-red-600">*</span>
-                    <input
-                        v-model="form.title"
-                        required
-                        maxlength="200"
-                        placeholder="e.g. Applied Urban Stormwater Management (MSMA 2nd Edition)"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3"
-                    />
-                </label>
+            <!-- Main 8/4 Layout -->
+            <form class="grid gap-6 lg:grid-cols-12 lg:items-start" @submit.prevent="submitModule">
+                <!-- Left Main Column (8 cols) -->
+                <div class="space-y-6 lg:col-span-8">
+                    <!-- Unified Module Details Card -->
+                    <div class="divide-y divide-line rounded-2xl bg-white shadow-card ring-1 ring-neutral-200/80">
+                        <!-- Basics & Cover -->
+                        <section class="space-y-5 p-6">
+                            <h2 class="text-sm font-semibold text-navy-950">Module details</h2>
 
-                <label class="text-sm">
-                    Module code
-                    <input
-                        v-model="form.code"
-                        maxlength="50"
-                        placeholder="Auto-generated if left blank (e.g. EHT-HYD-101)"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3 font-mono"
-                    />
-                </label>
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label for="mod-title" class="block text-xs font-medium text-ink">
+                                        Module title <span class="text-danger-600">*</span>
+                                    </label>
+                                    <input
+                                        id="mod-title"
+                                        v-model="form.title"
+                                        type="text"
+                                        required
+                                        maxlength="200"
+                                        placeholder="e.g. Applied Urban Stormwater Management"
+                                        class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/60 transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                    />
+                                </div>
 
-                <label class="text-sm md:col-span-2">
-                    Short summary
-                    <input
-                        v-model="form.summary"
-                        maxlength="500"
-                        placeholder="Concise summary displayed on the public standalone modules catalogue"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3"
-                    />
-                </label>
+                                <div>
+                                    <label for="mod-code" class="block text-xs font-medium text-ink">
+                                        Module code
+                                    </label>
+                                    <input
+                                        id="mod-code"
+                                        v-model="form.code"
+                                        type="text"
+                                        maxlength="50"
+                                        placeholder="Auto-generated if blank (e.g. EHT-HYD-101)"
+                                        class="tabular-nums-mono mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/60 transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                    />
+                                </div>
 
-                <label class="text-sm md:col-span-2">
-                    Full description &amp; syllabus <span class="text-red-600">*</span>
-                    <textarea
-                        v-model="form.description"
-                        required
-                        rows="5"
-                        class="mt-1 w-full rounded-md border border-neutral-300 p-3"
-                    />
-                </label>
+                                <div class="sm:col-span-2">
+                                    <label for="mod-summary" class="block text-xs font-medium text-ink">
+                                        Short summary
+                                    </label>
+                                    <input
+                                        id="mod-summary"
+                                        v-model="form.summary"
+                                        type="text"
+                                        maxlength="500"
+                                        placeholder="Concise summary displayed on catalogue cards"
+                                        class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/60 transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                    />
+                                </div>
 
-                <div class="flex items-center gap-4 md:col-span-2">
-                    <img
-                        v-if="coverPreview"
-                        :src="coverPreview"
-                        alt="Module cover"
-                        class="h-24 w-40 rounded-md border object-cover"
-                    />
-                    <span
-                        v-else
-                        class="grid h-24 w-40 place-items-center rounded-md border bg-neutral-50 text-xs text-neutral-500"
+                                <div class="sm:col-span-2">
+                                    <label for="mod-description" class="block text-xs font-medium text-ink">
+                                        Full description &amp; syllabus <span class="text-danger-600">*</span>
+                                    </label>
+                                    <textarea
+                                        id="mod-description"
+                                        v-model="form.description"
+                                        required
+                                        rows="5"
+                                        class="mt-1.5 w-full rounded-lg border border-line-strong/80 bg-white p-3.5 text-sm text-ink transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Cover Image Upload -->
+                            <div>
+                                <span class="block text-xs font-medium text-ink">Cover image</span>
+                                <input
+                                    ref="coverInputRef"
+                                    type="file"
+                                    accept="image/*"
+                                    class="sr-only"
+                                    @change="onCoverImage"
+                                />
+
+                                <div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center">
+                                    <button
+                                        type="button"
+                                        class="relative h-28 w-48 shrink-0 overflow-hidden rounded-xl bg-sand-50 ring-1 ring-line transition-all hover:ring-primary-600/40"
+                                        @click="coverInputRef?.click()"
+                                    >
+                                        <img
+                                            v-if="coverPreview"
+                                            :src="coverPreview"
+                                            alt="Module cover preview"
+                                            class="size-full object-cover"
+                                        />
+                                        <span
+                                            v-else
+                                            class="flex size-full flex-col items-center justify-center gap-1.5 text-muted"
+                                        >
+                                            <ImagePlus class="size-5" aria-hidden="true" />
+                                            <span class="text-xs font-medium">Upload cover</span>
+                                        </span>
+                                    </button>
+
+                                    <div class="space-y-1.5 text-xs text-muted">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button
+                                                type="button"
+                                                class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-semibold text-navy-950 ring-1 ring-line transition-colors hover:bg-sand-50"
+                                                @click="coverInputRef?.click()"
+                                            >
+                                                <Upload class="size-3.5" aria-hidden="true" />
+                                                <span>{{ coverPreview ? 'Replace image' : 'Choose image' }}</span>
+                                            </button>
+
+                                            <button
+                                                v-if="form.cover_image"
+                                                type="button"
+                                                class="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted hover:text-danger-600"
+                                                @click="clearCoverSelection"
+                                            >
+                                                <X class="size-3.5" aria-hidden="true" />
+                                                <span>Cancel</span>
+                                            </button>
+                                        </div>
+                                        <p>Recommended 16:9 landscape JPG, PNG, or WebP.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Learning Objectives -->
+                        <section class="space-y-4 p-6">
+                            <div class="flex items-center justify-between gap-3">
+                                <h2 class="text-sm font-semibold text-navy-950">Learning objectives</h2>
+                                <button
+                                    type="button"
+                                    class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-sand-50 px-3 text-xs font-semibold text-navy-950 ring-1 ring-line transition-colors hover:bg-sand-100"
+                                    @click="addObjective"
+                                >
+                                    <Plus class="size-3.5" aria-hidden="true" />
+                                    <span>Add objective</span>
+                                </button>
+                            </div>
+
+                            <p v-if="form.learning_objectives.length === 0" class="text-xs text-muted">
+                                Optional key outcomes displayed on the module overview page.
+                            </p>
+
+                            <div v-else class="space-y-2.5">
+                                <div
+                                    v-for="(_, index) in form.learning_objectives"
+                                    :key="index"
+                                    class="flex items-center gap-2"
+                                >
+                                    <input
+                                        v-model="form.learning_objectives[index]"
+                                        type="text"
+                                        maxlength="500"
+                                        placeholder="Learning outcome or engineering skill"
+                                        class="h-10 flex-1 rounded-lg border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/60 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-muted ring-1 ring-line transition-colors hover:bg-danger-50 hover:text-danger-700 hover:ring-danger-600/20"
+                                        aria-label="Remove objective"
+                                        @click="form.learning_objectives.splice(index, 1)"
+                                    >
+                                        <Trash2 class="size-4" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Edit Mode Only: Learning Materials -->
+                    <section
+                        v-if="mode === 'edit' && module"
+                        class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80"
                     >
-                        No cover
-                    </span>
-                    <label class="text-sm">
-                        Module cover image
-                        <input type="file" accept="image/*" class="mt-1 block text-sm" @change="onCoverImage" />
-                    </label>
-                </div>
-            </section>
-
-            <section class="grid gap-4 rounded-lg border border-neutral-200 bg-white p-5 md:grid-cols-2">
-                <label class="text-sm">
-                    Independent purchase price ({{ app.currency }}) <span class="text-red-600">*</span>
-                    <input
-                        v-model="form.independent_price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3 font-mono"
-                    />
-                </label>
-
-                <label class="text-sm">
-                    Publication status
-                    <select v-model="form.status" required class="mt-1 h-10 w-full rounded-md border border-neutral-300 px-3">
-                        <option v-for="status in statuses" :key="status.value" :value="status.value">
-                            {{ status.label }}
-                        </option>
-                    </select>
-                </label>
-            </section>
-
-            <section class="rounded-lg border border-neutral-200 bg-white p-5">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-neutral-900">Learning objectives</h2>
-                    <button
-                        type="button"
-                        class="rounded-md border border-neutral-300 px-3 py-1 text-xs font-medium hover:bg-neutral-50"
-                        @click="addObjective"
-                    >
-                        Add objective
-                    </button>
-                </div>
-                <div
-                    v-for="(_, index) in form.learning_objectives"
-                    :key="index"
-                    class="mt-2.5 flex items-center gap-2"
-                >
-                    <input
-                        v-model="form.learning_objectives[index]"
-                        maxlength="500"
-                        placeholder="Learning outcome or engineering skill"
-                        class="h-10 flex-1 rounded-md border border-neutral-300 px-3 text-sm"
-                    />
-                    <button
-                        type="button"
-                        class="rounded-md border border-neutral-200 px-3 py-2 text-xs text-red-700 hover:bg-red-50"
-                        @click="form.learning_objectives.splice(index, 1)"
-                    >
-                        Remove
-                    </button>
-                </div>
-                <p v-if="form.learning_objectives.length === 0" class="mt-2 text-xs text-neutral-500">
-                    Optional bullet points displayed on the module overview page.
-                </p>
-            </section>
-
-            <div class="flex justify-end gap-2">
-                <Link href="/admin-vue/modules" class="rounded-md border border-neutral-300 px-4 py-2 text-sm">
-                    Cancel
-                </Link>
-                <button
-                    type="submit"
-                    :disabled="busy"
-                    class="rounded-md bg-[#0F4C81] px-4 py-2 text-sm font-medium text-white hover:bg-[#0F4C81]/90 disabled:opacity-50"
-                >
-                    {{ busy ? 'Saving…' : mode === 'create' ? 'Create module' : 'Save module changes' }}
-                </button>
-            </div>
-        </form>
-
-        <section
-            v-if="mode === 'edit' && module"
-            class="mt-8 max-w-5xl rounded-lg border border-neutral-200 bg-white p-5"
-        >
-            <h2 class="text-base font-semibold text-neutral-900">
-                Standalone Module Learning Materials ({{ module.materials.length }})
-            </h2>
-            <p class="mt-1 text-sm text-neutral-500">
-                Upload workbooks, calculation sheets, and technical manuals included with this standalone module purchase.
-            </p>
-
-            <div class="mt-4 grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 p-4 md:grid-cols-2">
-                <label class="text-sm">
-                    Material title <span class="text-red-600">*</span>
-                    <input
-                        v-model="materialForm.title"
-                        placeholder="e.g. MSMA 2nd Edition Design Calculation Workbook"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
-                    />
-                </label>
-
-                <label class="text-sm">
-                    Material type
-                    <select
-                        v-model="materialForm.material_type"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
-                    >
-                        <option v-for="type in materialTypes" :key="type.value" :value="type.value">
-                            {{ type.label }}
-                        </option>
-                    </select>
-                </label>
-
-                <label class="text-sm">
-                    Status
-                    <select
-                        v-model="materialForm.status"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
-                    >
-                        <option v-for="st in materialStatuses" :key="st.value" :value="st.value">
-                            {{ st.label }}
-                        </option>
-                    </select>
-                </label>
-
-                <label class="text-sm">
-                    File <span class="text-red-600">*</span>
-                    <input
-                        :key="materialFileKey"
-                        type="file"
-                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.zip,.png,.jpg,.jpeg"
-                        class="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm"
-                        @change="onMaterialFile"
-                    />
-                </label>
-
-                <label class="text-sm md:col-span-2">
-                    Description
-                    <textarea
-                        v-model="materialForm.description"
-                        rows="2"
-                        placeholder="Optional description of what this file contains"
-                        class="mt-1 w-full rounded-md border border-neutral-300 bg-white p-2.5 text-sm"
-                    />
-                </label>
-
-                <div class="flex items-center justify-between md:col-span-2">
-                    <label class="flex items-center gap-2 text-sm">
-                        <input v-model="materialForm.is_downloadable" type="checkbox" />
-                        Allow entitled customers to download
-                    </label>
-                    <button
-                        type="button"
-                        :disabled="materialBusy || !materialForm.file || !materialForm.title.trim()"
-                        class="inline-flex h-10 items-center gap-2 rounded-md bg-[#0F4C81] px-4 text-sm font-medium text-white disabled:opacity-50"
-                        @click="uploadMaterial"
-                    >
-                        <Upload :size="16" />
-                        {{ materialBusy ? 'Uploading…' : 'Upload material' }}
-                    </button>
-                </div>
-            </div>
-
-            <div v-if="module.materials.length > 0" class="mt-5 divide-y divide-neutral-200 rounded-lg border border-neutral-200">
-                <div
-                    v-for="mat in module.materials"
-                    :key="mat.id"
-                    class="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
-                >
-                    <div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <p class="font-medium text-neutral-900">{{ mat.title }}</p>
-                            <span class="rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
-                                {{ mat.typeLabel }}
-                            </span>
-                            <span class="rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
-                                {{ mat.statusLabel }}
-                            </span>
+                        <div class="flex items-center justify-between gap-2">
+                            <h2 class="text-sm font-semibold text-navy-950">
+                                Learning materials ({{ module.materials.length }})
+                            </h2>
                         </div>
-                        <p v-if="mat.description" class="mt-0.5 text-xs text-neutral-600">{{ mat.description }}</p>
-                        <p class="mt-1 font-mono text-xs text-neutral-500">
-                            {{ mat.original_filename }} · {{ mat.fileSizeLabel }}
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <a
-                            :href="mat.downloadUrl"
-                            class="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-                        >
-                            <Download :size="14" />
-                            Download
-                        </a>
-                        <button
-                            type="button"
-                            class="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                            @click="removeMaterial(mat.id)"
-                        >
-                            <Trash2 :size="14" />
-                            Remove
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <p v-else class="mt-4 rounded-lg border border-neutral-200 p-6 text-center text-sm text-neutral-500">
-                No learning materials have been uploaded to this standalone module yet.
-            </p>
-        </section>
 
-        <section
-            v-if="mode === 'edit' && module"
-            class="mt-6 max-w-5xl rounded-lg border border-neutral-200 bg-white p-5"
-        >
-            <h2 class="flex items-center gap-2 text-base font-semibold text-neutral-900">
-                <Film :size="16" class="text-[#0F4C81]" />
-                Standalone Module Video Lessons ({{ (module.videos ?? []).length }})
-            </h2>
-            <p class="mt-1 text-sm text-neutral-500">
-                Upload self-paced video lessons included with this standalone module. Entitled customers stream them inside their Learning Portal.
-            </p>
-
-            <div class="mt-4 grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 p-4 md:grid-cols-2">
-                <label class="text-sm">
-                    Video lesson title <span class="text-red-600">*</span>
-                    <input
-                        v-model="videoForm.title"
-                        placeholder="e.g. Lesson 1: Runoff Hydrograph Basics"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
-                    />
-                </label>
-
-                <label class="text-sm">
-                    Publication status
-                    <select
-                        v-model="videoForm.status"
-                        class="mt-1 h-10 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm"
-                    >
-                        <option v-for="st in materialStatuses" :key="st.value" :value="st.value">
-                            {{ st.label }}
-                        </option>
-                    </select>
-                </label>
-
-                <label class="text-sm md:col-span-2">
-                    Video file (MP4, MOV, MKV, WebM) <span class="text-red-600">*</span>
-                    <input
-                        :key="videoFileKey"
-                        type="file"
-                        accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
-                        class="mt-1 block w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm"
-                        @change="onVideoFile"
-                    />
-                </label>
-
-                <label class="text-sm md:col-span-2">
-                    Description
-                    <textarea
-                        v-model="videoForm.description"
-                        rows="2"
-                        placeholder="Optional summary of topics covered in this lesson"
-                        class="mt-1 w-full rounded-md border border-neutral-300 bg-white p-2.5 text-sm"
-                    />
-                </label>
-
-                <div class="flex justify-end md:col-span-2">
-                    <button
-                        type="button"
-                        :disabled="videoBusy || !videoForm.file || !videoForm.title.trim()"
-                        class="inline-flex h-10 items-center gap-2 rounded-md bg-[#0F4C81] px-4 text-sm font-medium text-white disabled:opacity-50"
-                        @click="uploadVideo"
-                    >
-                        <Upload :size="16" />
-                        {{ videoBusy ? 'Uploading…' : 'Upload video lesson' }}
-                    </button>
-                </div>
-            </div>
-
-            <div
-                v-if="(module.videos ?? []).length > 0"
-                class="mt-5 divide-y divide-neutral-200 rounded-lg border border-neutral-200"
-            >
-                <div
-                    v-for="vid in module.videos"
-                    :key="vid.id"
-                    class="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
-                >
-                    <div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <p class="font-medium text-neutral-900">{{ vid.title }}</p>
-                            <span class="rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
-                                {{ vid.encodingLabel }}
-                            </span>
-                            <span class="rounded border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
-                                {{ vid.statusLabel }}
-                            </span>
+                        <div class="mt-4 grid gap-3 rounded-xl bg-sand-50/80 p-4 ring-1 ring-line/70 sm:grid-cols-2">
+                            <input
+                                v-model="materialForm.title"
+                                type="text"
+                                placeholder="Material title *"
+                                class="h-9 rounded-lg border border-line-strong/80 bg-white px-3 text-xs text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                            <select
+                                v-model="materialForm.material_type"
+                                class="h-9 rounded-lg border border-line-strong/80 bg-white px-3 text-xs text-ink focus:border-primary-600 focus:outline-none"
+                            >
+                                <option v-for="type in materialTypes" :key="type.value" :value="type.value">
+                                    {{ type.label }}
+                                </option>
+                            </select>
+                            <select
+                                v-model="materialForm.status"
+                                class="h-9 rounded-lg border border-line-strong/80 bg-white px-3 text-xs text-ink focus:border-primary-600 focus:outline-none"
+                            >
+                                <option v-for="st in materialStatuses" :key="st.value" :value="st.value">
+                                    {{ st.label }}
+                                </option>
+                            </select>
+                            <div class="flex items-center">
+                                <input
+                                    ref="materialFileRef"
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.zip,.png,.jpg,.jpeg"
+                                    class="sr-only"
+                                    @change="onMaterialFile"
+                                />
+                                <button
+                                    type="button"
+                                    class="inline-flex h-9 w-full items-center justify-center gap-1.5 truncate rounded-lg bg-white px-3 text-xs font-semibold text-navy-950 ring-1 ring-line hover:bg-sand-50"
+                                    @click="materialFileRef?.click()"
+                                >
+                                    <Upload class="size-3.5 shrink-0" aria-hidden="true" />
+                                    <span class="truncate">{{ materialForm.file?.name || 'Choose file *' }}</span>
+                                </button>
+                            </div>
+                            <textarea
+                                v-model="materialForm.description"
+                                rows="2"
+                                placeholder="Optional short description..."
+                                class="rounded-lg border border-line-strong/80 bg-white p-2.5 text-xs text-ink focus:border-primary-600 focus:outline-none sm:col-span-2"
+                            />
+                            <div class="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                                <label class="flex items-center gap-2 text-xs text-ink">
+                                    <input
+                                        v-model="materialForm.is_downloadable"
+                                        type="checkbox"
+                                        class="size-4 rounded border-line-strong accent-navy-950"
+                                    />
+                                    <span>Allow entitled customers to download</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    :disabled="materialBusy || !materialForm.file || !materialForm.title.trim()"
+                                    class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-navy-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-navy-900 disabled:opacity-45"
+                                    @click="uploadMaterial"
+                                >
+                                    <Upload class="size-3.5" aria-hidden="true" />
+                                    <span>{{ materialBusy ? 'Uploading...' : 'Upload material' }}</span>
+                                </button>
+                            </div>
                         </div>
-                        <p v-if="vid.description" class="mt-0.5 text-xs text-neutral-600">{{ vid.description }}</p>
-                        <p class="mt-1 font-mono text-xs text-neutral-500">
-                            {{ vid.original_filename ?? 'Video file' }} · {{ vid.durationLabel }}
+
+                        <ul v-if="module.materials.length > 0" class="mt-4 divide-y divide-line/70">
+                            <li
+                                v-for="mat in module.materials"
+                                :key="mat.id"
+                                class="flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center"
+                            >
+                                <div class="flex min-w-0 items-start gap-2.5">
+                                    <FileText class="mt-0.5 size-4 shrink-0 text-primary-600" aria-hidden="true" />
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="truncate text-sm font-medium text-navy-950">{{ mat.title }}</p>
+                                            <StatusBadge :tone="mat.status === 'published' ? 'success' : 'neutral'">
+                                                {{ mat.statusLabel }}
+                                            </StatusBadge>
+                                        </div>
+                                        <p v-if="mat.description" class="mt-0.5 text-xs text-muted">{{ mat.description }}</p>
+                                        <p class="tabular mt-0.5 text-xs text-muted/85">
+                                            {{ mat.original_filename }} &middot; {{ mat.fileSizeLabel }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <a
+                                        :href="mat.downloadUrl"
+                                        class="inline-flex h-8 items-center gap-1 rounded-lg bg-sand-50 px-3 text-xs font-semibold text-navy-950 ring-1 ring-line transition-colors hover:bg-sand-100"
+                                    >
+                                        <Download class="size-3.5" aria-hidden="true" />
+                                        <span>Download</span>
+                                    </a>
+                                    <button
+                                        type="button"
+                                        class="inline-flex size-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger-50 hover:text-danger-700"
+                                        aria-label="Remove material"
+                                        @click="removeMaterial(mat.id)"
+                                    >
+                                        <Trash2 class="size-3.5" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            </li>
+                        </ul>
+                        <p v-else class="mt-4 text-center text-xs text-muted">
+                            No learning materials uploaded yet.
                         </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                        @click="removeVideo(vid.id)"
+                    </section>
+
+                    <!-- Edit Mode Only: Video Lessons -->
+                    <section
+                        v-if="mode === 'edit' && module"
+                        class="rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80"
                     >
-                        <Trash2 :size="14" />
-                        Remove
-                    </button>
+                        <div class="flex items-center gap-2">
+                            <Film class="size-4 text-accent-600" aria-hidden="true" />
+                            <h2 class="text-sm font-semibold text-navy-950">
+                                Video lessons ({{ (module.videos ?? []).length }})
+                            </h2>
+                        </div>
+
+                        <div class="mt-4 grid gap-3 rounded-xl bg-sand-50/80 p-4 ring-1 ring-line/70 sm:grid-cols-2">
+                            <input
+                                v-model="videoForm.title"
+                                type="text"
+                                placeholder="Video lesson title *"
+                                class="h-9 rounded-lg border border-line-strong/80 bg-white px-3 text-xs text-ink focus:border-primary-600 focus:outline-none"
+                            />
+                            <select
+                                v-model="videoForm.status"
+                                class="h-9 rounded-lg border border-line-strong/80 bg-white px-3 text-xs text-ink focus:border-primary-600 focus:outline-none"
+                            >
+                                <option v-for="st in materialStatuses" :key="st.value" :value="st.value">
+                                    {{ st.label }}
+                                </option>
+                            </select>
+                            <div class="sm:col-span-2">
+                                <input
+                                    ref="videoFileRef"
+                                    type="file"
+                                    accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
+                                    class="sr-only"
+                                    @change="onVideoFile"
+                                />
+                                <button
+                                    type="button"
+                                    class="inline-flex h-9 w-full items-center justify-center gap-1.5 truncate rounded-lg bg-white px-3 text-xs font-semibold text-navy-950 ring-1 ring-line hover:bg-sand-50"
+                                    @click="videoFileRef?.click()"
+                                >
+                                    <Upload class="size-3.5 shrink-0" aria-hidden="true" />
+                                    <span class="truncate">{{ videoForm.file?.name || 'Choose video file (MP4, MOV, MKV, WebM) *' }}</span>
+                                </button>
+                            </div>
+                            <textarea
+                                v-model="videoForm.description"
+                                rows="2"
+                                placeholder="Optional lesson summary..."
+                                class="rounded-lg border border-line-strong/80 bg-white p-2.5 text-xs text-ink focus:border-primary-600 focus:outline-none sm:col-span-2"
+                            />
+                            <div class="flex justify-end sm:col-span-2">
+                                <button
+                                    type="button"
+                                    :disabled="videoBusy || !videoForm.file || !videoForm.title.trim()"
+                                    class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-navy-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-navy-900 disabled:opacity-45"
+                                    @click="uploadVideo"
+                                >
+                                    <Upload class="size-3.5" aria-hidden="true" />
+                                    <span>{{ videoBusy ? 'Uploading...' : 'Upload video' }}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <ul v-if="(module.videos ?? []).length > 0" class="mt-4 divide-y divide-line/70">
+                            <li
+                                v-for="vid in module.videos"
+                                :key="vid.id"
+                                class="flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center"
+                            >
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="truncate text-sm font-medium text-navy-950">{{ vid.title }}</p>
+                                        <StatusBadge :tone="vid.encodingStatus === 'ready' ? 'success' : 'warning'">
+                                            {{ vid.encodingLabel }}
+                                        </StatusBadge>
+                                        <StatusBadge :tone="vid.status === 'published' ? 'primary' : 'neutral'">
+                                            {{ vid.statusLabel }}
+                                        </StatusBadge>
+                                    </div>
+                                    <p v-if="vid.description" class="mt-0.5 text-xs text-muted">{{ vid.description }}</p>
+                                    <p class="tabular mt-0.5 text-xs text-muted/85">
+                                        {{ vid.original_filename ?? 'Video file' }} &middot; {{ vid.durationLabel }}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-danger-50 hover:text-danger-700"
+                                    aria-label="Remove video"
+                                    @click="removeVideo(vid.id)"
+                                >
+                                    <Trash2 class="size-3.5" aria-hidden="true" />
+                                </button>
+                            </li>
+                        </ul>
+                        <p v-else class="mt-4 text-center text-xs text-muted">
+                            No video lessons uploaded yet.
+                        </p>
+                    </section>
                 </div>
-            </div>
-            <p v-else class="mt-4 rounded-lg border border-neutral-200 p-6 text-center text-sm text-neutral-500">
-                No video lessons have been uploaded to this standalone module yet.
-            </p>
-        </section>
+
+                <!-- Right Sticky Column (4 cols): Pricing & Publishing -->
+                <aside class="space-y-5 lg:sticky lg:top-24 lg:col-span-4">
+                    <div class="space-y-4 rounded-2xl bg-white p-6 shadow-card ring-1 ring-neutral-200/80">
+                        <h2 class="text-sm font-semibold text-navy-950">Pricing &amp; publishing</h2>
+
+                        <div>
+                            <label for="mod-status" class="block text-xs font-medium text-ink">
+                                Publication status <span class="text-danger-600">*</span>
+                            </label>
+                            <select
+                                id="mod-status"
+                                v-model="form.status"
+                                required
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            >
+                                <option v-for="status in statuses" :key="status.value" :value="status.value">
+                                    {{ status.label }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="mod-price" class="block text-xs font-medium text-ink">
+                                Standalone price ({{ app.currency }}) <span class="text-danger-600">*</span>
+                            </label>
+                            <div class="relative mt-1.5">
+                                <span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-xs font-semibold text-muted">
+                                    {{ app.currency }}
+                                </span>
+                                <input
+                                    id="mod-price"
+                                    v-model="form.independent_price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                    placeholder="0.00"
+                                    class="tabular h-10 w-full rounded-lg border border-line-strong/80 bg-white pr-3.5 pl-13 text-sm font-semibold text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 border-t border-line pt-4">
+                            <button
+                                type="submit"
+                                :disabled="busy"
+                                class="inline-flex h-10 w-full items-center justify-center rounded-lg bg-navy-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-navy-900 disabled:opacity-50"
+                            >
+                                {{ busy ? 'Saving...' : mode === 'create' ? 'Create module' : 'Save changes' }}
+                            </button>
+
+                            <Link
+                                href="/admin-vue/modules"
+                                class="inline-flex h-9 w-full items-center justify-center rounded-lg text-xs font-semibold text-muted transition-colors hover:bg-sand-100 hover:text-navy-950"
+                            >
+                                Cancel
+                            </Link>
+                        </div>
+                    </div>
+                </aside>
+            </form>
+        </div>
     </AdminLayout>
 </template>

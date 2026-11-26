@@ -51,6 +51,7 @@ class CertificateController extends Controller
         return Inertia::render('Portal/Certificates/Show', [
             'certificate' => PortalPresenter::certificateDetail($certificate),
             'logoDataUri' => $certificateService->resolveLogoDataUri(),
+            'signatureDataUri' => $certificateService->resolveSignatureDataUri(),
         ]);
     }
 
@@ -72,17 +73,27 @@ class CertificateController extends Controller
 
         $disk = $certificate->pdf_storage_disk ?: 'certificates';
         $storageKey = $certificate->pdf_storage_key;
+        $pdfBytes = null;
 
-        if (blank($storageKey) || ! Storage::disk($disk)->exists($storageKey)) {
-            $certificate = $certificateService->regeneratePdf($certificate, $request->user());
-            $storageKey = $certificate->pdf_storage_key;
+        if (filled($storageKey) && Storage::disk($disk)->exists($storageKey)) {
+            $pdfBytes = Storage::disk($disk)->get($storageKey);
         }
 
-        abort_unless(
-            filled($storageKey) && Storage::disk($disk)->exists($storageKey),
-            404,
-            'The generated PDF certificate file is not available in storage.',
-        );
+        if (blank($pdfBytes)) {
+            try {
+                $certificate = $certificateService->regeneratePdf($certificate, $request->user());
+                $storageKey = $certificate->pdf_storage_key;
+                if (filled($storageKey) && Storage::disk($disk)->exists($storageKey)) {
+                    $pdfBytes = Storage::disk($disk)->get($storageKey);
+                }
+            } catch (\Throwable) {
+                $pdfBytes = null;
+            }
+        }
+
+        if (blank($pdfBytes)) {
+            $pdfBytes = $certificateService->renderPdfBytes($certificate);
+        }
 
         AuditLog::record(
             event: 'certificate.downloaded',
@@ -97,12 +108,11 @@ class CertificateController extends Controller
             actor: $request->user(),
         );
 
-        return $storageStreamer->streamProtectedFile(
-            request: $request,
-            disk: $disk,
-            storageKey: $storageKey,
-            contentType: 'application/pdf',
-            downloadFilename: "{$certificate->certificate_number}.pdf",
-        );
+        return response($pdfBytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$certificate->certificate_number.'.pdf"',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

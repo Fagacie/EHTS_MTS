@@ -338,14 +338,14 @@ class AdminContentController extends Controller
         $data = $this->validateAnnouncement($request);
         $data['created_by'] = $request->user()->id;
         Announcement::create($data);
-        return back()->with('success', 'Announcement draft created.');
+        return back()->with('status', 'Announcement draft created.');
     }
 
     public function updateAnnouncement(Request $request, Announcement $announcement): RedirectResponse
     {
         abort_if($announcement->status === AnnouncementStatus::Sent, 422, 'Sent announcements cannot be edited.');
         $announcement->update($this->validateAnnouncement($request));
-        return back()->with('success', 'Announcement updated.');
+        return back()->with('status', 'Announcement updated.');
     }
 
     private function validateAnnouncement(Request $request): array
@@ -367,14 +367,14 @@ class AdminContentController extends Controller
     {
         abort_unless(in_array($announcement->status, [AnnouncementStatus::Draft, AnnouncementStatus::Scheduled, AnnouncementStatus::Failed], true), 422, 'Only unsent announcements can be dispatched.');
         $count = $notifier->dispatchAnnouncement($announcement, $request->user());
-        return back()->with('success', "Announcement dispatched to {$count} recipient(s).");
+        return back()->with('status', "Announcement dispatched to {$count} recipient(s).");
     }
 
     public function destroyAnnouncement(Announcement $announcement): RedirectResponse
     {
         abort_unless($announcement->status === AnnouncementStatus::Draft, 422, 'Only draft announcements can be deleted.');
         $announcement->delete();
-        return back()->with('success', 'Announcement deleted.');
+        return back()->with('status', 'Announcement deleted.');
     }
 
     public function instructorProfiles(Request $request): Response

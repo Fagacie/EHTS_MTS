@@ -135,6 +135,16 @@ class CertificateService
      */
     public function resolveLogoDataUri(?string $logoPath = null): ?string
     {
+        $certJpeg = public_path('images/ecohydrotech-logo-cert.jpg');
+        if (is_file($certJpeg)) {
+            return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($certJpeg));
+        }
+
+        $pdfJpeg = public_path('images/ecohydrotech-logo-pdf.jpg');
+        if (is_file($pdfJpeg)) {
+            return 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($pdfJpeg));
+        }
+
         $configured = $logoPath ?: ($this->globalSettings()['logo_path'] ?? self::DEFAULT_LOGO_PATH);
 
         $publicFullPath = public_path($configured);
@@ -146,6 +156,9 @@ class CertificateService
         }
         if (is_file($publicFullPath)) {
             $ext = strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION));
+            if (in_array($ext, ['png', 'webp'], true) && ! extension_loaded('gd')) {
+                return null;
+            }
             $mime = match ($ext) {
                 'svg' => 'image/svg+xml',
                 'png' => 'image/png',
@@ -156,14 +169,6 @@ class CertificateService
             if ($mime !== null) {
                 return "data:{$mime};base64,".base64_encode((string) file_get_contents($publicFullPath));
             }
-        }
-
-        $fallbackLogo = public_path(self::DEFAULT_LOGO_PATH);
-        if (is_file($fallbackLogo)) {
-            $ext = strtolower(pathinfo($fallbackLogo, PATHINFO_EXTENSION));
-            $mime = $ext === 'svg' ? 'image/svg+xml' : 'image/png';
-
-            return "data:{$mime};base64,".base64_encode((string) file_get_contents($fallbackLogo));
         }
 
         return null;
@@ -184,7 +189,12 @@ class CertificateService
             return null;
         }
 
-        $mime = match (strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION))) {
+        $ext = strtolower(pathinfo($publicFullPath, PATHINFO_EXTENSION));
+        if (in_array($ext, ['png', 'webp'], true) && ! extension_loaded('gd')) {
+            return null;
+        }
+
+        $mime = match ($ext) {
             'png' => 'image/png',
             'jpg', 'jpeg' => 'image/jpeg',
             'svg' => 'image/svg+xml',
@@ -363,10 +373,15 @@ class CertificateService
                 actor: $admin,
             );
 
-            DB::afterCommit(fn () => GenerateCertificatePdfJob::dispatch($certificate->id));
-
             return $certificate->fresh(['user', 'trainingSession', 'module', 'issuer']);
         });
+
+        // Generate and issue immediately so trainees can view & download without waiting on an async queue worker.
+        try {
+            $certificate = $this->generateApprovedPdf($certificate->id);
+        } catch (\Throwable) {
+            GenerateCertificatePdfJob::dispatch($certificate->id);
+        }
 
         return $certificate->fresh(['user', 'trainingSession', 'module', 'issuer']);
     }

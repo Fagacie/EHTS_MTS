@@ -127,6 +127,7 @@ function printCertificate(): void {
                                     :signatory-name="certificate.signatoryName"
                                     :signatory-title="certificate.signatoryTitle"
                                     :logo-src="logoSrc"
+                                    :signature-src="signatureDataUri"
                                     :revoked="certificate.isRevoked"
                                 />
                             </DialogContent>
@@ -185,6 +186,7 @@ function printCertificate(): void {
                 :signatory-name="certificate.signatoryName"
                 :signatory-title="certificate.signatoryTitle"
                 :logo-src="logoSrc"
+                :signature-src="signatureDataUri"
                 :revoked="certificate.isRevoked"
             />
 

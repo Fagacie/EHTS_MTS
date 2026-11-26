@@ -11,6 +11,7 @@ export interface CertificateTemplateProps {
     signatoryName: string;
     signatoryTitle?: string | null;
     logoSrc?: string | null;
+    signatureSrc?: string | null;
     revoked?: boolean;
 }
 
@@ -49,16 +50,15 @@ defineProps<CertificateTemplateProps>();
                     <polygon points="18,190 13,190 190,13 190,18" fill="#c89d46" />
                 </svg>
 
-                <!-- Subtle Parchment Watermark Crest -->
-                <svg
-                    class="pointer-events-none absolute top-1/2 left-1/2 size-72 -translate-x-1/2 -translate-y-1/2 sm:size-96"
-                    viewBox="0 0 360 360"
+                <!-- Subtle Organisation Name Watermark -->
+                <div
+                    class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden px-12 select-none"
                     aria-hidden="true"
                 >
-                    <circle cx="180" cy="180" r="155" fill="none" stroke="#c89d46" stroke-width="1.5" opacity="0.14" />
-                    <circle cx="180" cy="180" r="136" fill="none" stroke="#0b2a5b" stroke-width="1" stroke-dasharray="4 6" opacity="0.10" />
-                    <circle cx="180" cy="180" r="98" fill="none" stroke="#2d8a3e" stroke-width="1" opacity="0.09" />
-                </svg>
+                    <p class="font-serif text-2xl font-semibold tracking-[0.26em] text-[#0b2a5b] uppercase opacity-[0.035] sm:text-4xl">
+                        {{ issuingOrganisation }}
+                    </p>
+                </div>
 
                 <!-- Revoked Watermark Overlay -->
                 <div
@@ -159,18 +159,28 @@ defineProps<CertificateTemplateProps>();
                         </div>
 
                         <!-- Authorised Signatory -->
-                        <div class="sm:text-right">
-                            <div class="inline-block min-w-56 border-t-[1.5px] border-[#0b2a5b] pt-1.5">
-                                <p class="text-sm font-bold text-[#0b2a5b]">
-                                    {{ signatoryName }}
-                                </p>
-                                <p v-if="signatoryTitle" class="mt-0.5 text-[11px] text-[#55657a]">
-                                    {{ signatoryTitle }}
+                        <div class="flex flex-col items-center sm:items-end">
+                            <div class="w-56 text-center">
+                                <div class="flex h-12 items-end justify-center pb-1">
+                                    <img
+                                        v-if="signatureSrc"
+                                        :src="signatureSrc"
+                                        alt="Authorised signature"
+                                        class="max-h-11 max-w-44 object-contain mix-blend-multiply"
+                                    />
+                                </div>
+                                <div class="border-t-[1.5px] border-[#0b2a5b] pt-1.5">
+                                    <p class="text-sm font-bold text-[#0b2a5b]">
+                                        {{ signatoryName }}
+                                    </p>
+                                    <p v-if="signatoryTitle" class="mt-0.5 text-[11px] text-[#55657a]">
+                                        {{ signatoryTitle }}
+                                    </p>
+                                </div>
+                                <p class="tabular mt-2 text-[11px] text-[#64748b]">
+                                    Issued {{ issuedDateLabel }}
                                 </p>
                             </div>
-                            <p class="tabular mt-2 text-[11px] text-[#64748b]">
-                                Issued {{ issuedDateLabel }}
-                            </p>
                         </div>
                     </div>
                 </div>

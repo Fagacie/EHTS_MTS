@@ -289,6 +289,10 @@ Route::middleware(['auth', 'active.account', 'verified', 'role:administrator'])
         Route::post('/admin-vue/certificates/issue', [AdminOperationsController::class, 'issueCertificate'])->name('admin-vue.certificates.issue');
         Route::post('/admin-vue/certificates/{certificate}/revoke', [AdminOperationsController::class, 'revokeCertificate'])->name('admin-vue.certificates.revoke');
         Route::get('/admin-vue/reports', [AdminOperationsController::class, 'reports'])->name('admin-vue.reports.index');
+        Route::get('/admin-vue/reports/pdf', [AdminOperationsController::class, 'downloadReportPdf'])->name('admin-vue.reports.pdf');
+        Route::get('/admin-vue/reports/export/{dataset}', [AdminOperationsController::class, 'exportReport'])->name('admin-vue.reports.export');
+        Route::get('/admin-vue/settings', [AdminOperationsController::class, 'systemSettings'])->name('admin-vue.settings.edit');
+        Route::post('/admin-vue/settings', [AdminOperationsController::class, 'updateSystemSettings'])->name('admin-vue.settings.update');
     });
 
 Route::middleware(['auth', 'active.account', 'verified', 'role:administrator'])

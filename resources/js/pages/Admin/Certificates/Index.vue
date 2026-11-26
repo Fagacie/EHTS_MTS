@@ -1,5 +1,618 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'; import { router } from '@inertiajs/vue3'; import { Award, Search, X } from 'lucide-vue-next'; import AdminLayout from '@/layouts/AdminLayout.vue'; import { Card, CardContent } from '@/components/ui/card'; import type { EtmsSharedProps } from '@/types/etms';
-interface Certificate { id:number; number:string; trainee:string; title:string; recordType:string; completionDate:string|null; issuedAt:string|null; status:string } interface Props extends EtmsSharedProps { certificates:{data:Certificate[];from:number|null;to:number|null;total:number;links:{url:string|null;label:string;active:boolean}[]};filters:{q:string;status:string};statuses:{value:string;label:string}[];trainees:{id:number;name:string;email:string}[];sessions:{id:number;session_code:string;title:string}[];modules:{id:number;code:string;title:string}[] } const props=defineProps<Props>(); const filters=reactive({...props.filters}); const revoke=ref<{id:number;number:string}|null>(null); const issue=ref(false); const reason=ref(''); const busy=ref(false); const form=reactive({trainee_id:'',record_type:'session',record_id:'',completion_date:'',notes:''}); function apply(){router.get('/admin-vue/certificates',filters,{preserveState:true,replace:true})} function clear(){filters.q='';filters.status='';apply()} function submitRevoke(){if(!revoke.value||!reason.value.trim())return;busy.value=true;router.post(`/admin-vue/certificates/${revoke.value.id}/revoke`,{revocation_reason:reason.value},{preserveScroll:true,onFinish:()=>{busy.value=false;revoke.value=null;reason.value=''}})} function submitIssue(){if(!form.trainee_id||!form.record_id||!form.completion_date)return;busy.value=true;router.post('/admin-vue/certificates/issue',form,{preserveScroll:true,onFinish:()=>{busy.value=false;issue.value=false;form.notes=''}})}
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import {
+    DialogClose,
+    DialogContent,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
+} from 'reka-ui';
+import {
+    AlertCircle,
+    Award,
+    Plus,
+    RotateCcw,
+    Search,
+    Settings,
+    ShieldOff,
+    X,
+} from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import DataTable, { type DataTableColumn } from '@/components/ds/DataTable.vue';
+import EmptyState from '@/components/ds/EmptyState.vue';
+import StatusBadge, { type StatusTone } from '@/components/ds/StatusBadge.vue';
+import AdminLayout from '@/layouts/AdminLayout.vue';
+import type { EtmsSharedProps } from '@/types/etms';
+
+interface CertificateItem {
+    id: number;
+    number: string;
+    trainee: string;
+    title: string;
+    recordType: string;
+    completionDate: string | null;
+    issuedAt: string | null;
+    status: string;
+}
+
+type CertificateRow = CertificateItem & Record<string, unknown>;
+
+interface Props extends EtmsSharedProps {
+    certificates: {
+        data: CertificateItem[];
+        from: number | null;
+        to: number | null;
+        total: number;
+        last_page?: number;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
+    filters: { q: string; status: string };
+    statuses: { value: string; label: string }[];
+    trainees: { id: number; name: string; email: string }[];
+    sessions: { id: number; session_code: string; title: string }[];
+    modules: { id: number; code: string; title: string }[];
+}
+
+const props = defineProps<Props>();
+const page = usePage();
+const serverErrors = computed(() => {
+    const errors = (page.props as { errors?: Record<string, string> }).errors ?? {};
+    return Object.values(errors).filter(Boolean);
+});
+const filters = reactive({ ...props.filters });
+const issueOpen = ref(false);
+const revokeTarget = ref<CertificateItem | null>(null);
+const reason = ref('');
+const busy = ref(false);
+
+const form = reactive({
+    trainee_id: '',
+    record_type: 'session' as 'session' | 'module',
+    record_id: '',
+    completion_date: '',
+    notes: '',
+});
+
+const revokeModalOpen = computed({
+    get: () => revokeTarget.value !== null,
+    set: (open: boolean) => {
+        if (!open) {
+            revokeTarget.value = null;
+            reason.value = '';
+        }
+    },
+});
+
+const hasActiveFilters = computed(
+    () => filters.q.trim() !== '' || filters.status !== '',
+);
+
+const rows = computed<CertificateRow[]>(() => props.certificates.data as CertificateRow[]);
+
+const columns: DataTableColumn[] = [
+    { key: 'certificate', label: 'Certificate', tabular: true },
+    { key: 'trainee', label: 'Trainee' },
+    { key: 'training', label: 'Training Programme' },
+    { key: 'status', label: 'Status' },
+];
+
+function apply(): void {
+    router.get(
+        '/admin-vue/certificates',
+        {
+            q: filters.q.trim() || undefined,
+            status: filters.status || undefined,
+        },
+        { preserveState: true, replace: true },
+    );
+}
+
+function selectStatus(statusValue: string): void {
+    filters.status = statusValue;
+    apply();
+}
+
+function clear(): void {
+    filters.q = '';
+    filters.status = '';
+    apply();
+}
+
+function setRecordType(type: 'session' | 'module'): void {
+    if (form.record_type !== type) {
+        form.record_type = type;
+        form.record_id = '';
+    }
+}
+
+function submitIssue(): void {
+    if (!form.trainee_id || !form.record_id || !form.completion_date) return;
+    busy.value = true;
+    router.post('/admin-vue/certificates/issue', form, {
+        preserveScroll: true,
+        onFinish: () => {
+            busy.value = false;
+        },
+        onSuccess: () => {
+            issueOpen.value = false;
+            form.trainee_id = '';
+            form.record_id = '';
+            form.completion_date = '';
+            form.notes = '';
+        },
+    });
+}
+
+function submitRevoke(): void {
+    if (!revokeTarget.value || !reason.value.trim()) return;
+    busy.value = true;
+    router.post(
+        `/admin-vue/certificates/${revokeTarget.value.id}/revoke`,
+        { revocation_reason: reason.value.trim() },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                busy.value = false;
+                revokeTarget.value = null;
+                reason.value = '';
+            },
+        },
+    );
+}
+
+function statusTone(status: string): StatusTone {
+    const s = status.toLowerCase();
+    if (s.includes('issued') || s.includes('active')) return 'success';
+    if (s.includes('revok')) return 'danger';
+    if (s.includes('pend')) return 'warning';
+    return 'neutral';
+}
+
+function formatDate(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+function decodeLabel(label: string): string {
+    return label
+        .replace(/&laquo;/g, '«')
+        .replace(/&raquo;/g, '»')
+        .replace(/&amp;/g, '&');
+}
 </script>
-<template><AdminLayout><div class="mb-6 flex items-start justify-between gap-4"><div><p class="text-sm font-medium text-[#0F4C81]">Academic operations</p><h1 class="mt-1 text-2xl font-semibold">Certificates</h1><p class="mt-1 text-sm text-slate-500">Review and issue certificates from verified training records.</p></div><div class="flex gap-2"><a href="/admin-vue/certificate-settings" class="rounded-md border px-4 py-2 text-sm">Signatory settings</a><button type="button" class="rounded-md bg-[#0F4C81] px-4 py-2 text-sm text-white" @click="issue=true">Issue certificate</button></div></div><Card><CardContent class="p-4"><form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto_auto]" @submit.prevent="apply"><label class="relative"><Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="16"/><input v-model="filters.q" class="h-10 w-full rounded-md border pl-9 text-sm" placeholder="Certificate, trainee or training"/></label><select v-model="filters.status" class="h-10 rounded-md border bg-white px-3 text-sm"><option value="">All statuses</option><option v-for="s in statuses" :key="s.value" :value="s.value">{{s.label}}</option></select><button class="h-10 rounded-md bg-slate-900 px-4 text-sm text-white">Apply</button><button type="button" class="inline-flex items-center justify-center gap-1 rounded-md border px-3 text-sm" @click="clear"><X :size="14"/>Clear</button></form></CardContent></Card><Card class="mt-6 overflow-hidden"><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="border-b bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">Certificate</th><th class="px-4 py-3">Trainee</th><th class="px-4 py-3">Training</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Action</th></tr></thead><tbody class="divide-y"><tr v-for="c in certificates.data" :key="c.id" class="hover:bg-slate-50"><td class="px-4 py-4 font-mono text-xs">{{c.number}}</td><td class="px-4 py-4 font-medium">{{c.trainee}}</td><td class="px-4 py-4">{{c.title}}</td><td class="px-4 py-4 text-xs text-slate-600">{{c.recordType==='session'?'Physical session':'Module'}}</td><td class="px-4 py-4"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs">{{c.status}}</span></td><td class="px-4 py-4"><button v-if="c.status==='Issued'" type="button" class="rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-700" @click="revoke={id:c.id,number:c.number}">Revoke</button></td></tr><tr v-if="!certificates.data.length"><td colspan="6" class="p-12 text-center text-sm text-slate-500"><Award class="mx-auto mb-2" :size="24"/>No certificates match the filters.</td></tr></tbody></table></div><div class="flex justify-between border-t px-4 py-3 text-sm text-slate-500"><span>Showing {{certificates.from??0}}–{{certificates.to??0}} of {{certificates.total}}</span><nav><a v-for="l in certificates.links" :key="l.label" :href="l.url??undefined" :class="['mx-0.5 rounded px-2 py-1 text-xs',l.active?'bg-[#0F4C81] text-white':'border',!l.url?'pointer-events-none opacity-40':'']" v-html="l.label"/></nav></div></Card><div v-if="issue" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"><div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold">Issue certificate</h2><div class="mt-4 space-y-3"><select v-model="form.trainee_id" class="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="">Select trainee</option><option v-for="trainee in trainees" :key="trainee.id" :value="trainee.id">{{trainee.name}} · {{trainee.email}}</option></select><select v-model="form.record_type" class="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="session">Physical session</option><option value="module">Training module</option></select><select v-if="form.record_type==='session'" v-model="form.record_id" class="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="">Select completed session</option><option v-for="session in sessions" :key="session.id" :value="session.id">{{session.session_code}} · {{session.title}}</option></select><select v-else v-model="form.record_id" class="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="">Select module</option><option v-for="module in modules" :key="module.id" :value="module.id">{{module.code}} · {{module.title}}</option></select><input v-model="form.completion_date" type="date" class="h-10 w-full rounded-md border px-3 text-sm" /><textarea v-model="form.notes" class="min-h-20 w-full rounded-md border p-3 text-sm" placeholder="Notes (optional)" maxlength="1000" /></div><div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border px-4 py-2 text-sm" @click="issue=false">Cancel</button><button type="button" class="rounded-md bg-[#0F4C81] px-4 py-2 text-sm text-white disabled:opacity-50" :disabled="busy||!form.trainee_id||!form.record_id||!form.completion_date" @click="submitIssue">{{busy?'Issuing…':'Issue certificate'}}</button></div></div></div><div v-if="revoke" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"><div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold">Revoke certificate</h2><p class="mt-1 text-sm text-slate-500">{{revoke.number}}</p><textarea v-model="reason" class="mt-4 min-h-28 w-full rounded-md border p-3 text-sm" placeholder="Mandatory revocation reason" maxlength="500" required/><div class="mt-4 flex justify-end gap-2"><button type="button" class="rounded-md border px-4 py-2 text-sm" @click="revoke=null">Cancel</button><button type="button" class="rounded-md bg-red-700 px-4 py-2 text-sm text-white disabled:opacity-50" :disabled="busy||!reason.trim()" @click="submitRevoke">{{busy?'Saving…':'Revoke certificate'}}</button></div></div></div></AdminLayout></template>
+
+<template>
+    <Head title="Certificates" />
+
+    <AdminLayout breadcrumb="Certificates">
+        <div class="space-y-6">
+            <!-- Header -->
+            <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="type-page-title">Certificates</h1>
+                    <p class="mt-1 text-sm text-muted">
+                        Issue, verify, and manage training completion certificates.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <AppButton href="/admin-vue/certificate-settings" variant="outline" size="sm" pill>
+                        <Settings class="size-3.5" aria-hidden="true" />
+                        <span>Signatory settings</span>
+                    </AppButton>
+                    <AppButton variant="warm" size="sm" pill @click="issueOpen = true">
+                        <Plus class="size-3.5" aria-hidden="true" />
+                        <span>Issue certificate</span>
+                    </AppButton>
+                </div>
+            </header>
+
+            <!-- Server Validation Errors -->
+            <section
+                v-if="serverErrors.length > 0"
+                role="alert"
+                class="flex items-start gap-3 rounded-xl bg-danger-50 p-4 text-sm text-danger-700 ring-1 ring-danger-600/20"
+            >
+                <AlertCircle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <ul class="list-disc space-y-0.5 pl-4 text-xs">
+                    <li v-for="error in serverErrors" :key="error">{{ error }}</li>
+                </ul>
+            </section>
+
+            <!-- Filter & Search Bar -->
+            <div class="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-card ring-1 ring-neutral-200/80 xl:flex-row xl:items-center xl:justify-between">
+                <div
+                    role="navigation"
+                    aria-label="Filter certificates by status"
+                    class="flex flex-wrap items-center gap-1.5"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === ''
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus('')"
+                    >
+                        All
+                    </button>
+
+                    <button
+                        v-for="statusOption in statuses"
+                        :key="statusOption.value"
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === statusOption.value
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus(statusOption.value)"
+                    >
+                        {{ statusOption.label }}
+                    </button>
+                </div>
+
+                <form class="flex items-center gap-2" @submit.prevent="apply">
+                    <div class="relative flex-1 xl:w-72">
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
+                            aria-hidden="true"
+                        />
+                        <input
+                            v-model="filters.q"
+                            type="search"
+                            placeholder="Search certificate, trainee, title..."
+                            aria-label="Search certificates"
+                            class="h-9 w-full rounded-xl border border-line-strong/80 bg-white pr-3 pl-8.5 text-xs text-ink placeholder:text-muted/75 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="inline-flex h-9 items-center rounded-xl bg-navy-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-navy-900"
+                    >
+                        Search
+                    </button>
+
+                    <button
+                        v-if="hasActiveFilters"
+                        type="button"
+                        class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-white px-3 text-xs font-semibold text-muted transition-colors hover:bg-sand-50 hover:text-navy-950"
+                        @click="clear"
+                    >
+                        <RotateCcw class="size-3.5" aria-hidden="true" />
+                        <span>Reset</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Empty State -->
+            <EmptyState
+                v-if="rows.length === 0"
+                :icon="Award"
+                title="No certificates found"
+                :description="
+                    hasActiveFilters
+                        ? 'Try clearing your search or status filter.'
+                        : 'Issued completion certificates for sessions and modules will appear here.'
+                "
+            >
+                <template #action>
+                    <div class="flex flex-wrap items-center justify-center gap-2.5">
+                        <AppButton
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            size="sm"
+                            pill
+                            @click="clear"
+                        >
+                            Reset filters
+                        </AppButton>
+                        <AppButton variant="warm" size="sm" pill @click="issueOpen = true">
+                            <Plus class="size-3.5" aria-hidden="true" />
+                            <span>Issue certificate</span>
+                        </AppButton>
+                    </div>
+                </template>
+            </EmptyState>
+
+            <!-- DataTable + Pagination -->
+            <template v-else>
+                <DataTable :columns="columns" :rows="rows" row-key="id">
+                    <template #cell-certificate="{ row }">
+                        <p class="tabular-nums-mono text-sm font-semibold text-navy-950">
+                            {{ row.number }}
+                        </p>
+                        <p class="tabular mt-0.5 text-xs text-muted">
+                            Issued {{ formatDate(row.issuedAt) }}
+                        </p>
+                    </template>
+
+                    <template #cell-trainee="{ row }">
+                        <span class="font-semibold text-navy-950">{{ row.trainee }}</span>
+                    </template>
+
+                    <template #cell-training="{ row }">
+                        <p class="font-medium text-ink">{{ row.title }}</p>
+                        <p class="mt-0.5 text-xs text-muted">
+                            {{ row.recordType === 'session' ? 'Live Session' : 'Standalone Module' }}
+                            <template v-if="row.completionDate">
+                                &middot; Completed {{ formatDate(row.completionDate) }}
+                            </template>
+                        </p>
+                    </template>
+
+                    <template #cell-status="{ row }">
+                        <StatusBadge :tone="statusTone(row.status)" dot>
+                            {{ row.status }}
+                        </StatusBadge>
+                    </template>
+
+                    <template #actions="{ row }">
+                        <button
+                            v-if="row.status === 'Issued'"
+                            type="button"
+                            class="inline-flex h-8 items-center gap-1 rounded-full bg-danger-50 px-3 text-xs font-semibold text-danger-700 ring-1 ring-inset ring-danger-600/20 transition-colors hover:bg-danger-600 hover:text-white"
+                            @click="revokeTarget = row"
+                        >
+                            <ShieldOff class="size-3.5" aria-hidden="true" />
+                            <span>Revoke</span>
+                        </button>
+                        <span v-else class="text-xs text-muted">—</span>
+                    </template>
+                </DataTable>
+
+                <!-- Pagination -->
+                <div
+                    v-if="certificates.total > 0"
+                    class="flex flex-col items-center justify-between gap-3 text-xs text-muted sm:flex-row"
+                >
+                    <span class="tabular">
+                        Showing {{ certificates.from ?? 0 }}–{{ certificates.to ?? 0 }} of {{ certificates.total }} certificates
+                    </span>
+
+                    <nav
+                        v-if="certificates.links.length > 3"
+                        class="flex flex-wrap items-center gap-1"
+                        aria-label="Pagination"
+                    >
+                        <template v-for="link in certificates.links" :key="link.label">
+                            <Link
+                                v-if="link.url"
+                                :href="link.url"
+                                preserve-scroll
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition-colors"
+                                :class="
+                                    link.active
+                                        ? 'bg-navy-950 text-white'
+                                        : 'bg-white text-ink ring-1 ring-line hover:bg-sand-50'
+                                "
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </Link>
+                            <span
+                                v-else
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-medium text-muted/45"
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </span>
+                        </template>
+                    </nav>
+                </div>
+            </template>
+        </div>
+
+        <!-- Reka UI Issue Certificate Modal -->
+        <DialogRoot v-model:open="issueOpen">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/55 backdrop-blur-[2px]" />
+                <DialogContent
+                    class="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-neutral-200 focus:outline-none"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <DialogTitle class="text-base font-bold text-navy-950">
+                                Issue certificate
+                            </DialogTitle>
+                            <p class="mt-1 text-xs text-muted">
+                                Generate an official Ecohydrotech completion certificate for a trainee.
+                            </p>
+                        </div>
+                        <DialogClose
+                            class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-sand-100 hover:text-navy-950"
+                            aria-label="Close dialog"
+                        >
+                            <X class="size-4" aria-hidden="true" />
+                        </DialogClose>
+                    </div>
+
+                    <form class="mt-5 space-y-4" @submit.prevent="submitIssue">
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                Trainee <span class="text-danger-600">*</span>
+                            </label>
+                            <select
+                                v-model="form.trainee_id"
+                                required
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            >
+                                <option value="">Select trainee...</option>
+                                <option v-for="trainee in trainees" :key="trainee.id" :value="trainee.id">
+                                    {{ trainee.name }} &middot; {{ trainee.email }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <span class="block text-xs font-medium text-ink">Record type</span>
+                            <div class="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-sand-100/90 p-1">
+                                <button
+                                    type="button"
+                                    class="h-8 rounded-lg text-xs font-semibold transition-all"
+                                    :class="
+                                        form.record_type === 'session'
+                                            ? 'bg-white text-navy-950 shadow-xs'
+                                            : 'text-muted hover:text-navy-950'
+                                    "
+                                    @click="setRecordType('session')"
+                                >
+                                    Live Session
+                                </button>
+                                <button
+                                    type="button"
+                                    class="h-8 rounded-lg text-xs font-semibold transition-all"
+                                    :class="
+                                        form.record_type === 'module'
+                                            ? 'bg-white text-navy-950 shadow-xs'
+                                            : 'text-muted hover:text-navy-950'
+                                    "
+                                    @click="setRecordType('module')"
+                                >
+                                    Training Module
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                {{ form.record_type === 'session' ? 'Completed session' : 'Training module' }}
+                                <span class="text-danger-600">*</span>
+                            </label>
+                            <select
+                                v-if="form.record_type === 'session'"
+                                v-model="form.record_id"
+                                required
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            >
+                                <option value="">Select session...</option>
+                                <option v-for="session in sessions" :key="session.id" :value="session.id">
+                                    {{ session.session_code }} &middot; {{ session.title }}
+                                </option>
+                            </select>
+                            <select
+                                v-else
+                                v-model="form.record_id"
+                                required
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            >
+                                <option value="">Select module...</option>
+                                <option v-for="mod in modules" :key="mod.id" :value="mod.id">
+                                    {{ mod.code }} &middot; {{ mod.title }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                Completion date <span class="text-danger-600">*</span>
+                            </label>
+                            <input
+                                v-model="form.completion_date"
+                                type="date"
+                                required
+                                class="tabular mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                Notes <span class="font-normal text-muted">(optional)</span>
+                            </label>
+                            <textarea
+                                v-model="form.notes"
+                                rows="2"
+                                maxlength="1000"
+                                placeholder="Optional issuance remarks..."
+                                class="mt-1.5 w-full rounded-lg border border-line-strong/80 bg-white p-3 text-sm text-ink placeholder:text-muted/60 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            />
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2.5 pt-2">
+                            <DialogClose
+                                class="inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-muted hover:bg-sand-100 hover:text-navy-950"
+                            >
+                                Cancel
+                            </DialogClose>
+                            <button
+                                type="submit"
+                                :disabled="busy || !form.trainee_id || !form.record_id || !form.completion_date"
+                                class="inline-flex h-9 items-center rounded-lg bg-navy-950 px-5 text-xs font-semibold text-white transition-colors hover:bg-navy-900 disabled:opacity-50"
+                            >
+                                {{ busy ? 'Issuing...' : 'Issue certificate' }}
+                            </button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
+
+        <!-- Reka UI Revoke Certificate Modal -->
+        <DialogRoot v-model:open="revokeModalOpen">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/55 backdrop-blur-[2px]" />
+                <DialogContent
+                    v-if="revokeTarget"
+                    class="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-neutral-200 focus:outline-none"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <DialogTitle class="text-base font-bold text-navy-950">
+                                Revoke certificate
+                            </DialogTitle>
+                            <p class="mt-1 text-xs text-muted">
+                                <span class="tabular-nums-mono font-semibold">{{ revokeTarget.number }}</span>
+                                &middot; {{ revokeTarget.trainee }}
+                            </p>
+                        </div>
+                        <DialogClose
+                            class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-sand-100 hover:text-navy-950"
+                            aria-label="Close dialog"
+                        >
+                            <X class="size-4" aria-hidden="true" />
+                        </DialogClose>
+                    </div>
+
+                    <form class="mt-4 space-y-4" @submit.prevent="submitRevoke">
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                Revocation reason <span class="text-danger-600">*</span>
+                            </label>
+                            <textarea
+                                v-model="reason"
+                                rows="3"
+                                required
+                                maxlength="500"
+                                placeholder="Enter mandatory revocation reason..."
+                                class="mt-1.5 w-full rounded-xl border border-line-strong/80 bg-white p-3 text-sm text-ink placeholder:text-muted/60 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            />
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2.5">
+                            <DialogClose
+                                class="inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-muted hover:bg-sand-100 hover:text-navy-950"
+                            >
+                                Cancel
+                            </DialogClose>
+                            <button
+                                type="submit"
+                                :disabled="busy || !reason.trim()"
+                                class="inline-flex h-9 items-center rounded-lg bg-danger-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-danger-700 disabled:opacity-50"
+                            >
+                                {{ busy ? 'Revoking...' : 'Confirm revoke' }}
+                            </button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
+    </AdminLayout>
+</template>

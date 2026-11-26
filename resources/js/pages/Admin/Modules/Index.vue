@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { BookOpen, Plus } from 'lucide-vue-next';
+import {
+    ArrowUpRight,
+    BookOpen,
+    KeyRound,
+    Plus,
+    RotateCcw,
+    Search,
+} from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import DataTable, { type DataTableColumn } from '@/components/ds/DataTable.vue';
+import EmptyState from '@/components/ds/EmptyState.vue';
+import StatusBadge, { type StatusTone } from '@/components/ds/StatusBadge.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import type { EtmsSharedProps } from '@/types/etms';
 
-interface ModuleRow {
+interface ModuleItem {
     id: number;
     code: string;
     title: string;
@@ -23,6 +31,8 @@ interface ModuleRow {
     editUrl: string;
 }
 
+type ModuleRow = ModuleItem & Record<string, unknown>;
+
 interface Paginator<T> {
     data: T[];
     current_page: number;
@@ -34,7 +44,7 @@ interface Paginator<T> {
 }
 
 interface Props extends EtmsSharedProps {
-    modules: Paginator<ModuleRow>;
+    modules: Paginator<ModuleItem>;
     filters: { q: string; status: string };
     statuses: { value: string; label: string }[];
 }
@@ -45,118 +55,273 @@ const filters = reactive({
     status: props.filters.status ?? '',
 });
 
+const hasActiveFilters = computed(
+    () => filters.q.trim() !== '' || filters.status !== '',
+);
+
+const rows = computed<ModuleRow[]>(() => props.modules.data as ModuleRow[]);
+
+const columns: DataTableColumn[] = [
+    { key: 'module', label: 'Module' },
+    { key: 'materials', label: 'Materials', tabular: true },
+    { key: 'price', label: 'Price', align: 'right', tabular: true },
+    { key: 'status', label: 'Status' },
+];
+
 function applyFilters(): void {
     router.get(
         '/admin-vue/modules',
         {
-            q: filters.q || undefined,
+            q: filters.q.trim() || undefined,
             status: filters.status || undefined,
         },
         { preserveState: true, replace: true },
     );
 }
+
+function selectStatus(statusValue: string): void {
+    filters.status = statusValue;
+    applyFilters();
+}
+
+function clearFilters(): void {
+    filters.q = '';
+    filters.status = '';
+    applyFilters();
+}
+
+function statusTone(statusValue: string): StatusTone {
+    if (statusValue === 'published') return 'success';
+    if (statusValue === 'draft') return 'warning';
+    if (statusValue === 'archived') return 'neutral';
+    return 'primary';
+}
+
+function decodeLabel(label: string): string {
+    return label
+        .replace(/&laquo;/g, '«')
+        .replace(/&raquo;/g, '»')
+        .replace(/&amp;/g, '&');
+}
 </script>
 
 <template>
-    <Head title="Standalone Learning Modules — Ecohydrotech Admin" />
+    <Head title="Modules" />
 
-    <AdminLayout>
-        <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-                <h1 class="text-2xl font-semibold text-neutral-900">Standalone Learning Modules</h1>
-                <p class="mt-1 text-sm text-neutral-500">
-                    Self-paced learning modules available for independent customer purchase without attending physical sessions.
-                </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <Button as-child variant="outline">
-                    <Link href="/admin-vue/module-entitlements">
-                        Module Entitlements
-                    </Link>
-                </Button>
-                <Button as-child class="bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90">
-                    <Link href="/admin-vue/modules/create">
-                        <Plus :size="16" class="mr-1.5" />
-                        Create standalone module
-                    </Link>
-                </Button>
-            </div>
-        </div>
-
-        <Card>
-            <CardContent class="p-4">
-                <form class="mb-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="applyFilters">
-                    <Input
-                        v-model="filters.q"
-                        class="h-10 flex-1"
-                        placeholder="Search by module code or title..."
-                    />
-                    <select
-                        v-model="filters.status"
-                        class="h-10 rounded-md border border-neutral-200 bg-white px-3 text-sm"
-                    >
-                        <option value="">All statuses</option>
-                        <option v-for="status in statuses" :key="status.value" :value="status.value">
-                            {{ status.label }}
-                        </option>
-                    </select>
-                    <Button type="submit" variant="outline" class="h-10">Filter</Button>
-                </form>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-left text-sm">
-                        <thead class="border-b border-neutral-200 bg-neutral-50 text-xs uppercase text-neutral-500">
-                            <tr>
-                                <th class="px-3 py-3">Code</th>
-                                <th class="px-3 py-3">Module Title</th>
-                                <th class="px-3 py-3">Materials</th>
-                                <th class="px-3 py-3">Purchase Price</th>
-                                <th class="px-3 py-3">Status</th>
-                                <th class="px-3 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-neutral-200">
-                            <tr v-for="mod in modules.data" :key="mod.id" class="hover:bg-neutral-50/70">
-                                <td class="px-3 py-3 font-mono text-xs font-semibold text-[#0F4C81]">
-                                    {{ mod.code }}
-                                </td>
-                                <td class="px-3 py-3">
-                                    <p class="font-medium text-neutral-900">{{ mod.title }}</p>
-                                    <p v-if="mod.summary" class="mt-0.5 line-clamp-1 text-xs text-neutral-500">
-                                        {{ mod.summary }}
-                                    </p>
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs">
-                                    {{ mod.materials }} file(s)
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs">
-                                    <span v-if="mod.price">{{ mod.currency }} {{ mod.price }}</span>
-                                    <span v-else class="text-neutral-400">—</span>
-                                </td>
-                                <td class="px-3 py-3">
-                                    <span class="inline-flex rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
-                                        {{ mod.statusLabel }}
-                                    </span>
-                                </td>
-                                <td class="px-3 py-3 text-right">
-                                    <Link
-                                        :href="mod.editUrl"
-                                        class="text-xs font-semibold text-[#0F4C81] hover:underline"
-                                    >
-                                        Manage module &amp; materials
-                                    </Link>
-                                </td>
-                            </tr>
-                            <tr v-if="modules.data.length === 0">
-                                <td colspan="6" class="px-3 py-12 text-center text-neutral-500">
-                                    <BookOpen class="mx-auto mb-2 h-6 w-6 text-neutral-400" />
-                                    No standalone learning modules found.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+    <AdminLayout breadcrumb="Modules">
+        <div class="space-y-6">
+            <!-- Header -->
+            <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="type-page-title">Learning modules</h1>
+                    <p class="mt-1 text-sm text-muted">
+                        Manage self-paced modules, downloadable materials, and video lessons.
+                    </p>
                 </div>
-            </CardContent>
-        </Card>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <AppButton href="/admin-vue/module-entitlements" variant="outline" size="sm" pill>
+                        <KeyRound class="size-3.5" aria-hidden="true" />
+                        <span>Module Access</span>
+                    </AppButton>
+                    <AppButton href="/admin-vue/modules/create" variant="warm" size="sm" pill>
+                        <Plus class="size-3.5" aria-hidden="true" />
+                        <span>Create module</span>
+                    </AppButton>
+                </div>
+            </header>
+
+            <!-- Filter & Search Bar -->
+            <div class="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-card ring-1 ring-neutral-200/80 xl:flex-row xl:items-center xl:justify-between">
+                <div
+                    role="navigation"
+                    aria-label="Filter modules by status"
+                    class="flex flex-wrap items-center gap-1.5"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === ''
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus('')"
+                    >
+                        All
+                    </button>
+
+                    <button
+                        v-for="statusOption in statuses"
+                        :key="statusOption.value"
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === statusOption.value
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus(statusOption.value)"
+                    >
+                        {{ statusOption.label }}
+                    </button>
+                </div>
+
+                <form class="flex items-center gap-2" @submit.prevent="applyFilters">
+                    <div class="relative flex-1 xl:w-72">
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
+                            aria-hidden="true"
+                        />
+                        <input
+                            v-model="filters.q"
+                            type="search"
+                            placeholder="Search code or title..."
+                            aria-label="Search modules"
+                            class="h-9 w-full rounded-xl border border-line-strong/80 bg-white pr-3 pl-8.5 text-xs text-ink placeholder:text-muted/75 transition-colors focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="inline-flex h-9 items-center rounded-xl bg-navy-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-navy-900"
+                    >
+                        Search
+                    </button>
+
+                    <button
+                        v-if="hasActiveFilters"
+                        type="button"
+                        class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-white px-3 text-xs font-semibold text-muted transition-colors hover:bg-sand-50 hover:text-navy-950"
+                        @click="clearFilters"
+                    >
+                        <RotateCcw class="size-3.5" aria-hidden="true" />
+                        <span>Reset</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Empty State -->
+            <EmptyState
+                v-if="rows.length === 0"
+                :icon="BookOpen"
+                title="No learning modules found"
+                :description="
+                    hasActiveFilters
+                        ? 'Try clearing your search or status filter.'
+                        : 'Create your first standalone learning module to publish materials and video lessons.'
+                "
+            >
+                <template #action>
+                    <div class="flex flex-wrap items-center justify-center gap-2.5">
+                        <AppButton
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            size="sm"
+                            pill
+                            @click="clearFilters"
+                        >
+                            Reset filters
+                        </AppButton>
+                        <AppButton href="/admin-vue/modules/create" variant="warm" size="sm" pill>
+                            <Plus class="size-3.5" aria-hidden="true" />
+                            <span>Create module</span>
+                        </AppButton>
+                    </div>
+                </template>
+            </EmptyState>
+
+            <!-- DataTable + Pagination -->
+            <template v-else>
+                <DataTable
+                    :columns="columns"
+                    :rows="rows"
+                    row-key="id"
+                >
+                    <template #cell-module="{ row }">
+                        <Link
+                            :href="row.editUrl"
+                            class="font-semibold text-navy-950 transition-colors hover:text-primary-600"
+                        >
+                            {{ row.title }}
+                        </Link>
+                        <p class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                            <span class="tabular-nums-mono font-medium text-primary-700">{{ row.code }}</span>
+                            <template v-if="row.summary">
+                                <span>&middot;</span>
+                                <span class="line-clamp-1 max-w-md">{{ row.summary }}</span>
+                            </template>
+                        </p>
+                    </template>
+
+                    <template #cell-materials="{ row }">
+                        <span class="tabular text-sm text-ink">
+                            {{ row.materials }} {{ row.materials === 1 ? 'file' : 'files' }}
+                        </span>
+                    </template>
+
+                    <template #cell-price="{ row }">
+                        <span v-if="row.price" class="tabular font-semibold text-navy-950">
+                            {{ row.currency }} {{ row.price }}
+                        </span>
+                        <span v-else class="text-muted">—</span>
+                    </template>
+
+                    <template #cell-status="{ row }">
+                        <StatusBadge :tone="statusTone(row.status)" dot>
+                            {{ row.statusLabel }}
+                        </StatusBadge>
+                    </template>
+
+                    <template #actions="{ row }">
+                        <Link
+                            :href="row.editUrl"
+                            class="inline-flex h-8 items-center gap-1 rounded-full bg-sand-50 px-3 text-xs font-semibold text-navy-950 ring-1 ring-line transition-colors hover:bg-navy-950 hover:text-white hover:ring-navy-950"
+                        >
+                            <span>Manage</span>
+                            <ArrowUpRight class="size-3.5" aria-hidden="true" />
+                        </Link>
+                    </template>
+                </DataTable>
+
+                <!-- Pagination Footer -->
+                <div
+                    v-if="modules.last_page > 1 || modules.total > 0"
+                    class="flex flex-col items-center justify-between gap-3 text-xs text-muted sm:flex-row"
+                >
+                    <span class="tabular">
+                        Showing {{ modules.from ?? 0 }}–{{ modules.to ?? 0 }} of {{ modules.total }} modules
+                    </span>
+
+                    <nav
+                        v-if="modules.last_page > 1"
+                        class="flex flex-wrap items-center gap-1"
+                        aria-label="Pagination"
+                    >
+                        <template v-for="link in modules.links" :key="link.label">
+                            <Link
+                                v-if="link.url"
+                                :href="link.url"
+                                preserve-scroll
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition-colors"
+                                :class="
+                                    link.active
+                                        ? 'bg-navy-950 text-white'
+                                        : 'bg-white text-ink ring-1 ring-line hover:bg-sand-50'
+                                "
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </Link>
+                            <span
+                                v-else
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-medium text-muted/45"
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </span>
+                        </template>
+                    </nav>
+                </div>
+            </template>
+        </div>
     </AdminLayout>
 </template>

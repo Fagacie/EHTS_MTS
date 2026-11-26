@@ -1,30 +1,464 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
-import { ReceiptText, Search, X } from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import {
+    DialogClose,
+    DialogContent,
+    DialogOverlay,
+    DialogPortal,
+    DialogRoot,
+    DialogTitle,
+} from 'reka-ui';
+import {
+    CheckCircle2,
+    CreditCard,
+    ReceiptText,
+    RotateCcw,
+    Search,
+    X,
+    XCircle,
+} from 'lucide-vue-next';
+import AppButton from '@/components/ds/AppButton.vue';
+import DataTable, { type DataTableColumn } from '@/components/ds/DataTable.vue';
+import EmptyState from '@/components/ds/EmptyState.vue';
+import StatusBadge, { type StatusTone } from '@/components/ds/StatusBadge.vue';
 import AdminLayout from '@/layouts/AdminLayout.vue';
-import { Card, CardContent } from '@/components/ui/card';
 import type { EtmsSharedProps } from '@/types/etms';
-interface Refund { id: number; reference: string; orderNumber: string | null; customer: string; amount: string; method: string; status: string; reason: string | null; requestedAt: string | null }
-interface Props extends EtmsSharedProps { refunds: { data: Refund[]; from: number | null; to: number | null; total: number; links: { url: string | null; label: string; active: boolean }[] }; filters: { q: string; status: string }; statuses: { value: string; label: string }[] }
+
+interface RefundItem {
+    id: number;
+    reference: string;
+    orderNumber: string | null;
+    customer: string;
+    amount: string;
+    method: string;
+    status: string;
+    reason: string | null;
+    requestedAt: string | null;
+}
+
+type RefundRow = RefundItem & Record<string, unknown>;
+
+interface Props extends EtmsSharedProps {
+    refunds: {
+        data: RefundItem[];
+        from: number | null;
+        to: number | null;
+        total: number;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
+    filters: { q: string; status: string };
+    statuses: { value: string; label: string }[];
+}
+
 const props = defineProps<Props>();
 const filters = reactive({ ...props.filters });
-function apply(): void { router.get('/admin-vue/refunds', filters, { preserveState: true, replace: true }); }
-function clear(): void { filters.q = ''; filters.status = ''; apply(); }
-const action = ref<{ type: 'complete' | 'reject'; refund: Refund } | null>(null);
-const form = reactive({ refund_method: 'manual_bank_transfer', disbursement_reference: '', failure_reason: '' });
+const action = ref<{ type: 'complete' | 'reject'; refund: RefundItem } | null>(null);
+const form = reactive({
+    refund_method: 'manual_bank_transfer',
+    disbursement_reference: '',
+    failure_reason: '',
+});
 const busy = ref(false);
+
+const modalOpen = computed({
+    get: () => action.value !== null,
+    set: (open: boolean) => {
+        if (!open) action.value = null;
+    },
+});
+
+const hasActiveFilters = computed(
+    () => filters.q.trim() !== '' || filters.status !== '',
+);
+
+const rows = computed<RefundRow[]>(() => props.refunds.data as RefundRow[]);
+
+const columns: DataTableColumn[] = [
+    { key: 'refund', label: 'Refund', tabular: true },
+    { key: 'customer', label: 'Customer' },
+    { key: 'amount', label: 'Amount', align: 'right', tabular: true },
+    { key: 'method', label: 'Method' },
+    { key: 'status', label: 'Status' },
+    { key: 'reason', label: 'Reason' },
+];
+
+function apply(): void {
+    router.get(
+        '/admin-vue/refunds',
+        {
+            q: filters.q.trim() || undefined,
+            status: filters.status || undefined,
+        },
+        { preserveState: true, replace: true },
+    );
+}
+
+function selectStatus(val: string): void {
+    filters.status = val;
+    apply();
+}
+
+function clear(): void {
+    filters.q = '';
+    filters.status = '';
+    apply();
+}
+
+function statusTone(status: string): StatusTone {
+    const s = status.toLowerCase();
+    if (s.includes('complet')) return 'success';
+    if (s.includes('request') || s.includes('approv') || s.includes('process')) return 'warning';
+    if (s.includes('reject') || s.includes('fail')) return 'danger';
+    return 'neutral';
+}
+
 function submitAction(): void {
     if (!action.value) return;
     busy.value = true;
-    router.post(`/admin-vue/refunds/${action.value.refund.id}/${action.value.type === 'complete' ? 'complete' : 'reject'}`, action.value.type === 'complete' ? { refund_method: form.refund_method, disbursement_reference: form.disbursement_reference } : { failure_reason: form.failure_reason }, { preserveScroll: true, onFinish: () => { busy.value = false; action.value = null; } });
+    const isComplete = action.value.type === 'complete';
+    router.post(
+        `/admin-vue/refunds/${action.value.refund.id}/${isComplete ? 'complete' : 'reject'}`,
+        isComplete
+            ? {
+                  refund_method: form.refund_method,
+                  disbursement_reference: form.disbursement_reference,
+              }
+            : { failure_reason: form.failure_reason.trim() },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                busy.value = false;
+                action.value = null;
+                form.disbursement_reference = '';
+                form.failure_reason = '';
+            },
+        },
+    );
+}
+
+function decodeLabel(label: string): string {
+    return label
+        .replace(/&laquo;/g, '«')
+        .replace(/&raquo;/g, '»')
+        .replace(/&amp;/g, '&');
 }
 </script>
+
 <template>
-    <AdminLayout>
-        <div class="mb-6"><p class="text-sm font-medium text-[#0F4C81]">Finance</p><h1 class="mt-1 text-2xl font-semibold tracking-tight">Refunds</h1><p class="mt-1 text-sm text-slate-500">Review refund requests and their audited processing state.</p></div>
-        <Card><CardContent class="p-4"><form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_14rem_auto_auto]" @submit.prevent="apply"><label class="relative"><span class="sr-only">Search refunds</span><Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="16" /><input v-model="filters.q" type="search" placeholder="Refund, order or customer" class="h-10 w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm outline-none focus:border-[#0F4C81]" /></label><select v-model="filters.status" class="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="">All statuses</option><option v-for="status in statuses" :key="status.value" :value="status.value">{{ status.label }}</option></select><button class="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white">Apply</button><button type="button" class="inline-flex h-10 items-center justify-center gap-1 rounded-md border border-slate-300 px-3 text-sm" @click="clear"><X :size="14" /> Clear</button></form></CardContent></Card>
-        <Card class="mt-6 overflow-hidden"><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Refund</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Amount</th><th class="px-4 py-3">Method</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Reason</th><th class="px-4 py-3">Actions</th></tr></thead><tbody class="divide-y divide-slate-100"><tr v-for="refund in refunds.data" :key="refund.id" class="hover:bg-slate-50"><td class="px-4 py-4"><p class="font-mono text-xs font-medium">{{ refund.reference }}</p><p class="text-xs text-slate-500">{{ refund.orderNumber ?? 'No order' }}</p></td><td class="px-4 py-4 font-medium">{{ refund.customer }}</td><td class="px-4 py-4 font-mono text-xs">MYR {{ refund.amount }}</td><td class="px-4 py-4 text-slate-600">{{ refund.method }}</td><td class="px-4 py-4"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">{{ refund.status }}</span></td><td class="max-w-xs px-4 py-4 text-xs text-slate-600">{{ refund.reason || '—' }}</td><td class="px-4 py-4"><div class="flex flex-wrap gap-2"><button v-if="['Requested','Approved','Processing'].includes(refund.status)" type="button" class="rounded-md bg-emerald-700 px-3 py-1.5 text-xs text-white" @click="action = { type: 'complete', refund }">Complete</button><button v-if="refund.status === 'Requested'" type="button" class="rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-700" @click="action = { type: 'reject', refund }">Reject</button></div></td></tr><tr v-if="refunds.data.length === 0"><td colspan="7" class="px-4 py-12 text-center text-sm text-slate-500"><ReceiptText class="mx-auto mb-2 text-slate-400" :size="24" />No refunds match the filters.</td></tr></tbody></table></div><div class="flex justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500"><span>Showing {{ refunds.from ?? 0 }}–{{ refunds.to ?? 0 }} of {{ refunds.total }}</span><nav class="flex gap-1"><a v-for="link in refunds.links" :key="link.label" :href="link.url ?? undefined" :class="['rounded-md px-3 py-1.5 text-xs', link.active ? 'bg-[#0F4C81] text-white' : 'border border-slate-200', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></nav></div></Card>
-        <div v-if="action" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"><div class="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold">{{ action.type === 'complete' ? 'Complete refund' : 'Reject refund' }}</h2><div class="mt-4 space-y-3"><select v-if="action.type === 'complete'" v-model="form.refund_method" class="h-10 w-full rounded-md border bg-white px-3 text-sm"><option value="manual_bank_transfer">Manual bank transfer</option><option value="original_method">Original payment method</option></select><input v-if="action.type === 'complete'" v-model="form.disbursement_reference" class="h-10 w-full rounded-md border px-3 text-sm" placeholder="Disbursement reference (optional)" /><textarea v-else v-model="form.failure_reason" class="min-h-24 w-full rounded-md border p-3 text-sm" placeholder="Mandatory rejection reason" maxlength="500" /></div><div class="mt-5 flex justify-end gap-2"><button type="button" class="rounded-md border px-4 py-2 text-sm" @click="action = null">Cancel</button><button type="button" class="rounded-md bg-[#0F4C81] px-4 py-2 text-sm text-white disabled:opacity-50" :disabled="busy || (action.type === 'reject' && !form.failure_reason.trim())" @click="submitAction">{{ busy ? 'Saving…' : 'Continue' }}</button></div></div></div>
+    <Head title="Refunds" />
+
+    <AdminLayout breadcrumb="Refunds">
+        <div class="space-y-6">
+            <!-- Header -->
+            <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="type-page-title">Refunds</h1>
+                    <p class="mt-1 text-sm text-muted">
+                        Review refund requests and record disbursement completion or rejection.
+                    </p>
+                </div>
+
+                <AppButton href="/admin-vue/payments" variant="outline" size="sm" pill>
+                    <CreditCard class="size-3.5" aria-hidden="true" />
+                    <span>Payments</span>
+                </AppButton>
+            </header>
+
+            <!-- Filter & Search Bar -->
+            <div class="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-card ring-1 ring-neutral-200/80 xl:flex-row xl:items-center xl:justify-between">
+                <div
+                    role="navigation"
+                    aria-label="Filter refunds by status"
+                    class="flex flex-wrap items-center gap-1.5"
+                >
+                    <button
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === ''
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus('')"
+                    >
+                        All
+                    </button>
+
+                    <button
+                        v-for="statusOption in statuses"
+                        :key="statusOption.value"
+                        type="button"
+                        class="inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150"
+                        :class="
+                            filters.status === statusOption.value
+                                ? 'bg-navy-950 text-white shadow-xs'
+                                : 'bg-sand-50 text-muted hover:bg-sand-100 hover:text-navy-950'
+                        "
+                        @click="selectStatus(statusOption.value)"
+                    >
+                        {{ statusOption.label }}
+                    </button>
+                </div>
+
+                <form class="flex items-center gap-2" @submit.prevent="apply">
+                    <div class="relative flex-1 xl:w-72">
+                        <Search
+                            class="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted"
+                            aria-hidden="true"
+                        />
+                        <input
+                            v-model="filters.q"
+                            type="search"
+                            placeholder="Search refund, order, customer..."
+                            aria-label="Search refunds"
+                            class="h-9 w-full rounded-xl border border-line-strong/80 bg-white pr-3 pl-8.5 text-xs text-ink placeholder:text-muted/75 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="inline-flex h-9 items-center rounded-xl bg-navy-950 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-navy-900"
+                    >
+                        Search
+                    </button>
+
+                    <button
+                        v-if="hasActiveFilters"
+                        type="button"
+                        class="inline-flex h-9 items-center gap-1 rounded-xl border border-line bg-white px-3 text-xs font-semibold text-muted transition-colors hover:bg-sand-50 hover:text-navy-950"
+                        @click="clear"
+                    >
+                        <RotateCcw class="size-3.5" aria-hidden="true" />
+                        <span>Reset</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Empty State -->
+            <EmptyState
+                v-if="rows.length === 0"
+                :icon="ReceiptText"
+                title="No refunds found"
+                :description="
+                    hasActiveFilters
+                        ? 'Try clearing your search or status filter.'
+                        : 'Refund requests and processed disbursements will appear here.'
+                "
+            >
+                <template #action>
+                    <AppButton
+                        v-if="hasActiveFilters"
+                        variant="outline"
+                        size="sm"
+                        pill
+                        @click="clear"
+                    >
+                        Reset filters
+                    </AppButton>
+                </template>
+            </EmptyState>
+
+            <!-- DataTable + Pagination -->
+            <template v-else>
+                <DataTable :columns="columns" :rows="rows" row-key="id">
+                    <template #cell-refund="{ row }">
+                        <p class="tabular-nums-mono text-sm font-semibold text-navy-950">
+                            {{ row.reference }}
+                        </p>
+                        <Link
+                            v-if="row.orderNumber"
+                            :href="`/admin-vue/orders/${row.orderNumber}`"
+                            class="tabular-nums-mono mt-0.5 inline-block text-xs text-primary-600 hover:underline"
+                        >
+                            {{ row.orderNumber }}
+                        </Link>
+                        <p v-else class="mt-0.5 text-xs text-muted">No linked order</p>
+                    </template>
+
+                    <template #cell-customer="{ row }">
+                        <span class="font-semibold text-navy-950">{{ row.customer }}</span>
+                    </template>
+
+                    <template #cell-amount="{ row }">
+                        <span class="tabular font-bold text-navy-950">MYR {{ row.amount }}</span>
+                    </template>
+
+                    <template #cell-method="{ row }">
+                        <span class="text-sm text-ink">{{ row.method }}</span>
+                    </template>
+
+                    <template #cell-status="{ row }">
+                        <StatusBadge :tone="statusTone(row.status)" dot>
+                            {{ row.status }}
+                        </StatusBadge>
+                    </template>
+
+                    <template #cell-reason="{ row }">
+                        <p class="max-w-xs truncate text-xs text-muted" :title="row.reason ?? ''">
+                            {{ row.reason || '—' }}
+                        </p>
+                    </template>
+
+                    <template #actions="{ row }">
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                            <button
+                                v-if="['Requested', 'Approved', 'Processing'].includes(row.status)"
+                                type="button"
+                                class="inline-flex h-8 items-center gap-1 rounded-full bg-success-50 px-3 text-xs font-semibold text-success-700 ring-1 ring-inset ring-success-600/20 transition-colors hover:bg-success-600 hover:text-white"
+                                @click="action = { type: 'complete', refund: row }"
+                            >
+                                <CheckCircle2 class="size-3.5" aria-hidden="true" />
+                                <span>Complete</span>
+                            </button>
+
+                            <button
+                                v-if="row.status === 'Requested'"
+                                type="button"
+                                class="inline-flex h-8 items-center gap-1 rounded-full bg-danger-50 px-3 text-xs font-semibold text-danger-700 ring-1 ring-inset ring-danger-600/20 transition-colors hover:bg-danger-600 hover:text-white"
+                                @click="action = { type: 'reject', refund: row }"
+                            >
+                                <XCircle class="size-3.5" aria-hidden="true" />
+                                <span>Reject</span>
+                            </button>
+
+                            <span
+                                v-if="!['Requested', 'Approved', 'Processing'].includes(row.status)"
+                                class="text-xs text-muted"
+                            >
+                                —
+                            </span>
+                        </div>
+                    </template>
+                </DataTable>
+
+                <!-- Pagination -->
+                <div
+                    v-if="refunds.total > 0"
+                    class="flex flex-col items-center justify-between gap-3 text-xs text-muted sm:flex-row"
+                >
+                    <span class="tabular">
+                        Showing {{ refunds.from ?? 0 }}–{{ refunds.to ?? 0 }} of {{ refunds.total }} refunds
+                    </span>
+
+                    <nav
+                        v-if="refunds.links.length > 3"
+                        class="flex flex-wrap items-center gap-1"
+                        aria-label="Pagination"
+                    >
+                        <template v-for="link in refunds.links" :key="link.label">
+                            <Link
+                                v-if="link.url"
+                                :href="link.url"
+                                preserve-scroll
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition-colors"
+                                :class="
+                                    link.active
+                                        ? 'bg-navy-950 text-white'
+                                        : 'bg-white text-ink ring-1 ring-line hover:bg-sand-50'
+                                "
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </Link>
+                            <span
+                                v-else
+                                class="tabular inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-xs font-medium text-muted/45"
+                            >
+                                {{ decodeLabel(link.label) }}
+                            </span>
+                        </template>
+                    </nav>
+                </div>
+            </template>
+        </div>
+
+        <!-- Reka UI Complete / Reject Refund Modal -->
+        <DialogRoot v-model:open="modalOpen">
+            <DialogPortal>
+                <DialogOverlay class="fixed inset-0 z-50 bg-navy-950/55 backdrop-blur-[2px]" />
+                <DialogContent
+                    v-if="action"
+                    class="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-neutral-200 focus:outline-none"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <DialogTitle class="text-base font-bold text-navy-950">
+                                {{ action.type === 'complete' ? 'Complete refund' : 'Reject refund' }}
+                            </DialogTitle>
+                            <p class="mt-1 text-xs text-muted">
+                                <span class="tabular-nums-mono font-semibold">{{ action.refund.reference }}</span>
+                                &middot; MYR {{ action.refund.amount }}
+                            </p>
+                        </div>
+                        <DialogClose
+                            class="inline-flex size-8 items-center justify-center rounded-full text-muted hover:bg-sand-100 hover:text-navy-950"
+                            aria-label="Close dialog"
+                        >
+                            <X class="size-4" aria-hidden="true" />
+                        </DialogClose>
+                    </div>
+
+                    <div v-if="action.type === 'complete'" class="mt-4 space-y-3.5">
+                        <div>
+                            <label class="block text-xs font-medium text-ink">Refund method</label>
+                            <select
+                                v-model="form.refund_method"
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3 text-sm text-ink focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            >
+                                <option value="manual_bank_transfer">Manual bank transfer</option>
+                                <option value="original_method">Original payment method</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-ink">
+                                Disbursement reference <span class="font-normal text-muted">(optional)</span>
+                            </label>
+                            <input
+                                v-model="form.disbursement_reference"
+                                type="text"
+                                placeholder="e.g. Bank transfer reference"
+                                class="mt-1.5 h-10 w-full rounded-lg border border-line-strong/80 bg-white px-3.5 text-sm text-ink placeholder:text-muted/60 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                            />
+                        </div>
+                    </div>
+
+                    <div v-else class="mt-4">
+                        <label class="block text-xs font-medium text-ink">
+                            Rejection reason <span class="text-danger-600">*</span>
+                        </label>
+                        <textarea
+                            v-model="form.failure_reason"
+                            rows="3"
+                            required
+                            maxlength="500"
+                            placeholder="Enter mandatory rejection reason..."
+                            class="mt-1.5 w-full rounded-xl border border-line-strong/80 bg-white p-3 text-sm text-ink placeholder:text-muted/60 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
+                        />
+                    </div>
+
+                    <div class="mt-5 flex items-center justify-end gap-2.5">
+                        <DialogClose
+                            class="inline-flex h-9 items-center rounded-lg px-4 text-xs font-semibold text-muted hover:bg-sand-100 hover:text-navy-950"
+                        >
+                            Cancel
+                        </DialogClose>
+                        <button
+                            type="button"
+                            :disabled="busy || (action.type === 'reject' && !form.failure_reason.trim())"
+                            class="inline-flex h-9 items-center rounded-lg px-5 text-xs font-semibold text-white transition-colors disabled:opacity-50"
+                            :class="
+                                action.type === 'reject'
+                                    ? 'bg-danger-600 hover:bg-danger-700'
+                                    : 'bg-navy-950 hover:bg-navy-900'
+                            "
+                            @click="submitAction"
+                        >
+                            {{ busy ? 'Saving...' : action.type === 'complete' ? 'Complete refund' : 'Reject refund' }}
+                        </button>
+                    </div>
+                </DialogContent>
+            </DialogPortal>
+        </DialogRoot>
     </AdminLayout>
 </template>

@@ -425,6 +425,7 @@ export interface PortalUpcomingBooking {
     statusValue: string;
     statusLabel: string;
     detailUrl: string;
+    receiptUrl?: string;
 }
 
 export interface PortalActivityItem {
@@ -472,6 +473,7 @@ export interface PortalCalendarEvent {
     statusValue: string;
     statusLabel: string;
     detailUrl: string;
+    receiptUrl?: string;
 }
 
 export interface PortalDashboardProps extends EtmsSharedProps {
@@ -611,6 +613,7 @@ export interface PortalOrderListItem {
     statusValue: string;
     statusLabel: string;
     detailUrl: string;
+    receiptUrl?: string;
 }
 
 export interface PortalOrdersIndexProps extends EtmsSharedProps {
@@ -637,6 +640,7 @@ export interface PortalOrderLinkedBooking {
     statusValue: string;
     statusLabel: string;
     detailUrl: string;
+    receiptUrl?: string;
 }
 
 export interface PortalOrderLinkedEntitlement {
@@ -693,6 +697,7 @@ export interface PortalOrderDetail {
     totalLabel: string;
     currency: string;
     payUrl: string;
+    receiptUrl: string;
     items: PortalOrderLineItem[];
     bookings: PortalOrderLinkedBooking[];
     entitlements: PortalOrderLinkedEntitlement[];

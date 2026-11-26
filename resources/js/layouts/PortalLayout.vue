@@ -33,7 +33,6 @@ import {
     PanelLeftOpen,
     Search,
     Settings,
-    ShieldCheck,
     Video,
     X,
 } from 'lucide-vue-next';
@@ -176,13 +175,7 @@ const navItems = computed<NavEntry[]>(() => [
         label: 'Profile',
         href: routes.value.portalProfile,
         icon: Settings,
-        active: isActive('/portal/profile'),
-    },
-    {
-        label: 'Security',
-        href: routes.value.portalSecurity,
-        icon: ShieldCheck,
-        active: isActive('/portal/security'),
+        active: isActive('/portal/profile') || isActive('/portal/security'),
     },
 ]);
 

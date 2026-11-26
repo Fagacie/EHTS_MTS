@@ -67,7 +67,7 @@ class PortalPresenter
 
         $normalized = $parsedPath === '/' ? '/' : rtrim($parsedPath, '/');
 
-        if (str_contains($normalized, '/stream/') || str_ends_with($normalized, '/download')) {
+        if (str_contains($normalized, '/stream/') || str_ends_with($normalized, '/download') || str_ends_with($normalized, '/receipt')) {
             return false;
         }
 
@@ -317,6 +317,7 @@ class PortalPresenter
             'statusValue' => $order->status->value,
             'statusLabel' => $order->status->label(),
             'detailUrl' => route('portal.orders.show', $order),
+            'receiptUrl' => route('portal.orders.receipt', $order),
         ];
     }
 
@@ -357,6 +358,7 @@ class PortalPresenter
             'totalLabel' => $order->formattedTotal(),
             'currency' => $order->currency,
             'payUrl' => route('portal.orders.pay', $order),
+            'receiptUrl' => route('portal.orders.receipt', $order),
             'items' => $order->items->map(static fn ($item): array => [
                 'id' => $item->id,
                 'title' => $item->item_title_snapshot,

@@ -13,6 +13,7 @@ use App\Services\Booking\SessionBookingService;
 use App\Services\Payment\PaymentOrchestrationService;
 use App\Support\PortalPresenter;
 use App\Support\PublicCataloguePresenter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,6 +104,61 @@ class OrderController extends Controller
 
         return Inertia::render('Portal/Orders/Show', [
             'order' => PortalPresenter::orderDetail($order),
+        ]);
+    }
+
+    public function downloadReceipt(Request $request, Order $order): SymfonyResponse
+    {
+        abort_unless($order->user_id === $request->user()->id, 403);
+
+        $order->load([
+            'items.trainingSession',
+            'items.module',
+            'payments.refunds',
+            'bookings.trainingSession',
+            'moduleEntitlements.module',
+            'refunds',
+        ]);
+
+        $orderData = PortalPresenter::orderDetail($order);
+
+        $logoDataUri = null;
+        $jpegLogoPath = public_path('images/ecohydrotech-logo-pdf.jpg');
+        $pngLogoPath = public_path('images/ecohydrotech-logo.png');
+
+        if (is_file($jpegLogoPath)) {
+            $raw = file_get_contents($jpegLogoPath);
+            if ($raw !== false) {
+                $logoDataUri = 'data:image/jpeg;base64,'.base64_encode($raw);
+            }
+        } elseif (extension_loaded('gd') && is_file($pngLogoPath)) {
+            $raw = file_get_contents($pngLogoPath);
+            if ($raw !== false) {
+                $logoDataUri = 'data:image/png;base64,'.base64_encode($raw);
+            }
+        }
+
+        $isPaid = in_array($orderData['statusValue'], ['paid', 'completed'], true);
+        $latestPayment = $orderData['payments'][0] ?? null;
+
+        $pdf = Pdf::loadView('pdf.receipt', [
+            'order' => $orderData,
+            'logoDataUri' => $logoDataUri,
+            'isPaid' => $isPaid,
+            'latestPayment' => $latestPayment,
+            'generatedAtLabel' => now()->timezone(PortalPresenter::displayTimezone())->format('d M Y, h:i A').' MYT',
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOption('isRemoteEnabled', false)
+            ->setOption('isHtml5ParserEnabled', true);
+
+        $filename = sprintf('Ecohydrotech-Receipt-%s.pdf', preg_replace('/[^A-Za-z0-9_-]/', '', $order->order_number));
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

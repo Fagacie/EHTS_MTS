@@ -118,6 +118,7 @@ Route::prefix('portal')
         Route::get('/bookings/{booking:booking_reference}', [BookingController::class, 'show'])->name('bookings.show');
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/{order:order_number}', [OrderController::class, 'show'])->name('orders.show');
+        Route::get('/orders/{order:order_number}/receipt', [OrderController::class, 'downloadReceipt'])->name('orders.receipt');
         Route::post('/orders/{order:order_number}/pay', [OrderController::class, 'pay'])->name('orders.pay');
         Route::get('/modules', [LearningPortalController::class, 'modules'])->name('modules.index');
         Route::get('/modules/{module:slug}', [LearningPortalController::class, 'showModule'])->name('modules.show');
